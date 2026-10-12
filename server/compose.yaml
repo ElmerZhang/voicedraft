@@ -1,0 +1,16 @@
+services:
+  sync:
+    build: .
+    restart: unless-stopped
+    environment:
+      VOICEDRAFT_SYNC_TOKEN: ${VOICEDRAFT_SYNC_TOKEN:?Set a random token of at least 32 characters}
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - vault:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+volumes:
+  vault:

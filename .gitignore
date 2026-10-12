@@ -1,0 +1,7 @@
+.build/
+dist/
+.DS_Store
+*.sqlite3*
+.env
+__pycache__/
+.local/

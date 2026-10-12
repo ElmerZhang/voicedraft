@@ -1,6 +1,8 @@
 # VoiceDraft
 
-Read `~/.agents/company-knowledge/10-team/agents/shared-agent-rules.md`.
+This is a personal experimental project, not a company project.
+Follow this repository's instructions and documentation. Company-specific workflows do not apply.
+Do not register this project or write its code, configuration, documentation, or lessons to a company knowledge base.
 
 This is a standalone macOS app with a self-hosted encrypted synchronization service.
 Read `docs/architecture.md` before changing boundaries and `docs/roadmap.md` for scope.

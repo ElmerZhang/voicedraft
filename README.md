@@ -1,5 +1,7 @@
 # VoiceDraft
 
+VoiceDraft is a personal experimental project, independent of company projects and knowledge bases.
+
 A native macOS voice writing app with independently configurable Qwen speech and writing models, plus a self-hosted encrypted configuration vault. This is a runnable first release, not full Typeless feature parity.
 
 ## Run the Mac app

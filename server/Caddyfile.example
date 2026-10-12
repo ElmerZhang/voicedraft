@@ -1,0 +1,6 @@
+sync.example.com {
+    request_body {
+        max_size 1400KB
+    }
+    reverse_proxy 127.0.0.1:8765
+}

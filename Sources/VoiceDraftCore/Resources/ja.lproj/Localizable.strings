@@ -291,3 +291,5 @@
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  どのアプリでも開始／終了";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  翻訳      ⌃ ⌥ E  選択テキストを編集      ⌃ ⌥ A  質問";
 "The connection is too slow for live transcription. Please try again." = "接続が遅すぎるため、リアルタイム認識を続けられません。もう一度お試しください。";
+"Could not copy the result." = "結果をコピーできませんでした。";
+"The app did not confirm insertion. Check the input field before copying the result." = "入力を確認できませんでした。結果をコピーする前に入力欄を確認してください。";

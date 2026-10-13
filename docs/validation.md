@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-10-13 · Confirm actual insertion and dismiss after copying
+
+- After the user reported another failure, the running app showed `Text inserted` while its Accessibility permission was valid. The old AXSelectedText fast path returned immediately on AX success. Inspection of the local Chromium source found that its Cocoa setter dispatches `kReplaceSelectedText`, while `BrowserAccessibility::AccessibilityPerformAction` has no implementation for that action. This supports a silent no-op failure path; the previous app had no per-attempt trace proving which insertion branch ran.
+- Removed the AXSelectedText write fast path. All eligible destinations now receive one normal Command-V, followed by a bounded observation of the original input's expected value/caret. Unchanged fields no longer count as successful insertion, and a missing confirmation does not trigger a duplicate paste. Clipboard restoration remains conditional on no intervening copy.
+- Five new regression tests cover an acknowledged-but-unchanged editor, selection replacement with Chinese/emoji UTF-16 offsets, rich editors without AXValue, identical replacement, and missing/invalid ranges. `python3 scripts/test-all.py` passed all 64 Swift tests and all 6 Python server tests, including both localhost integrations. Both localization checks (295 shared / 65 desktop messages in eight languages), final release packaging, signing, Info.plist and diff checks passed. No real audio or provider request was used by automated tests.
+- The result card now calls its existing close action immediately after a successful clipboard write; failure keeps the card available. Invoked Copy on the final isolated synthetic HUD. The UI inspection tool timed out looking for its window afterwards, so this is not independent visual proof of disappearance. Preview reopen handling now avoids resurrecting a copied card when an inspection tool activates the app.
+- Relaunched the final regular bundle with the existing 16 history entries, models, vocabulary and input-device settings preserved. Renewed the current bundle's stale ad-hoc Accessibility entry under the user's existing authorization; the running app's internal permission indicator passed. Actual microphone-to-Google-Translate insertion remains pending the user's recording check.
+
 ## 2026-10-13 · Web input eligibility and missing Accessibility authorization
 
 - Extended focused-text eligibility to accept writable selection ranges on text input roles. Browser editors can support caret movement and keyboard paste even when AX cannot replace their selected text or value. Non-text roles, disabled controls, and password inputs remain excluded; app/element/selection/range revalidation before insertion is unchanged.

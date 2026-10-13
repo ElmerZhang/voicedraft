@@ -156,7 +156,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     @objc func showWindow() {
-        if hudPreviewOnly { showHUD(); return }
+        if hudPreviewOnly {
+            // Inspecting an app can issue a reopen event. Do not resurrect a
+            // copied preview card; this also lets native checks observe dismissal.
+            if !state.hudCopied { showHUD() }
+            return
+        }
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
     private func captureHUDPreviews(to path: String) {

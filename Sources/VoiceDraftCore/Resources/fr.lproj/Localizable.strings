@@ -291,3 +291,5 @@
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Espace  Démarrer ou terminer dans toute app";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  Traduire      ⌃ ⌥ E  Modifier la sélection      ⌃ ⌥ A  Questionner";
 "The connection is too slow for live transcription. Please try again." = "La connexion est trop lente pour la transcription en direct. Réessayez.";
+"Could not copy the result." = "Impossible de copier le résultat.";
+"The app did not confirm insertion. Check the input field before copying the result." = "La saisie n’a pas été confirmée. Vérifiez le champ avant de copier le résultat.";

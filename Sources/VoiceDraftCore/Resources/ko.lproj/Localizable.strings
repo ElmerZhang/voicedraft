@@ -291,3 +291,5 @@
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  모든 앱에서 시작/종료";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  번역      ⌃ ⌥ E  선택 텍스트 수정      ⌃ ⌥ A  질문";
 "The connection is too slow for live transcription. Please try again." = "연결이 너무 느려 실시간 받아쓰기를 계속할 수 없습니다. 다시 시도하세요.";
+"Could not copy the result." = "결과를 복사하지 못했습니다.";
+"The app did not confirm insertion. Check the input field before copying the result." = "입력 여부를 확인하지 못했습니다. 결과를 복사하기 전에 입력란을 확인하세요.";

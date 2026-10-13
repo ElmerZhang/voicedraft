@@ -58,3 +58,9 @@
 "Automatic insertion" = "自動挿入";
 "Accessibility" = "アクセシビリティ";
 "Start with your models" = "モデルの設定から始める";
+"Live transcript" = "リアルタイム認識";
+"Say corrections before finishing" = "終了前に声で訂正できます";
+"Finish dictation" = "音声入力を完了";
+"Could not finish" = "完了できませんでした";
+"Copy last transcript" = "認識結果をコピー";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "対応モデルを選択してください。Message モデルは話している間に文字を表示し、HTTP モデルは録音終了後に認識します。辞書は選択したモデルに合わせて適用されます。";

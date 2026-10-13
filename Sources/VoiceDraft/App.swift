@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 import VoiceDraftCore
 
 @main
@@ -46,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var state: AppState!
     private var window: NSWindow!
     private var hud: NSPanel!
+    private var hudObservation: AnyCancellable?
+    private var hudScreen: NSScreen?
+    private var hudPreviewOnly = false
     private var statusItem: NSStatusItem!
     private let shortcuts = GlobalShortcuts()
     private var menuKeys: [ObjectIdentifier: String] = [:]
@@ -54,7 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         let previewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_PREVIEWS"]
-        let isolatedPreview = previewDirectory != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
+        let hudPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_HUD_PREVIEWS"]
+        let hudPreview = ProcessInfo.processInfo.environment["VOICEDRAFT_HUD_PREVIEW"]
+        hudPreviewOnly = hudPreview != nil
+        let isolatedPreview = previewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
         state = AppState(preview: isolatedPreview)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -63,14 +70,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: DesktopRootView(state: state))
         window.center()
-        hud = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 516, height: 102), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        hud = DictationPanel(contentRect: NSRect(origin: .zero, size: DictationHUDKind.compact.size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         hud.level = .floating; hud.isOpaque = false; hud.backgroundColor = .clear; hud.hasShadow = true
+        hud.title = "VoiceDraft Dictation"
         hud.hidesOnDeactivate = false
         hud.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hud.contentView = NSHostingView(rootView: RecordingHUD(state: state))
         state.showMain = { [weak self] in self?.showWindow() }
         state.showHUD = { [weak self] in self?.showHUD() }
         state.hideHUD = { [weak self] in self?.hud.orderOut(nil) }
+        hudObservation = state.$hudKind.sink { [weak self] kind in
+            DispatchQueue.main.async { self?.resizeHUD(kind) }
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "VoiceDraft")
         updateStatusMenu()
@@ -87,8 +98,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !isolatedPreview {
             do { try shortcuts.install() } catch { state.error = .init(error: error) }
         }
-        showWindow()
+        if !hudPreviewOnly { showWindow() }
         if let previewDirectory { capturePreviews(to: previewDirectory) }
+        else if let hudPreviewDirectory { captureHUDPreviews(to: hudPreviewDirectory) }
+        else if let hudPreview { state.prepareHUDPreview(hudPreview); showHUD() }
     }
     private func updateStatusMenu() {
         let menu = NSMenu()
@@ -142,16 +155,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
         }
     }
-    @objc func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    private func showHUD() {
-        if let screen = NSScreen.main {
-            hud.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - hud.frame.width / 2, y: screen.visibleFrame.minY + 38))
+    @objc func showWindow() {
+        if hudPreviewOnly { showHUD(); return }
+        window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    private func captureHUDPreviews(to path: String) {
+        Task {
+            do {
+                let directory = URL(fileURLWithPath: path, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                for name in ["recording", "live", "processing", "result", "long-result", "failure"] {
+                    state.prepareHUDPreview(name); showHUD()
+                    try await Task.sleep(nanoseconds: 300_000_000)
+                    guard let view = hud.contentView else { continue }
+                    view.layoutSubtreeIfNeeded()
+                    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
+                    try data.write(to: directory.appendingPathComponent(name + ".png"))
+                }
+                print("Rendered six synthetic HUD states without microphone, model, Keychain, or persisted data access.")
+            } catch { fputs("HUD preview failed: \(error.localizedDescription)\n", stderr) }
+            NSApp.terminate(nil)
         }
+    }
+    private func showHUD() {
+        if !hud.isVisible { hudScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main }
+        resizeHUD(state.hudKind)
         hud.orderFrontRegardless()
+    }
+    private func resizeHUD(_ kind: DictationHUDKind) {
+        guard let hud else { return }
+        let size = kind.size
+        if let screen = hudScreen ?? NSScreen.main {
+            hud.setFrame(NSRect(x: screen.visibleFrame.midX - size.width / 2,
+                                y: screen.visibleFrame.minY + 16, width: size.width, height: size.height), display: true)
+        } else { hud.setContentSize(size) }
     }
     @objc private func toggleRecording() { state.toggle(external: true) }
     @objc private func quitApp() { state.cancel(); NSApp.terminate(nil) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
     func applicationWillTerminate(_ notification: Notification) { state.cancel() }
+}
+
+// The recording/result controls must never replace the original editor's keyboard focus.
+private final class DictationPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }

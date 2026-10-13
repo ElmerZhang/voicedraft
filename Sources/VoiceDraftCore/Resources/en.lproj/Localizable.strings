@@ -290,3 +290,4 @@
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50.";
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  to start or finish in any app";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask";
+"The connection is too slow for live transcription. Please try again." = "The connection is too slow for live transcription. Please try again.";

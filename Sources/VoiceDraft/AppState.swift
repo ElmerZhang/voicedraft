@@ -32,6 +32,14 @@ final class AppState: ObservableObject {
     private var store: LocalStore?
     let preview: Bool
     private let recorder = AudioRecorder()
+    private let liveRecorder = LiveAudioRecorder()
+    private var liveFeed: LiveAudioFeed?
+    private var stopTask: Task<Void, Never>?
+    @Published private(set) var liveTranscript = ""
+    @Published private(set) var hudKind = DictationHUDKind.compact
+    @Published private(set) var hudText = ""
+    @Published private(set) var hudCopied = false
+    private var runAutoPaste = false
     @Published private(set) var inputDevices: [AudioInputDevice] = []
     @Published private(set) var defaultInputID: String?
     @Published private(set) var recordingDeviceName = ""
@@ -63,6 +71,23 @@ final class AppState: ObservableObject {
     var hideHUD: (() -> Void)?
     var busy: Bool { phase != "idle" }
     var recording: Bool { phase == "recording" }
+
+    /// Synthetic UI fixtures only; this path cannot load keys, record, or call a model.
+    func prepareHUDPreview(_ name: String) {
+        guard preview else { return }
+        phase = "idle"; elapsed = 12; level = 0.45; hudCopied = false; error = ""
+        recordingDeviceName = "Preview microphone"
+        liveTranscript = "周二下午三点开会。\n不对，把刚才的周二改成周四，时间不变。"
+        hudText = "周四下午三点开会。"; result = hudText
+        switch name {
+        case "recording": phase = "recording"; hudKind = .compact
+        case "live": phase = "recording"; hudKind = .live
+        case "processing": phase = "processing"; hudKind = .live
+        case "failure": hudKind = .failure; hudText = liveTranscript; error = "The speech connection ended before the final result."
+        case "long-result": hudKind = .result; hudText = Array(repeating: "这是用于检查长文本滚动的示例，不会发送到任何模型。", count: 18).joined(separator: "\n")
+        default: hudKind = .result
+        }
+    }
 
     init(preview: Bool = false) {
         self.preview = preview
@@ -222,108 +247,164 @@ final class AppState: ObservableObject {
         if recording { finish(); return }
         guard !busy else { return }
         if let override { mode = override }
-        error = ""; notice = ""
+        error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact
+        generation = UUID(); let id = generation
         target = external ? TextInsertion.capture() : nil
-        if target?.secure == true { error = "Voice input is disabled in password fields."; showMain?(); return }
-        runMode = mode; runSettings = settings
+        runMode = mode; runSettings = settings; runAutoPaste = device.autoPaste
         runSelection = external ? (target?.selection ?? "") : selection
         do {
+            if target?.secure == true { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
             guard let speech = settings.speech, let writing = settings.writing else {
                 throw VoiceDraftError.message("Choose your speech and writing models.")
             }
-            try speech.validateForInference()
-            try settings.vocabulary.validate()
+            try speech.validateForInference(); try settings.vocabulary.validate()
             if mode != .verbatim { try writing.validateForInference() }
             runSpeechKey = try key(for: speech); runWritingKey = try key(for: writing)
             guard !runSpeechKey.isEmpty else { throw VoiceDraftError.message("Add your Bailian API key in Models first.") }
             if mode != .verbatim, runWritingKey.isEmpty { throw VoiceDraftError.message("Add an API key for the writing model first.") }
             if mode == .edit && runSelection.isEmpty { throw VoiceDraftError.message("Select text in the destination app before using Edit selection.") }
-        } catch { self.error = .init(error: error); showMain?(); return }
+        } catch { fail(error, id: id); return }
         let inputDeviceID = device.inputDeviceID
-        recordingDeviceName = ""
-        phase = "starting"; status = "Opening microphone…"; elapsed = 0
-        generation = UUID(); let id = generation
+        recordingDeviceName = ""; elapsed = 0; level = 0
+        phase = "starting"; status = "Opening microphone…"
         showHUD?()
-        task = Task { [self] in
-            do {
-                let input = try await recorder.start(preferredID: inputDeviceID)
-                guard generation == id else { return }
-                recordingDeviceName = input.name
-                phase = "recording"; status = "Listening · speak naturally"
-                tick = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-                    Task { @MainActor in
-                        guard let self, self.recording else { return }
-                        if let failure = self.recorder.failure { self.fail(failure, id: id); return }
-                        self.elapsed = self.recorder.elapsed; self.level = self.recorder.level
-                        if self.elapsed >= 240 { self.finish() }
+        if let speech = settings.speech, speech.adapter == .qwenMessageWebSocket {
+            let feed = LiveAudioFeed(), vocabulary = settings.vocabulary, speechKey = runSpeechKey
+            liveFeed = feed
+            task = Task { [self] in
+                do {
+                    let raw = try await SpeechClient.transcribeLive(profile: speech, key: speechKey, audio: feed.stream, vocabulary: vocabulary,
+                        onReady: { [weak self] in
+                            guard let self else { throw CancellationError() }
+                            try await self.beginLiveCapture(id: id, inputID: inputDeviceID, feed: feed)
+                        }, onUpdate: { [weak self] text in
+                            await self?.updateLiveTranscript(text, id: id)
+                        })
+                    try Task.checkCancellation(); guard generation == id else { return }
+                    guard phase == "processing", elapsed >= 0.25 else {
+                        throw VoiceDraftError.message("The recording was too short. Try again.")
                     }
-                }
-            } catch { fail(error, id: id) }
+                    try await deliverTranscript(raw, id: id, duration: elapsed)
+                } catch { fail(error, id: id) }
+            }
+        } else {
+            liveFeed = nil
+            task = Task { [self] in
+                do {
+                    let input = try await recorder.start(preferredID: inputDeviceID)
+                    try Task.checkCancellation(); guard generation == id else { return }
+                    captureDidStart(input, id: id)
+                } catch { fail(error, id: id) }
+            }
         }
+    }
+    private func beginLiveCapture(id: UUID, inputID: String?, feed: LiveAudioFeed) async throws {
+        guard generation == id, phase == "starting" else { throw CancellationError() }
+        let input = try await liveRecorder.start(preferredID: inputID, feed: feed)
+        try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
+        captureDidStart(input, id: id)
+    }
+    private func captureDidStart(_ input: AudioInputDevice, id: UUID) {
+        recordingDeviceName = input.name; phase = "recording"; status = "Listening · speak naturally"
+        tick = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.generation == id, self.recording else { return }
+                let failure = self.liveFeed != nil ? self.liveRecorder.failure : self.recorder.failure
+                if let failure { self.fail(failure, id: id); return }
+                self.elapsed = self.liveFeed != nil ? self.liveRecorder.elapsed : self.recorder.elapsed
+                self.level = self.liveFeed != nil ? self.liveRecorder.level : self.recorder.level
+                if self.elapsed >= 240 { self.finish() }
+            }
+        }
+    }
+    private func updateLiveTranscript(_ text: String, id: UUID) {
+        guard generation == id, busy else { return }
+        liveTranscript = text
+        if !text.isEmpty { hudKind = .live }
     }
     func finish() {
         guard recording, let configuration = runSettings, let speech = configuration.speech else { return }
-        tick?.invalidate(); tick = nil; elapsed = recorder.elapsed
-        let duration = elapsed, id = generation, mode = runMode, selected = runSelection, destination = target
-        let speechKey = runSpeechKey, writingKey = runWritingKey
+        tick?.invalidate(); tick = nil
+        elapsed = liveFeed != nil ? liveRecorder.elapsed : recorder.elapsed
+        let duration = elapsed, id = generation, speechKey = runSpeechKey
         phase = "processing"; status = "Recognizing with Qwen…"
-        task = Task {
-            do {
-                let wav = try await recorder.stop()
-                try Task.checkCancellation(); guard generation == id else { return }
-                guard duration >= 0.25 else { throw VoiceDraftError.message("The recording was too short. Try again.") }
-                let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary)
-                try Task.checkCancellation(); guard generation == id else { return }
-                transcript = raw; result = ""
-                var output = raw
-                if mode != .verbatim, let writing = configuration.writing {
-                    status = "Writing with \(writing.name)…"
-                    let request = try QwenRequests.writing(profile: writing, key: writingKey, text: raw, mode: mode,
-                        settings: configuration, selection: selected, application: destination?.name ?? "VoiceDraft")
-                    do { output = try await HTTPTransport().complete(request) }
-                    catch {
-                        guard !Task.isCancelled else { throw CancellationError() }
-                        result = raw
-                        saveHistory(mode: .verbatim, original: raw, output: raw, app: destination?.name ?? "VoiceDraft", duration: duration)
-                        throw VoiceDraftError.message("Writing failed. Your transcript is preserved. \(error.localizedDescription)")
-                    }
-                }
-                try Task.checkCancellation(); guard generation == id else { return }
-                result = output
-                saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
-                if let destination, device.autoPaste, mode != .ask {
-                    status = "Inserting text…"
-                    do {
-                        try await TextInsertion.insert(output, into: destination)
-                        guard generation == id else { return }
-                        status = "Text inserted"
-                    } catch {
-                        guard generation == id else { return }
-                        self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
-                    }
-                } else {
-                    status = "Your text is ready"
-                    if mode == .ask { page = "Studio"; showMain?() }
-                }
-                phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""
-                closeHUDAfterDelay(id: id)
-            } catch { fail(error, id: id) }
+        if liveFeed != nil {
+            // Closing capture flushes the last PCM frame; the existing receive task waits for finals.
+            stopTask = Task {
+                do { try await liveRecorder.stop() }
+                catch { fail(error, id: id) }
+            }
+        } else {
+            task = Task {
+                do {
+                    let wav = try await recorder.stop()
+                    try Task.checkCancellation(); guard generation == id else { return }
+                    guard duration >= 0.25 else { throw VoiceDraftError.message("The recording was too short. Try again.") }
+                    let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary)
+                    try Task.checkCancellation(); guard generation == id else { return }
+                    try await deliverTranscript(raw, id: id, duration: duration)
+                } catch { fail(error, id: id) }
+            }
         }
     }
-    func cancel() {
-        generation = UUID(); task?.cancel(); recorder.cancel(); tick?.invalidate(); tick = nil
-        phase = "idle"; level = 0; status = "Cancelled"; runSpeechKey = ""; runWritingKey = ""; hideHUD?()
+    private func deliverTranscript(_ raw: String, id: UUID, duration: Double) async throws {
+        guard generation == id, let configuration = runSettings else { throw CancellationError() }
+        let mode = runMode, selected = runSelection, destination = target, writingKey = runWritingKey
+        transcript = raw; result = ""
+        var output = raw
+        if mode != .verbatim, let writing = configuration.writing {
+            status = "Writing with \(writing.name)…"
+            let request = try QwenRequests.writing(profile: writing, key: writingKey, text: raw, mode: mode,
+                settings: configuration, selection: selected, application: destination?.name ?? "VoiceDraft")
+            do { output = try await HTTPTransport().complete(request) }
+            catch {
+                try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
+                result = raw; hudText = raw
+                saveHistory(mode: .verbatim, original: raw, output: raw, app: destination?.name ?? "VoiceDraft", duration: duration)
+                throw VoiceDraftError.message("Writing failed. Your transcript is preserved. \(error.localizedDescription)")
+            }
+        }
+        try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
+        result = output
+        saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
+        var inserted = false
+        if let destination, destination.editable, runAutoPaste, mode != .ask {
+            status = "Inserting text…"
+            do {
+                try await TextInsertion.insert(output, into: destination)
+                try Task.checkCancellation(); guard generation == id else { return }
+                inserted = true; status = "Text inserted"
+            } catch {
+                try Task.checkCancellation(); guard generation == id else { return }
+                self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
+            }
+        } else { status = "Your text is ready" }
+        phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
+        if inserted { hudKind = .compact; closeHUDAfterDelay(id: id) }
+        else { hudText = output; hudKind = .result; showHUD?() }
     }
+    func cancel() {
+        generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
+        recorder.cancel(); liveRecorder.cancel(); tick?.invalidate(); tick = nil
+        phase = "idle"; level = 0; status = "Cancelled"; runSpeechKey = ""; runWritingKey = ""
+        liveTranscript = ""; hudText = ""; hudKind = .compact; hideHUD?()
+    }
+    func dismissHUD() { if busy { cancel() } else { hideHUD?() } }
+    func copyHUDResult() { copyResult(hudText); hudCopied = true }
     private func fail(_ error: Error, id: UUID) {
         guard generation == id else { return }
-        recorder.cancel(); tick?.invalidate(); tick = nil; phase = "idle"; level = 0
+        generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
+        recorder.cancel(); liveRecorder.cancel(); tick?.invalidate(); tick = nil; phase = "idle"; level = 0
         runSpeechKey = ""; runWritingKey = ""
-        if error is CancellationError { status = "Cancelled" }
-        else { self.error = .init(error: error); status = "Something needs attention"; showMain?() }
-        closeHUDAfterDelay(id: id)
+        if error is CancellationError { status = "Cancelled"; hideHUD?() }
+        else {
+            self.error = .init(error: error); status = "Something needs attention"
+            if hudText.isEmpty { hudText = liveTranscript }
+            hudKind = .failure; showHUD?()
+        }
     }
     private func closeHUDAfterDelay(id: UUID) {
-        Task { try? await Task.sleep(nanoseconds: 2_000_000_000); if generation == id && !busy { hideHUD?() } }
+        Task { try? await Task.sleep(nanoseconds: 1_200_000_000); if generation == id && !busy { hideHUD?() } }
     }
     private func saveHistory(mode: WritingMode, original: String, output: String, app: String, duration: Double) {
         guard device.keepHistory else { return }
@@ -341,6 +422,7 @@ final class AppState: ObservableObject {
     }
     func processText() {
         guard !busy, !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        liveTranscript = ""; hudText = ""; hudCopied = false; hideHUD?()
         generation = UUID(); let id = generation
         phase = "processing"; status = "Writing with Qwen…"; error = ""
         let configuration = settings, mode = mode, raw = transcript, selected = selection

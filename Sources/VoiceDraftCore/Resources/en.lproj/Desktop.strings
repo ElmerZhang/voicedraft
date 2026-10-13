@@ -58,3 +58,9 @@
 "Automatic insertion" = "Automatic insertion";
 "Accessibility" = "Accessibility";
 "Start with your models" = "Start with your models";
+"Live transcript" = "Live transcript";
+"Say corrections before finishing" = "Say corrections before finishing";
+"Finish dictation" = "Finish dictation";
+"Could not finish" = "Could not finish";
+"Copy last transcript" = "Copy last transcript";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model.";

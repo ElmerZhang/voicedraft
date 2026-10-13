@@ -58,12 +58,17 @@ public enum MessageASRRequests {
         request.setValue("Bearer \(try QwenRequests.validKey(key, name: profile.name))", forHTTPHeaderField: "Authorization")
         return request
     }
-    public static func start(profile: ModelProfile, vocabulary: AppVocabulary, taskID: String) throws -> String {
+    public static func start(profile: ModelProfile, vocabulary: AppVocabulary, taskID: String, live: Bool = false) throws -> String {
         try profile.validateForInference()
         guard profile.adapter == .qwenMessageWebSocket else { throw VoiceDraftError.message("Choose a Message speech model.") }
         var parameters = try profile.modelParameters()
-        parameters["format"] = "wav"; parameters["sample_rate"] = 16000
-        parameters["intermediate_result_enabled"] = false
+        parameters["format"] = live ? "pcm" : "wav"; parameters["sample_rate"] = 16000
+        parameters["intermediate_result_enabled"] = live
+        if live {
+            parameters["heartbeat"] = parameters["heartbeat"] ?? true
+            // Keep spoken corrections in the transcript for the writing stage.
+            parameters["disfluency_removal_enabled"] = false
+        }
         try vocabulary.validate()
         let words = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability).weighted
         if !words.isEmpty { parameters["vocabulary"] = words }
@@ -89,6 +94,10 @@ public struct MessageASRResults {
     public private(set) var started = false
     public private(set) var finished = false
     private var sentences: [Int: String] = [:]
+    private var hypotheses: [Int: String] = [:]
+    public var preview: String {
+        sentences.merging(hypotheses) { final, _ in final }.sorted { $0.key < $1.key }.map(\.value).filter { !$0.isEmpty }.joined(separator: "\n")
+    }
     public init(taskID: String) { self.taskID = taskID }
     public mutating func accept(_ text: String) throws {
         guard text.utf8.count <= 1_000_000,
@@ -110,12 +119,15 @@ public struct MessageASRResults {
                 throw VoiceDraftError.message("Unexpected speech result. Please try again.")
             }
             if sentence["heartbeat"] as? Bool == true { return }
-            guard sentence["sentence_end"] as? Bool == true else { return }
             guard let id = sentence["sentence_id"] as? Int, (1...10_000).contains(id),
                   let value = sentence["text"] as? String, value.utf8.count <= 100_000 else {
                 throw VoiceDraftError.message("The speech service returned an invalid sentence.")
             }
-            sentences[id] = value
+            if sentence["sentence_end"] as? Bool == true {
+                sentences[id] = value; hypotheses.removeValue(forKey: id)
+            } else if sentences[id] == nil {
+                hypotheses[id] = value
+            }
         case "task-finished":
             guard started else { throw VoiceDraftError.message("The speech task ended before it started.") }
             finished = true
@@ -123,7 +135,9 @@ public struct MessageASRResults {
         }
     }
     public func transcript() throws -> String {
-        guard finished else { throw VoiceDraftError.message("The speech connection ended before the final result.") }
+        guard finished, hypotheses.values.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            throw VoiceDraftError.message("The speech connection ended before the final result.")
+        }
         return try QwenRequests.nonempty(sentences.keys.sorted().compactMap { sentences[$0] }.joined(separator: "\n"))
     }
 }
@@ -137,7 +151,7 @@ protocol ASRWebSocket: Sendable {
     func cancel()
 }
 
-private final class NativeASRWebSocket: ASRWebSocket, @unchecked Sendable {
+final class NativeASRWebSocket: ASRWebSocket, @unchecked Sendable {
     private let session: URLSession
     private let socket: URLSessionWebSocketTask
     init(request: URLRequest) {

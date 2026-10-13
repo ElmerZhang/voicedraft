@@ -1,5 +1,15 @@
 # Validation record
 
+## 2026-10-13 · Compact HUD, copy fallback, and live Message ASR
+
+- Added 13 synthetic tests for live request parameters, sentence revisions, incomplete final tails, live updates before stop, exact PCM frame/tail delivery, cancellation during handshake/capture/upload/final wait, deadlines, early completion/disconnect/send errors, capture startup failure, bounded-buffer overflow, spoken-correction writing requests, and negotiated PCM validation/metering.
+- `python3 scripts/test-all.py` passed all 55 Swift tests (including both localhost integration cases; no skips) and all 6 Python server tests. The initial sandbox attempt failed because localhost binding is prohibited; the isolated fixture suite then passed outside that restriction. No real audio, selections, credentials, or model services were used by the tests.
+- Both localization checks passed: 293 shared messages and 65 desktop messages in eight languages. Release packaging, ICNS verification, code signature verification, and Info.plist validation passed. The existing Home testing workspace remains available.
+- Rendered and inspected six native synthetic HUD states: compact recording, live preview, processing, copy result, long scrollable result, and failure, in `dist/hud-previews/`. In the isolated native preview, clicking Copy changed the card to Copied; cancelling the live preview cleared the recording state and disabled Finish. The inspection tool reopens a preview window when observing it, so disappearance after Dismiss was not independently verified through that tool.
+- Relaunched `dist/VoiceDraft.app` and verified it opened idle with the existing Message speech model, writing model, Wireless Mic Rx input selection, four active terms, and nine saved history entries. The prior completed result was confirmed in History before relaunch. Synthetic fixture data was not written to the regular app.
+- Not exercised: live hardware capture/conversion on the selected microphone, a real Bailian WebSocket, measured partial-result latency, model accuracy for spoken corrections, or actual editor insertion/focus changes. These still require a short user recording test. Protocol/cancellation fixtures and native rendering are not substitutes for that end-to-end check. HTTP adapters continue using the prior recorded-file workflow.
+- Preview reproduction: set `VOICEDRAFT_CAPTURE_HUD_PREVIEWS` to an output directory when launching a separately identified preview bundle. For interaction, use `VOICEDRAFT_HUD_PREVIEW=result` or `live`. These switches force isolated preview state with no persisted configuration, Keychain access, or global shortcuts.
+
 ## Desktop visual and interaction acceptance — 2026-10-13
 
 - Rendered Home, History, Dictionary, Settings, Models, and Sync in the native app. Compared the four primary layouts with the supplied reference screenshots: white content, rounded light-gray sidebar, large headings, key caps, word grid, daily history rows, and a dimmed settings overlay. Home retains the full Studio test workspace. The sidebar Models button was removed by the parallel navigation change; its settings entry remains available.

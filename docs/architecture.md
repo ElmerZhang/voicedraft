@@ -26,6 +26,8 @@ An active run captures its selected models, credentials, vocabulary, mode, selec
 
 ## System integration
 
+SwiftUI owns the application menu through scene commands; AppKit owns the main window and recording panel. Standard editing shortcuts (undo, redo, cut, copy, paste, and select all) dispatch through AppKit's responder chain to the focused editor, including model configuration sheets. Do not assign `NSApp.mainMenu` during launch: SwiftUI can replace it when assembling its scene menus.
+
 Carbon global hotkeys start/stop workflows. A nonactivating AppKit panel displays recording state without stealing focus. Accessibility captures the frontmost application's focused element and selected range/text. Before insertion, the app rechecks process, field, selection, and range. Password fields are excluded.
 
 Insertion first uses the Accessibility selected-text attribute when supported. Otherwise it temporarily supplies the clipboard and sends Command-V. Existing clipboard formats are restored after 800 ms only if no newer clipboard change occurred. Paste is best effort; slow or nonstandard editors may need manual copying. The app never sends Enter or runs a model-generated command. Selected-text access and insertion require real-app compatibility testing.

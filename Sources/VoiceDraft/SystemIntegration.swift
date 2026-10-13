@@ -3,43 +3,6 @@ import AVFoundation
 import Carbon
 import VoiceDraftCore
 
-@MainActor
-final class AudioRecorder {
-    private var recorder: AVAudioRecorder?
-    private var url: URL?
-    var elapsed: Double { recorder?.currentTime ?? 0 }
-    var level: Double {
-        recorder?.updateMeters()
-        return max(0.02, min(1, pow(10, Double(recorder?.averagePower(forChannel: 0) ?? -60) / 30)))
-    }
-    func start() async throws {
-        let allowed = await AVCaptureDevice.requestAccess(for: .audio)
-        try Task.checkCancellation()
-        guard allowed else { throw VoiceDraftError.message("Enable VoiceDraft in System Settings > Privacy & Security > Microphone.") }
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("voicedraft-\(UUID().uuidString).wav")
-        let audio = try AVAudioRecorder(url: file, settings: [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 16_000,
-            AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,
-            AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false
-        ])
-        audio.isMeteringEnabled = true
-        guard audio.prepareToRecord(), audio.record() else { throw VoiceDraftError.message("The microphone could not start. Check your input device.") }
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
-        recorder = audio; url = file
-    }
-    func stop() throws -> Data {
-        recorder?.stop(); recorder = nil
-        guard let url else { throw VoiceDraftError.message("No recording is available.") }
-        defer { try? FileManager.default.removeItem(at: url); self.url = nil }
-        return try Data(contentsOf: url)
-    }
-    func cancel() {
-        recorder?.stop(); recorder = nil
-        if let url { try? FileManager.default.removeItem(at: url) }
-        url = nil
-    }
-}
-
 struct InputTarget {
     let pid: pid_t
     let name: String

@@ -1,0 +1,1 @@
+"NSMicrophoneUsageDescription" = "VoiceDraft は音声入力の開始時に録音し、設定した Alibaba Cloud の音声認識モデルに送信します。";

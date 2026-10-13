@@ -87,12 +87,14 @@ final class MessageASRTests: XCTestCase {
         var p = ModelProfile.qwen(.speech); p.selectModel("qwen-audio-3.1-asr-flash-message"); return p
     }
     private func run(_ socket: FixtureSocket, timeout: UInt64 = 2_000_000_000) async throws -> String {
-        let start = try MessageASRRequests.start(profile: profile(), hotwords: "Test", taskID: socket.id)
+        let start = try MessageASRRequests.start(profile: profile(), vocabulary: AppVocabulary(words: "Test"), taskID: socket.id)
         return try await MessageASRSession.transcribe(socket: socket, start: start, wav: Data(repeating: 0, count: 7200), taskID: socket.id, timeoutNanoseconds: timeout)
     }
 
     func testMessageHandshakeAndEnvelopeUseWebSocketAndModelCapabilities() throws {
-        var p = profile(); p.speechOptions.hotwords = [.init(text: "Test", weight: 50)]
+        var p = profile()
+        var vocabulary = AppVocabulary(words: "Other")
+        vocabulary.entries.append(.init(text: "Test", priority: true))
         p.extraJSON = #"{"keep_dialect":true,"disfluency_removal_enabled":false}"#
         let request = try MessageASRRequests.connection(profile: p, key: "synthetic-key\n")
         XCTAssertEqual(request.url?.scheme, "wss")
@@ -100,7 +102,7 @@ final class MessageASRTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-key")
         XCTAssertNil(request.httpBody)
         let id = UUID().uuidString
-        let text = try MessageASRRequests.start(profile: p, hotwords: "Other", taskID: id)
+        let text = try MessageASRRequests.start(profile: p, vocabulary: vocabulary, taskID: id)
         let root = try JSONSerialization.jsonObject(with: Data(text.utf8)) as! [String: Any]
         let header = root["header"] as! [String: String]
         XCTAssertEqual(header, ["action": "run-task", "task_id": id, "streaming": "duplex"])
@@ -114,7 +116,7 @@ final class MessageASRTests: XCTestCase {
         XCTAssertEqual(params["vocabulary"] as? [String: Int], ["Test": 50, "Other": 3])
         XCTAssertEqual(params["keep_dialect"] as? Bool, true)
         XCTAssertFalse(text.contains("synthetic-key"))
-        XCTAssertThrowsError(try QwenRequests.speech(profile: p, key: "synthetic-key", wav: Data([1]), vocabulary: ""))
+        XCTAssertThrowsError(try QwenRequests.speech(profile: p, key: "synthetic-key", wav: Data([1]), vocabulary: AppVocabulary(words: "")))
     }
 
     func testFinalSentencesReplaceDuplicatesAndIgnorePartialAndHeartbeatEvents() throws {

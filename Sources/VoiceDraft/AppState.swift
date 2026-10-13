@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 import CryptoKit
 import VoiceDraftCore
@@ -9,21 +10,44 @@ final class AppState: ObservableObject {
     @Published private(set) var device = DeviceSettings()
     @Published private(set) var history: [HistoryEntry] = []
     @Published var page = "Studio"
+    @Published private(set) var interfaceLanguage = L10n.language
+    var languageChanged: (() -> Void)?
+    func setLanguage(_ value: AppLanguage) {
+        L10n.language = value
+        interfaceLanguage = value
+        languageChanged?()
+    }
     @Published var mode: WritingMode = .polish
     @Published var transcript = ""
     @Published var result = ""
     @Published var selection = ""
-    @Published var status = "Ready when you are"
-    @Published var error = ""
+    @Published var status: LocalizedMessage = "Ready when you are"
+    @Published var error: LocalizedMessage = ""
     @Published private(set) var phase = "idle"
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var level: Double = 0
-    @Published private(set) var syncStatus = "Not connected"
+    @Published private(set) var syncStatus: LocalizedMessage = "Not connected"
     @Published private(set) var syncing = false
-    @Published var notice = ""
+    @Published var notice: LocalizedMessage = ""
     private var store: LocalStore?
     let preview: Bool
     private let recorder = AudioRecorder()
+    @Published private(set) var inputDevices: [AudioInputDevice] = []
+    @Published private(set) var defaultInputID: String?
+    @Published private(set) var recordingDeviceName = ""
+    private var inputObservers: [NSObjectProtocol] = []
+    func refreshInputDevices() {
+        guard !preview else { return }
+        inputDevices = AudioRecorder.devices(); defaultInputID = AudioRecorder.defaultDeviceID
+    }
+    func selectInputDevice(_ id: String) {
+        guard !busy else { return }
+        var updated = device
+        updated.inputDeviceID = id.isEmpty ? nil : id
+        updated.inputDeviceName = inputDevices.first { $0.id == id }?.name
+        do { try store?.write(updated, name: "device"); device = updated }
+        catch { self.error = .init(error: error) }
+    }
     private var tick: Timer?
     private var syncTimer: Timer?
     private var task: Task<Void, Never>?
@@ -42,7 +66,11 @@ final class AppState: ObservableObject {
 
     init(preview: Bool = false) {
         self.preview = preview
-        if preview { return }
+        if preview {
+            inputDevices = [.init(id: "preview-microphone", name: "MacBook Pro Microphone")]
+            defaultInputID = "preview-microphone"
+            return
+        }
         do {
             let store = try LocalStore(); self.store = store
             settings = try store.read("settings", fallback: SharedSettings())
@@ -50,6 +78,12 @@ final class AppState: ObservableObject {
             device = try store.read("device", fallback: DeviceSettings())
             history = try store.read("history", fallback: [HistoryEntry]())
         } catch { self.error = "Could not load local data: \(error.localizedDescription)" }
+        refreshInputDevices()
+        for name in [AVCaptureDevice.wasConnectedNotification, AVCaptureDevice.wasDisconnectedNotification, NSApplication.didBecomeActiveNotification] {
+            inputObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.refreshInputDevices() }
+            })
+        }
         syncTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.device.autoSync, !self.busy,
@@ -83,11 +117,11 @@ final class AppState: ObservableObject {
             self.settings = settings; device.dirty = true; try persistDevice()
             notice = "Saved on this Mac"
             if device.autoSync { Task { await sync() } }
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = .init(error: error) }
     }
     func saveDevice(autoPaste: Bool, history: Bool) {
         device.autoPaste = autoPaste; device.keepHistory = history
-        do { try persistDevice() } catch { self.error = error.localizedDescription }
+        do { try persistDevice() } catch { self.error = .init(error: error) }
     }
     func configureSync(url: String, token: String, passphrase: String, automatic: Bool) {
         do {
@@ -104,7 +138,7 @@ final class AppState: ObservableObject {
             try KeychainStore.write(passphrase, account: "sync-passphrase")
             device.serverURL = url; device.autoSync = automatic
             try persistDevice(); syncStatus = "Connection saved. Sync or download to continue."
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = .init(error: error) }
     }
     private func snapshot() throws -> SyncSnapshot {
         var keys: [String: String] = [:]
@@ -167,8 +201,8 @@ final class AppState: ObservableObject {
                 }
                 try apply(decoded, revision: remote.revision)
             }
-            syncStatus = "Synced · revision \(device.syncRevision) · \(Date().formatted(date: .omitted, time: .shortened))"
-        } catch { syncStatus = error.localizedDescription }
+            syncStatus = "Synced · revision \(device.syncRevision) · \(Date().formatted(.dateTime.hour().minute().locale(L10n.locale)))"
+        } catch { syncStatus = .init(error: error) }
     }
 
     func toggle(mode override: WritingMode? = nil, external: Bool = false) {
@@ -185,24 +219,28 @@ final class AppState: ObservableObject {
                 throw VoiceDraftError.message("Choose your speech and writing models.")
             }
             try speech.validateForInference()
-            if speech.vocabularyCapability == .weighted { _ = try speech.speechOptions.weightedVocabulary(settings.hotwords) }
+            try settings.vocabulary.validate()
             if mode != .verbatim { try writing.validateForInference() }
             runSpeechKey = try key(for: speech); runWritingKey = try key(for: writing)
             guard !runSpeechKey.isEmpty else { throw VoiceDraftError.message("Add your Bailian API key in Models first.") }
             if mode != .verbatim, runWritingKey.isEmpty { throw VoiceDraftError.message("Add an API key for the writing model first.") }
             if mode == .edit && runSelection.isEmpty { throw VoiceDraftError.message("Select text in the destination app before using Edit selection.") }
-        } catch { self.error = error.localizedDescription; showMain?(); return }
+        } catch { self.error = .init(error: error); showMain?(); return }
+        let inputDeviceID = device.inputDeviceID
+        recordingDeviceName = ""
         phase = "starting"; status = "Opening microphone…"; elapsed = 0
         generation = UUID(); let id = generation
         showHUD?()
         task = Task { [self] in
             do {
-                try await recorder.start()
-                guard generation == id else { recorder.cancel(); return }
+                let input = try await recorder.start(preferredID: inputDeviceID)
+                guard generation == id else { return }
+                recordingDeviceName = input.name
                 phase = "recording"; status = "Listening · speak naturally"
                 tick = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
                     Task { @MainActor in
                         guard let self, self.recording else { return }
+                        if let failure = self.recorder.failure { self.fail(failure, id: id); return }
                         self.elapsed = self.recorder.elapsed; self.level = self.recorder.level
                         if self.elapsed >= 240 { self.finish() }
                     }
@@ -218,9 +256,10 @@ final class AppState: ObservableObject {
         phase = "processing"; status = "Recognizing with Qwen…"
         task = Task {
             do {
-                let wav = try recorder.stop()
+                let wav = try await recorder.stop()
+                try Task.checkCancellation(); guard generation == id else { return }
                 guard duration >= 0.25 else { throw VoiceDraftError.message("The recording was too short. Try again.") }
-                let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, hotwords: configuration.hotwords)
+                let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary)
                 try Task.checkCancellation(); guard generation == id else { return }
                 transcript = raw; result = ""
                 var output = raw
@@ -247,7 +286,7 @@ final class AppState: ObservableObject {
                         status = "Text inserted"
                     } catch {
                         guard generation == id else { return }
-                        self.error = error.localizedDescription; status = "Result ready · open VoiceDraft to copy"
+                        self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
                     }
                 } else {
                     status = "Your text is ready"
@@ -267,7 +306,7 @@ final class AppState: ObservableObject {
         recorder.cancel(); tick?.invalidate(); tick = nil; phase = "idle"; level = 0
         runSpeechKey = ""; runWritingKey = ""
         if error is CancellationError { status = "Cancelled" }
-        else { self.error = error.localizedDescription; status = "Something needs attention"; showMain?() }
+        else { self.error = .init(error: error); status = "Something needs attention"; showMain?() }
         closeHUDAfterDelay(id: id)
     }
     private func closeHUDAfterDelay(id: UUID) {
@@ -281,7 +320,7 @@ final class AppState: ObservableObject {
     }
     func deleteHistory(_ id: UUID? = nil) {
         if let id { history.removeAll { $0.id == id } } else { history.removeAll() }
-        do { try store?.write(history, name: "history") } catch { self.error = error.localizedDescription }
+        do { try store?.write(history, name: "history") } catch { self.error = .init(error: error) }
     }
     func copyResult(_ text: String? = nil) {
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text ?? result, forType: .string)

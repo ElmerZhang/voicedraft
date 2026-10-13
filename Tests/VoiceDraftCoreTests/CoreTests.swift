@@ -10,7 +10,7 @@ final class CoreTests: XCTestCase {
             profile.endpoint += "\r\n"
             let request: URLRequest
             if role == .speech {
-                request = try QwenRequests.speech(profile: profile, key: "test-only-key\n", wav: Data([1]), vocabulary: "")
+                request = try QwenRequests.speech(profile: profile, key: "test-only-key\n", wav: Data([1]), vocabulary: AppVocabulary(words: ""))
             } else {
                 request = try QwenRequests.writing(profile: profile, key: "test-only-key\n", text: "Test", mode: .polish, settings: SharedSettings())
             }
@@ -20,7 +20,7 @@ final class CoreTests: XCTestCase {
             XCTAssertEqual(request.url?.absoluteString, ModelProfile.qwen(role).endpoint)
             profile.model = "\r\n\u{2028} "
             if role == .speech {
-                XCTAssertThrowsError(try QwenRequests.speech(profile: profile, key: "test-only-key", wav: Data([1]), vocabulary: ""))
+                XCTAssertThrowsError(try QwenRequests.speech(profile: profile, key: "test-only-key", wav: Data([1]), vocabulary: AppVocabulary(words: "")))
             } else {
                 XCTAssertThrowsError(try QwenRequests.writing(profile: profile, key: "test-only-key", text: "Test", mode: .polish, settings: SharedSettings()))
             }
@@ -43,7 +43,7 @@ final class CoreTests: XCTestCase {
 
     func testEncryptedVaultRoundTripHidesSecrets() throws {
         var settings = SharedSettings()
-        settings.hotwords = "Project-A\nCustomer-B"
+        settings.vocabulary = AppVocabulary(words: "Project-A\nCustomer-B")
         let original = SyncSnapshot(settings: settings, credentials: [settings.speechID.uuidString: "test-api-secret"])
         let encrypted = try SyncCrypto.encrypt(original, passphrase: "test-passphrase-123")
         let serialized = String(decoding: try JSONEncoder().encode(encrypted), as: UTF8.self)
@@ -82,7 +82,7 @@ final class CoreTests: XCTestCase {
 
     func testQwenAudioRequestUsesDataURLAndSeparateKey() throws {
         let profile = ModelProfile.qwen(.speech)
-        let request = try QwenRequests.speech(profile: profile, key: "speech-secret", wav: Data([1, 2, 3]), vocabulary: "Acme, Qwen")
+        let request = try QwenRequests.speech(profile: profile, key: "speech-secret", wav: Data([1, 2, 3]), vocabulary: AppVocabulary(words: "Acme, Qwen"))
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer speech-secret")
         let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: request.httpBody!) as? [String: Any])
         XCTAssertEqual(body["model"] as? String, "qwen3-asr-flash")
@@ -92,7 +92,7 @@ final class CoreTests: XCTestCase {
         let audio = try XCTUnwrap(content[0]["input_audio"] as? [String: String])
         XCTAssertEqual(audio["data"], "data:audio/wav;base64,AQID")
         XCTAssertFalse(String(decoding: request.httpBody!, as: UTF8.self).contains("speech-secret"))
-        XCTAssertThrowsError(try QwenRequests.speech(profile: profile, key: "key", wav: Data(), vocabulary: ""))
+        XCTAssertThrowsError(try QwenRequests.speech(profile: profile, key: "key", wav: Data(), vocabulary: AppVocabulary(words: "")))
     }
 
     func testWritingModesAndReservedParameters() throws {
@@ -135,7 +135,7 @@ final class CoreTests: XCTestCase {
         let firstDevice = try SyncClient(baseURL: address, token: token)
         let secondDevice = try SyncClient(baseURL: address, token: token)
         let initial = try await firstDevice.fetch()
-        var settings = SharedSettings(); settings.hotwords = "Cross-device vocabulary"
+        var settings = SharedSettings(); settings.vocabulary = AppVocabulary(words: "Cross-device vocabulary")
         let snapshot = SyncSnapshot(settings: settings, credentials: [settings.speechID.uuidString: "test-only-api-key"])
         let encrypted = try SyncCrypto.encrypt(snapshot, passphrase: "integration-passphrase")
         let saved = try await firstDevice.upload(encrypted, revision: initial.revision)
@@ -155,7 +155,7 @@ final class CoreTests: XCTestCase {
         let transport = HTTPTransport()
         var speech = ModelProfile.qwen(.speech), writing = ModelProfile.qwen(.writing)
         speech.endpoint = address + "/mock/qwen"; writing.endpoint = speech.endpoint
-        let audio = try QwenRequests.speech(profile: speech, key: "test-only-key", wav: Data([1, 2, 3]), vocabulary: "VoiceDraft")
+        let audio = try QwenRequests.speech(profile: speech, key: "test-only-key", wav: Data([1, 2, 3]), vocabulary: AppVocabulary(words: "VoiceDraft"))
         let raw = try await transport.complete(audio)
         let request = try QwenRequests.writing(profile: writing, key: "test-only-key", text: raw, mode: .polish, settings: SharedSettings())
         let output = try await transport.complete(request)

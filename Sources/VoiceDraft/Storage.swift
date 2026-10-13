@@ -51,6 +51,8 @@ enum KeychainStore {
 }
 
 struct DeviceSettings: Codable {
+    var inputDeviceID: String? = nil
+    var inputDeviceName: String? = nil
     var serverURL = "http://127.0.0.1:8765"
     var autoSync = false
     var autoPaste = true

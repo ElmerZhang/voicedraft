@@ -1,5 +1,15 @@
 # Validation record
 
+## Global vocabulary, interface languages, and audio inputs — 2026-10-13
+
+- Replaced model-owned vocabulary with one app-wide source: term, enablement, strength, priority, language, preferred spelling, aliases, and IPA pronunciation. Adapter projections keep the source intact while enforcing the supported Qwen formats and limits. Schema-v1/v2 migrations preserve profile/credential associations, merge legacy terms deterministically, preserve remote vocabulary references, and normalize legacy tab separators without dropping long terms.
+- Added Simplified Chinese, Traditional Chinese, English, Japanese, Korean, German, French, and Spanish catalogs, local language selection, localized app errors/menus, and microphone usage descriptions. `scripts/check-localizations.py` passed for 292 messages in all eight languages. Swift tests check actual translated lookup (including SwiftPM's lowercased Chinese resource directories), locale fallback, and verbatim interpolation of user content.
+- Added local input-device UID selection and per-take AVCaptureSession routing. Missing explicit devices fail instead of silently falling back. The floating panel receives the actual bound device name. Each take owns its recording file and callbacks; cancellation cannot clean up a later take, and cancelled finalization is checked before inference.
+- The isolated feature snapshot, excluding the parallel desktop redesign, passed `swift test --disable-sandbox`: 40 tests passed, 2 existing localhost integration tests skipped, 0 failures. Coverage includes vocabulary projection/migration/encrypted round trip, localization, and device-resolution policy. The release build, icon validation, signature verification, and Info.plist validation passed with localization bundles packaged inside the app.
+- `python3 -m unittest discover -s server -v` encountered six setup errors because this execution sandbox denies localhost `socket.bind` with `PermissionError`; no server assertions ran. The service code is unchanged. An earlier automatic approval review rejected sandbox escalation, so it was not retried.
+- The shared working tree also contains a separate desktop redesign. At the user's request, its changes are preserved and joint native UI acceptance/restart is deferred until that task is complete. This entry does not claim visual acceptance of the final combined UI.
+- No real microphone capture or provider request was made. Real device routing, unplug/interruption behavior, permission prompts, resulting WAV format, and the live HUD device label still require a user recording test. Native-language copy review remains pending.
+
 ## Model catalog and protocol adapters — 2026-10-13
 
 - Confirmed the running configuration used `qwen-audio-3.1-asr-flash-message` with a chat-completions HTTP endpoint and showed HTTP 400. The provider's [Message WebSocket guide](https://help.aliyun.com/zh/model-studio/qwen-asr-message-websocket-api) specifies task-based WebSocket inference. The old app did not retain the original provider error code, so no more specific historical error is claimed.

@@ -293,3 +293,8 @@
 "The connection is too slow for live transcription. Please try again." = "接続が遅すぎるため、リアルタイム認識を続けられません。もう一度お試しください。";
 "Could not copy the result." = "結果をコピーできませんでした。";
 "The app did not confirm insertion. Check the input field before copying the result." = "入力を確認できませんでした。結果をコピーする前に入力欄を確認してください。";
+"Paste sent to terminal" = "ターミナルに貼り付けを送信しました";
+"The active app changed. Copy the result when ready." = "使用中のアプリが変わりました。準備ができたら結果をコピーしてください。";
+"The active window changed. Copy the result when ready." = "使用中のウィンドウが変わりました。準備ができたら結果をコピーしてください。";
+"The focused input changed. Copy the result when ready." = "入力先が変わりました。準備ができたら結果をコピーしてください。";
+"The text selection changed. Copy the result when ready." = "選択範囲またはカーソル位置が変わりました。準備ができたら結果をコピーしてください。";

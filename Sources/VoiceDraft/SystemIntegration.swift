@@ -7,11 +7,16 @@ struct InputTarget {
     let pid: pid_t
     let name: String
     let element: AXUIElement?
+    let window: AXUIElement?
     let range: CFRange?
     let selection: String
+    let value: String?
     let secure: Bool
     let editable: Bool
+    let keyboardSurface: Bool
 }
+
+enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal }
 
 @MainActor
 enum TextInsertion {
@@ -24,23 +29,39 @@ enum TextInsertion {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
         let root = AXUIElementCreateApplication(app.processIdentifier)
-        let focused = attribute(root, kAXFocusedUIElementAttribute)
-        let element: AXUIElement? = focused.flatMap {
-            CFGetTypeID($0) == AXUIElementGetTypeID() ? ($0 as! AXUIElement) : nil
+        let focused = uiElement(attribute(root, kAXFocusedUIElementAttribute))
+        let window = uiElement(attribute(root, kAXFocusedWindowAttribute))
+        let editor = focused.flatMap {
+            FocusedInputResolver.resolve(from: $0, capabilities: capabilities,
+                parent: { uiElement(attribute($0, kAXParentAttribute)) }, equals: { CFEqual($0, $1) })
         }
+        // Warp's TTY surface does not consistently expose an AX text editor.
+        // This is a narrow compatibility path: no browser/app-wide fallback,
+        // no dialogs/buttons, and the window + exposed surface must stay focused.
+        let terminalSurface = KeyboardSurfacePolicy.accepts(bundleIdentifier: app.bundleIdentifier,
+            focused: focused.map(capabilities), editor: editor.map(capabilities),
+            standardWindow: window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole,
+            modalWindow: window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true)
+        let element = editor ?? focused
         let range = element.flatMap(selectedRange)
         let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
         let secure = element.flatMap { attribute($0, kAXSubroleAttribute) as? String } == "AXSecureTextField"
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
-                           element: element, range: range, selection: selection, secure: secure,
-                           editable: element.map(isEditable) ?? false)
+                           element: element, window: window, range: range, selection: selection,
+                           value: terminalSurface ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,
+                           editable: terminalSurface || (editor.map { capabilities($0).acceptsInsertion } ?? false),
+                           keyboardSurface: terminalSurface)
+    }
+    private static func uiElement(_ value: CFTypeRef?) -> AXUIElement? {
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
     }
     private static func selectedRange(_ element: AXUIElement) -> CFRange? {
         guard let value = attribute(element, kAXSelectedTextRangeAttribute), CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         var range = CFRange()
         return AXValueGetValue(value as! AXValue, .cfRange, &range) ? range : nil
     }
-    private static func isEditable(_ element: AXUIElement) -> Bool {
+    private static func capabilities(_ element: AXUIElement) -> TextInputCapabilities {
         func isSettable(_ name: String) -> Bool {
             var value = DarwinBoolean(false)
             return AXUIElementIsAttributeSettable(element, name as CFString, &value) == .success && value.boolValue
@@ -52,24 +73,33 @@ enum TextInsertion {
             canReplaceSelection: isSettable(kAXSelectedTextAttribute),
             canSetValue: isSettable(kAXValueAttribute),
             canSetSelectionRange: isSettable(kAXSelectedTextRangeAttribute)
-        ).acceptsInsertion
+        )
     }
     static func requestAccess() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
-    static func insert(_ text: String, into target: InputTarget) async throws {
+    static func insert(_ text: String, into target: InputTarget) async throws -> TextInsertionOutcome {
         try Task.checkCancellation()
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
-        guard target.editable, let current = capture(), current.editable, current.pid == target.pid,
-              let original = target.element, let focused = current.element, CFEqual(original, focused),
-              current.selection == target.selection,
-              rangesMatch(current.range, target.range) else {
-            throw VoiceDraftError.message("The input focus or selection changed. Copy the result when ready.")
+        guard let current = capture(), current.pid == target.pid else {
+            throw VoiceDraftError.message("The active app changed. Copy the result when ready.")
         }
-        let receipt = TextInsertionReceipt(value: attribute(original, kAXValueAttribute) as? String,
-            range: current.range.map { NSRange(location: $0.location, length: $0.length) }, replacement: text)
+        guard sameElement(target.window, current.window) else {
+            throw VoiceDraftError.message("The active window changed. Copy the result when ready.")
+        }
+        guard target.editable, current.editable, !current.secure,
+              target.keyboardSurface == current.keyboardSurface, sameElement(target.element, current.element) else {
+            throw VoiceDraftError.message("The focused input changed. Copy the result when ready.")
+        }
+        guard InputSelectionPolicy.matches(originalRange: nsRange(target.range), originalText: target.selection,
+            originalValue: target.value, currentRange: nsRange(current.range), currentText: current.selection,
+            currentValue: current.value, keyboardSurface: target.keyboardSurface) else {
+            throw VoiceDraftError.message("The text selection changed. Copy the result when ready.")
+        }
+        let receiptRange = nsRange(current.range) ?? (current.value == "" ? NSRange(location: 0, length: 0) : nil)
+        let receipt = TextInsertionReceipt(value: current.value, range: receiptRange, replacement: text)
 
         // Chromium can acknowledge AXSelectedText writes without implementing
         // the replacement action. Use the editor's normal paste path instead.
@@ -102,16 +132,23 @@ enum TextInsertion {
         // Keep the clipboard available during cancellation as the paste is already queued.
         for _ in 0..<20 {
             await Task.detached { try? await Task.sleep(nanoseconds: 75_000_000) }.value
-            let range = selectedRange(original).map { NSRange(location: $0.location, length: $0.length) }
-            if receipt.confirms(value: attribute(original, kAXValueAttribute) as? String, range: range) { return }
+            if !target.keyboardSurface, let original = current.element,
+               receipt.confirms(value: attribute(original, kAXValueAttribute) as? String,
+                                range: nsRange(selectedRange(original))) { return .confirmed }
         }
         try Task.checkCancellation()
+        // Terminal echo is not an AX value/selection replacement. Keep the
+        // honest distinction between sending paste and observing inserted text.
+        if target.keyboardSurface { return .sentToTerminal }
         throw VoiceDraftError.message("The app did not confirm insertion. Check the input field before copying the result.")
     }
-    private static func rangesMatch(_ a: CFRange?, _ b: CFRange?) -> Bool {
+    private static func nsRange(_ range: CFRange?) -> NSRange? {
+        range.map { NSRange(location: $0.location, length: $0.length) }
+    }
+    private static func sameElement(_ a: AXUIElement?, _ b: AXUIElement?) -> Bool {
         switch (a, b) {
         case (nil, nil): return true
-        case let (a?, b?): return a.location == b.location && a.length == b.length
+        case let (a?, b?): return CFEqual(a, b)
         default: return false
         }
     }

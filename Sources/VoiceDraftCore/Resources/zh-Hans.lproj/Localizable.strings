@@ -293,3 +293,8 @@
 "The connection is too slow for live transcription. Please try again." = "网络连接过慢，无法继续实时识别。请重试。";
 "Could not copy the result." = "无法复制结果。";
 "The app did not confirm insertion. Check the input field before copying the result." = "未能确认文字已输入。请先检查输入框，再决定是否复制结果。";
+"Paste sent to terminal" = "已向终端发送粘贴";
+"The active app changed. Copy the result when ready." = "当前 App 已改变。准备好后可复制结果。";
+"The active window changed. Copy the result when ready." = "当前窗口已改变。准备好后可复制结果。";
+"The focused input changed. Copy the result when ready." = "焦点所在的输入框已改变。准备好后可复制结果。";
+"The text selection changed. Copy the result when ready." = "选中的文字或光标位置已改变。准备好后可复制结果。";

@@ -293,3 +293,8 @@
 "The connection is too slow for live transcription. Please try again." = "Die Verbindung ist für die Live-Transkription zu langsam. Bitte erneut versuchen.";
 "Could not copy the result." = "Das Ergebnis konnte nicht kopiert werden.";
 "The app did not confirm insertion. Check the input field before copying the result." = "Die Eingabe wurde nicht bestätigt. Prüfe das Eingabefeld, bevor du das Ergebnis kopierst.";
+"Paste sent to terminal" = "Einfügen an Terminal gesendet";
+"The active app changed. Copy the result when ready." = "Die aktive App hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
+"The active window changed. Copy the result when ready." = "Das aktive Fenster hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
+"The focused input changed. Copy the result when ready." = "Das fokussierte Eingabefeld hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
+"The text selection changed. Copy the result when ready." = "Die Textauswahl oder Cursorposition hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";

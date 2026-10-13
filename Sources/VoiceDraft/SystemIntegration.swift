@@ -79,7 +79,7 @@ enum TextInsertion {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
-    static func insert(_ text: String, into target: InputTarget) async throws -> TextInsertionOutcome {
+    static func insert(_ text: String, into target: InputTarget, onPasteSent: () -> Void) async throws -> TextInsertionOutcome {
         try Task.checkCancellation()
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
@@ -127,6 +127,9 @@ enum TextInsertion {
         }
         down.flags = .maskCommand; up.flags = .maskCommand
         down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
+        // UI completion does not need to wait for AX confirmation. Keep the
+        // clipboard alive below until the editor has had time to consume it.
+        onPasteSent()
         // AX/event success only acknowledges delivery. Wait for the actual
         // field update before claiming success, without retrying and duplicating text.
         // Keep the clipboard available during cancellation as the paste is already queued.

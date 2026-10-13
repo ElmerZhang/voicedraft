@@ -376,7 +376,10 @@ final class AppState: ObservableObject {
         } else if let destination, destination.editable, runAutoPaste, mode != .ask {
             status = "Inserting text…"
             do {
-                let outcome = try await TextInsertion.insert(output, into: destination)
+                let outcome = try await TextInsertion.insert(output, into: destination) { [weak self] in
+                    guard let self, self.generation == id else { return }
+                    self.hideHUD?()
+                }
                 try Task.checkCancellation(); guard generation == id else { return }
                 delivery = outcome
                 switch outcome {
@@ -390,8 +393,7 @@ final class AppState: ObservableObject {
             }
         } else { status = "Your text is ready" }
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
-        if delivery == .sentWithoutConfirmation { hideHUD?(); hudKind = .compact }
-        else if delivery != nil { hudKind = .compact; closeHUDAfterDelay(id: id) }
+        if delivery != nil { hudKind = .compact }
         else { hudText = output; hudKind = .result; showHUD?() }
     }
     func cancel() {
@@ -417,9 +419,6 @@ final class AppState: ObservableObject {
             if hudText.isEmpty { hudText = liveTranscript }
             hudKind = .failure; showHUD?()
         }
-    }
-    private func closeHUDAfterDelay(id: UUID) {
-        Task { try? await Task.sleep(nanoseconds: 1_200_000_000); if generation == id && !busy { hideHUD?() } }
     }
     private func saveHistory(mode: WritingMode, original: String, output: String, app: String, duration: Double) {
         guard device.keepHistory else { return }

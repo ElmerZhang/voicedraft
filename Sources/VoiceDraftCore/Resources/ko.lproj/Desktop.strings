@@ -64,3 +64,13 @@
 "Could not finish" = "완료하지 못했습니다";
 "Copy last transcript" = "마지막 받아쓰기 복사";
 "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "지원 모델을 먼저 선택하세요. Message 모델은 말하는 동안 실시간으로 표시하며 HTTP 모델은 녹음이 끝난 뒤 인식합니다. 사전은 선택한 모델에 맞게 적용됩니다.";
+"Auto-added" = "자동 추가";
+"Manually-added" = "직접 추가";
+"Word status" = "단어 상태";
+"All statuses" = "모든 상태";
+"Learn from corrections" = "수정 내용에서 학습";
+"Discover words from dictation" = "음성 입력에서 단어 발견";
+"Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "음성 입력 후 글쓰기 모델로 고유명사와 전문 용어를 학습합니다. 수정한 단어는 바로 추가하며, 새 후보는 앱 실행 중 서로 다른 음성 입력에서 두 번 등장해야 추가됩니다.";
+"For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "삽입 후 45초 동안 지원되는 편집기에서 음성 입력 문장의 수정 내용을 학습합니다. 문서의 다른 내용은 전송하지 않습니다. 삭제한 단어는 자동으로 다시 추가하지 않습니다.";
+"Added to dictionary:" = "사전에 추가됨:";
+"Could not learn words this time. Your dictation is unaffected." = "이번에는 단어를 학습하지 못했습니다. 음성 입력에는 영향이 없습니다.";

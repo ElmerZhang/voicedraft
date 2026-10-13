@@ -64,3 +64,13 @@
 "Could not finish" = "No se pudo terminar";
 "Copy last transcript" = "Copiar última transcripción";
 "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "Elige un modelo compatible. Los modelos Message muestran texto mientras hablas; los HTTP reconocen al terminar. El diccionario se adapta al modelo elegido.";
+"Auto-added" = "Añadidas automáticamente";
+"Manually-added" = "Añadidas manualmente";
+"Word status" = "Estado de palabra";
+"All statuses" = "Todos los estados";
+"Learn from corrections" = "Aprender de correcciones";
+"Discover words from dictation" = "Descubrir palabras del dictado";
+"Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "Aprende nombres y términos especializados con tu modelo de escritura después del dictado. Las correcciones se añaden directamente; las palabras descubiertas deben aparecer en dos dictados distintos mientras la app está abierta.";
+"For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "Durante 45 segundos tras insertar el texto, aprende de cambios al dictado en editores compatibles. No se envía el resto del documento. Las palabras eliminadas no se vuelven a añadir automáticamente.";
+"Added to dictionary:" = "Añadido al diccionario:";
+"Could not learn words this time. Your dictation is unaffected." = "Esta vez no se pudieron aprender palabras. Tu dictado no se ve afectado.";

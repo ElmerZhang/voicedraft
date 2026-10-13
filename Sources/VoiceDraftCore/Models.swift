@@ -100,7 +100,7 @@ public enum WritingMode: String, Codable, CaseIterable, Identifiable {
 }
 
 public struct SharedSettings: Codable, Equatable {
-    public var schemaVersion = 3
+    public var schemaVersion = 4
     public var profiles: [ModelProfile]
     public var speechID: UUID
     public var writingID: UUID
@@ -117,8 +117,8 @@ public struct SharedSettings: Codable, Equatable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let version = try c.decode(Int.self, forKey: .schemaVersion)
-        guard (1...3).contains(version) else { throw VoiceDraftError.message("This configuration needs a newer app.") }
-        schemaVersion = 3
+        guard (1...4).contains(version) else { throw VoiceDraftError.message("This configuration needs a newer app.") }
+        schemaVersion = 4
         profiles = try c.decode([ModelProfile].self, forKey: .profiles)
         speechID = try c.decode(UUID.self, forKey: .speechID)
         writingID = try c.decode(UUID.self, forKey: .writingID)
@@ -144,7 +144,7 @@ public struct SharedSettings: Codable, Equatable {
     }
 
     public func validate() throws {
-        guard schemaVersion == 3 else { throw VoiceDraftError.message("This configuration needs a newer app.") }
+        guard schemaVersion == 4 else { throw VoiceDraftError.message("This configuration needs a newer app.") }
         guard !profiles.isEmpty, profiles.count <= 50,
               Set(profiles.map(\.id)).count == profiles.count,
               speech != nil, writing != nil else {

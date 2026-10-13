@@ -151,6 +151,50 @@ enum TextInsertion {
     private static func nsRange(_ range: CFRange?) -> NSRange? {
         range.map { NSRange(location: $0.location, length: $0.length) }
     }
+    /// Observe only the same focused editor, for at most 45 seconds. No keyboard
+    /// hooks, surrounding-document upload, terminal output, or focus reacquisition.
+    static func observeCorrections(to text: String, in target: InputTarget,
+                                   onCorrection: (VocabularyLearningSample) -> Void) async {
+        guard target.editable, !target.secure, !target.keyboardSurface, target.window != nil, let element = target.element,
+              let context = DictationCorrectionContext(value: target.value,
+                  range: nsRange(target.range) ?? (target.value == "" ? NSRange(location: 0, length: 0) : nil), inserted: text) else { return }
+        let clock = ContinuousClock(), started = ContinuousClock.now
+        let deadline = started.advanced(by: .seconds(45))
+        var confirmedInsertion = false, lastText = text, baseline = text, stableSince = started
+        // Fresh observer objects get short timeouts; insertion's AX objects and
+        // the process-wide accessibility timeout remain unchanged.
+        func observerAttribute(_ node: AXUIElement, _ name: String) -> CFTypeRef? {
+            AXUIElementSetMessagingTimeout(node, 0.1)
+            return attribute(node, name)
+        }
+        func observerCapabilities(_ node: AXUIElement) -> TextInputCapabilities {
+            AXUIElementSetMessagingTimeout(node, 0.1)
+            return capabilities(node)
+        }
+        while clock.now < deadline {
+            do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+            guard clock.now < deadline, !Task.isCancelled, AXIsProcessTrusted(),
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid else { return }
+            let root = AXUIElementCreateApplication(target.pid)
+            guard sameElement(uiElement(observerAttribute(root, kAXFocusedWindowAttribute)), target.window),
+                  let focused = uiElement(observerAttribute(root, kAXFocusedUIElementAttribute)),
+                  let editor = FocusedInputResolver.resolve(from: focused, capabilities: observerCapabilities,
+                    parent: { uiElement(observerAttribute($0, kAXParentAttribute)) }, equals: { CFEqual($0, $1) }),
+                  CFEqual(editor, element), observerCapabilities(editor).acceptsInsertion,
+                  let value = observerAttribute(editor, kAXValueAttribute) as? String else { return }
+            if !confirmedInsertion {
+                if value == target.value, clock.now < started.advanced(by: .seconds(2)) { continue }
+                guard value == context.expectedValue else { return }
+                confirmedInsertion = true
+            }
+            guard let edited = context.editedText(value: value, selection: nsRange(selectedRange(editor))) else { return }
+            if edited != lastText { lastText = edited; stableSince = clock.now; continue }
+            if clock.now >= stableSince.advanced(by: .seconds(2)), clock.now < deadline, edited != baseline {
+                if let sample = VocabularyLearningSample(source: .editedDictation, before: baseline, after: edited) { onCorrection(sample) }
+                baseline = edited
+            }
+        }
+    }
     private static func sameElement(_ a: AXUIElement?, _ b: AXUIElement?) -> Bool {
         switch (a, b) {
         case (nil, nil): return true

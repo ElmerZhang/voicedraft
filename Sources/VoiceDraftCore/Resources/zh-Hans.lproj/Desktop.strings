@@ -64,3 +64,13 @@
 "Could not finish" = "未能完成";
 "Copy last transcript" = "复制本次识别结果";
 "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "先选择支持的模型。Message 模型会在说话时实时显示文字；HTTP 模型在结束录音后识别。词典会自动适配所选模型。";
+"Auto-added" = "自动添加";
+"Manually-added" = "手动添加";
+"Word status" = "词条状态";
+"All statuses" = "所有状态";
+"Learn from corrections" = "从纠错中学习";
+"Discover words from dictation" = "从口述中发现新词";
+"Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "口述完成后，使用你的润色模型学习专名和专业词。纠错词直接添加；发现的新词需要在本次应用运行期间的两次独立口述中出现。";
+"For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "输入后的 45 秒内，可从受支持编辑器中对口述文字的修改学习。不会发送文档中的其他内容。删除的词不会自动加回。";
+"Added to dictionary:" = "已加入词典：";
+"Could not learn words this time. Your dictation is unaffected." = "本次未能学习新词，不影响语音输入。";

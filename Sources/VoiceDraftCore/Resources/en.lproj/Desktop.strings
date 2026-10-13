@@ -64,3 +64,13 @@
 "Could not finish" = "Could not finish";
 "Copy last transcript" = "Copy last transcript";
 "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model.";
+"Auto-added" = "Auto-added";
+"Manually-added" = "Manually-added";
+"Word status" = "Word status";
+"All statuses" = "All statuses";
+"Learn from corrections" = "Learn from corrections";
+"Discover words from dictation" = "Discover words from dictation";
+"Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open.";
+"For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning.";
+"Added to dictionary:" = "Added to dictionary:";
+"Could not learn words this time. Your dictation is unaffected." = "Could not learn words this time. Your dictation is unaffected.";

@@ -1,6 +1,8 @@
 import Foundation
 import CryptoKit
 
+public enum VocabularyOrigin: String, Codable { case manual, automatic }
+
 /// Provider-independent source of truth. Adapters only derive request data from this value.
 public struct VocabularyEntry: Codable, Equatable, Identifiable {
     public var id = UUID()
@@ -12,8 +14,25 @@ public struct VocabularyEntry: Codable, Equatable, Identifiable {
     public var displayAs = ""
     public var aliases: [String] = []
     public var pronunciation = "" // IPA; retained for adapters that support pronunciation lexicons.
+    public var origin: VocabularyOrigin = .manual
     public init(text: String = "", boost: Int = 50, priority: Bool = false) {
         self.text = text; self.boost = boost; self.priority = priority
+    }
+    private enum CodingKeys: String, CodingKey {
+        case id, text, enabled, boost, priority, language, displayAs, aliases, pronunciation, origin
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        boost = try c.decode(Int.self, forKey: .boost)
+        priority = try c.decode(Bool.self, forKey: .priority)
+        language = try c.decode(String.self, forKey: .language)
+        displayAs = try c.decode(String.self, forKey: .displayAs)
+        aliases = try c.decode([String].self, forKey: .aliases)
+        pronunciation = try c.decode(String.self, forKey: .pronunciation)
+        origin = try c.decodeIfPresent(VocabularyOrigin.self, forKey: .origin) ?? .manual
     }
     public var normalized: Self {
         var value = self
@@ -44,11 +63,54 @@ public struct LegacyVocabularyReference: Codable, Equatable {
 public struct AppVocabulary: Codable, Equatable {
     public var enabled = true
     public var entries: [VocabularyEntry] = []
+    public var learnFromCorrections = true
+    public var discoverFromDictation = true
+    // Hashes suppress relearning deleted terms without retaining deleted spelling.
+    public var excludedAutomaticTerms: Set<String> = []
     // Remote lists cannot be reconstructed without fetching them. Preserve references for
     // manual recovery, but never combine an unknown remote list with the app-owned projection.
     public var legacyReferences: [LegacyVocabularyReference] = []
     public init() {}
     public init(words: String) { appendLines(words) }
+    private enum CodingKeys: String, CodingKey {
+        case enabled, entries, legacyReferences, learnFromCorrections, discoverFromDictation, excludedAutomaticTerms
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        entries = try c.decode([VocabularyEntry].self, forKey: .entries)
+        legacyReferences = try c.decode([LegacyVocabularyReference].self, forKey: .legacyReferences)
+        learnFromCorrections = try c.decodeIfPresent(Bool.self, forKey: .learnFromCorrections) ?? true
+        discoverFromDictation = try c.decodeIfPresent(Bool.self, forKey: .discoverFromDictation) ?? true
+        excludedAutomaticTerms = try c.decodeIfPresent(Set<String>.self, forKey: .excludedAutomaticTerms) ?? []
+    }
+    public mutating func removeEntry(_ id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        for term in [entry.text, entry.displayAs] + entry.aliases where !term.isEmpty {
+            excludedAutomaticTerms.insert(Self.automaticTermKey(term))
+        }
+        entries.removeAll { $0.id == id }
+    }
+    public static func automaticTermKey(_ text: String) -> String {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .precomposedStringWithCanonicalMapping
+        return SHA256.hash(data: Data(normalized.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    @discardableResult
+    public mutating func learn(_ terms: [String], fromDiscovery: Bool = false) -> [String] {
+        guard enabled, fromDiscovery ? discoverFromDictation : learnFromCorrections else { return [] }
+        var known = Set(entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(Self.automaticTermKey))
+        var added: [String] = []
+        for term in terms.prefix(5) {
+            let key = Self.automaticTermKey(term)
+            guard VocabularyLearning.isTerm(term), !excludedAutomaticTerms.contains(key),
+                  entries.count < 200_000, known.insert(key).inserted else { continue }
+            var entry = VocabularyEntry(text: term); entry.origin = .automatic
+            entries.append(entry); added.append(term)
+        }
+        return added
+    }
     public mutating func appendLines(_ words: String) {
         var seen = Set(entries.map(\.text))
         for line in words.split(whereSeparator: \.isNewline) {
@@ -57,7 +119,9 @@ public struct AppVocabulary: Codable, Equatable {
         }
     }
     public func validate() throws {
-        guard entries.count <= 200_000, Set(entries.map(\.id)).count == entries.count else {
+        guard entries.count <= 200_000, Set(entries.map(\.id)).count == entries.count,
+              excludedAutomaticTerms.count <= 200_000,
+              excludedAutomaticTerms.allSatisfy({ $0.count == 64 && $0.allSatisfy(\.isHexDigit) }) else {
             throw VoiceDraftError.message("The app vocabulary contains too many entries or duplicate entry IDs.")
         }
         for entry in entries { try entry.validate() }

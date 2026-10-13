@@ -29,6 +29,13 @@ final class AppState: ObservableObject {
     @Published private(set) var syncStatus: LocalizedMessage = "Not connected"
     @Published private(set) var syncing = false
     @Published var notice: LocalizedMessage = ""
+    @Published private(set) var vocabularyLearningStatus = ""
+    private var vocabularyLearningTask: Task<Void, Never>?
+    private var correctionObservationTask: Task<Void, Never>?
+    private var resultCorrectionTask: Task<Void, Never>?
+    private var vocabularyLearningID = UUID()
+    private var resultBeforeCorrection: String?
+    private var vocabularyDiscoveries = VocabularyDiscoveryTracker()
     private var store: LocalStore?
     let preview: Bool
     private let recorder = AudioRecorder()
@@ -100,6 +107,8 @@ final class AppState: ObservableObject {
                 settings.vocabulary = AppVocabulary(words: "VoiceDraft\nQwen\nSwiftUI\nBailian\nWebSocket\nmacOS\nAPI")
                 settings.vocabulary.entries[2].priority = true
                 settings.vocabulary.entries[6].enabled = false
+                settings.vocabulary.entries[0].origin = .automatic
+                settings.vocabulary.entries[3].origin = .automatic
                 history = [
                     HistoryEntry(mode: .polish, original: "A sample voice note", result: "A sample voice note, ready to use.", application: "VoiceDraft Preview", duration: 12),
                     HistoryEntry(mode: .translate, original: "这是用于界面检查的示例。", result: "This is a sample for checking the interface.", application: "VoiceDraft Preview", duration: 8),
@@ -154,6 +163,11 @@ final class AppState: ObservableObject {
                 throw error
             }
             self.error = ""
+            if settings.writing != self.settings.writing || settings.vocabulary.enabled != self.settings.vocabulary.enabled
+                || settings.vocabulary.learnFromCorrections != self.settings.vocabulary.learnFromCorrections
+                || settings.vocabulary.discoverFromDictation != self.settings.vocabulary.discoverFromDictation {
+                stopVocabularyLearning()
+            }
             self.settings = settings; device.dirty = true; try persistDevice()
             notice = "Saved on this Mac"
             if device.autoSync { Task { await sync() } }
@@ -200,6 +214,7 @@ final class AppState: ObservableObject {
             for (id, value) in old { try? KeychainStore.write(value, account: id) }
             throw error
         }
+        stopVocabularyLearning()
         settings = incoming.settings; device.syncRevision = revision; device.dirty = false
         try persistDevice()
     }
@@ -248,6 +263,7 @@ final class AppState: ObservableObject {
     func toggle(mode override: WritingMode? = nil, external: Bool = false) {
         if recording { finish(); return }
         guard !busy else { return }
+        stopCorrectionObservation()
         if let override { mode = override }
         error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact
         generation = UUID(); let id = generation
@@ -379,6 +395,9 @@ final class AppState: ObservableObject {
                 let outcome = try await TextInsertion.insert(output, into: destination) { [weak self] in
                     guard let self, self.generation == id else { return }
                     self.hideHUD?()
+                    if (mode == .polish || mode == .verbatim), configuration.vocabulary.learnFromCorrections {
+                        self.observeCorrections(to: output, in: destination, configuration: configuration)
+                    }
                 }
                 try Task.checkCancellation(); guard generation == id else { return }
                 delivery = outcome
@@ -395,8 +414,15 @@ final class AppState: ObservableObject {
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
         if delivery != nil { hudKind = .compact }
         else { hudText = output; hudKind = .result; showHUD?() }
+        if mode == .polish || mode == .verbatim {
+            resultBeforeCorrection = output
+            if let sample = VocabularyLearningSample(source: .dictation, before: raw, after: output) {
+                learnVocabulary(from: sample, configuration: configuration)
+            }
+        }
     }
     func cancel() {
+        stopCorrectionObservation()
         generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
         recorder.cancel(); liveRecorder.cancel(); tick?.invalidate(); tick = nil
         phase = "idle"; level = 0; status = "Cancelled"; runSpeechKey = ""; runWritingKey = ""
@@ -442,6 +468,7 @@ final class AppState: ObservableObject {
     }
     func processText() {
         guard !busy, !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        stopCorrectionObservation()
         liveTranscript = ""; hudText = ""; hudCopied = false; hideHUD?()
         generation = UUID(); let id = generation
         phase = "processing"; status = "Writing with Qwen…"; error = ""
@@ -459,7 +486,87 @@ final class AppState: ObservableObject {
                 try Task.checkCancellation(); guard generation == id else { return }
                 result = output; phase = "idle"; status = "Your text is ready"
                 saveHistory(mode: mode, original: raw, output: output, app: "VoiceDraft", duration: 0)
+                if mode == .polish || mode == .verbatim {
+                    resultBeforeCorrection = output
+                    if let sample = VocabularyLearningSample(source: .dictation, before: raw, after: output) {
+                        learnVocabulary(from: sample, configuration: configuration)
+                    }
+                }
             } catch { fail(error, id: id) }
+        }
+    }
+    func editResult(_ text: String) {
+        result = text
+        resultCorrectionTask?.cancel()
+        guard !busy, let before = resultBeforeCorrection else { return }
+        let configuration = settings
+        resultCorrectionTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: 2_000_000_000) } catch { return }
+            guard let self, !self.busy, self.result == text, self.resultBeforeCorrection == before else { return }
+            if let sample = VocabularyLearningSample(source: .editedDictation, before: before, after: text) {
+                self.learnVocabulary(from: sample, configuration: configuration)
+            }
+            self.resultBeforeCorrection = text
+        }
+    }
+
+    private func stopCorrectionObservation() {
+        correctionObservationTask?.cancel(); correctionObservationTask = nil
+        resultCorrectionTask?.cancel(); resultCorrectionTask = nil; resultBeforeCorrection = nil
+    }
+    private func stopVocabularyLearning() {
+        vocabularyLearningID = UUID(); vocabularyLearningTask?.cancel(); vocabularyLearningTask = nil
+        vocabularyDiscoveries = VocabularyDiscoveryTracker()
+        stopCorrectionObservation(); vocabularyLearningStatus = ""
+    }
+    private func observeCorrections(to output: String, in target: InputTarget, configuration: SharedSettings) {
+        guard !preview, settings.vocabulary.enabled, settings.vocabulary.learnFromCorrections,
+              !target.keyboardSurface, !target.secure else { return }
+        correctionObservationTask?.cancel()
+        correctionObservationTask = Task { [weak self] in
+            await TextInsertion.observeCorrections(to: output, in: target) { [weak self] sample in
+                self?.learnVocabulary(from: sample, configuration: configuration)
+            }
+        }
+    }
+    private func learnVocabulary(from sample: VocabularyLearningSample, configuration: SharedSettings) {
+        let corrections = configuration.vocabulary.learnFromCorrections && settings.vocabulary.learnFromCorrections
+        let discovery = configuration.vocabulary.discoverFromDictation && settings.vocabulary.discoverFromDictation && sample.source == .dictation
+        guard !preview, configuration.vocabulary.enabled, settings.vocabulary.enabled,
+              discovery || (corrections && (sample.source == .editedDictation || sample.hasSpokenCorrection)),
+              let profile = configuration.writing, settings.writing == profile else { return }
+        vocabularyLearningTask?.cancel()
+        let id = UUID(), takeID = generation; vocabularyLearningID = id
+        vocabularyLearningStatus = ""
+        vocabularyLearningTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let request = try QwenRequests.vocabularyLearning(profile: profile, key: self.key(for: profile), sample: sample)
+                let response = try await HTTPTransport().complete(request)
+                try Task.checkCancellation()
+                guard self.vocabularyLearningID == id, self.settings.writing == profile,
+                      self.settings.vocabulary.enabled else { return }
+                // Merge into current settings, never the capture-time snapshot. Disabled
+                // entries and deletion suppression also cover in-flight responses.
+                var updated = self.settings
+                var added = corrections ? updated.vocabulary.learn(VocabularyLearning.terms(from: response, sample: sample)) : []
+                if discovery, updated.vocabulary.discoverFromDictation {
+                    let candidates = VocabularyLearning.discoveries(from: response, sample: sample)
+                    let confirmed = self.vocabularyDiscoveries.confirmed(candidates, takeID: takeID)
+                    added += updated.vocabulary.learn(confirmed, fromDiscovery: true)
+                }
+                guard !added.isEmpty else { return }
+                try updated.validate()
+                try self.store?.write(updated, name: "settings")
+                self.settings = updated; self.device.dirty = true
+                try self.persistDevice()
+                self.vocabularyLearningStatus = D("Added to dictionary:") + " " + added.joined(separator: ", ")
+                if self.device.autoSync { await self.sync() }
+            } catch {
+                guard !(error is CancellationError), self.vocabularyLearningID == id else { return }
+                // Learning is optional: never turn a completed dictation into a failure.
+                self.vocabularyLearningStatus = D("Could not learn words this time. Your dictation is unaffected.")
+            }
         }
     }
 }

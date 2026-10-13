@@ -290,3 +290,4 @@
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "{0} termes prêts. L’intensité 0–100 est convertie en pondérations 1–5 ; les 50 premiers termes prioritaires reçoivent 50.";
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Espace  Démarrer ou terminer dans toute app";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  Traduire      ⌃ ⌥ E  Modifier la sélection      ⌃ ⌥ A  Questionner";
+"The connection is too slow for live transcription. Please try again." = "La connexion est trop lente pour la transcription en direct. Réessayez.";

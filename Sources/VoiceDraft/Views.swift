@@ -249,7 +249,7 @@ struct ModelsView: View {
                     }
                 }
             }
-            Text(L("Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and adapts the app vocabulary to its supported format. Recognition starts after you stop recording. Other model families require their own adapters."))
+            Text(D("Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model."))
                 .font(.caption).foregroundStyle(.secondary).lineSpacing(4)
         }.sheet(item: $editing) { profile in ProfileEditor(state: state, profile: profile) }
     }
@@ -624,33 +624,5 @@ struct HistoryView: View {
         }.confirmationDialog(L("Delete all local history?"), isPresented: $confirmClear, titleVisibility: .visible) {
             Button(L("Delete history"), role: .destructive) { state.deleteHistory() }
         }
-    }
-}
-
-struct RecordingHUD: View {
-    @Environment(\.locale) private var interfaceLocale
-    @ObservedObject var state: AppState
-    var body: some View {
-        let _ = interfaceLocale
-        HStack(spacing: 14) {
-            Image(systemName: state.recording ? "waveform" : "sparkles").foregroundStyle(state.recording ? .orange : .green)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L(state.status)).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                if state.busy {
-                    Text(state.recordingDeviceName.isEmpty ? L("Preparing audio input…") : L("Input: \(state.recordingDeviceName)"))
-                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.75)).lineLimit(1).truncationMode(.middle)
-                        .help(state.recordingDeviceName)
-                }
-                if state.recording { ProgressView(value: state.level).frame(width: 180).tint(.orange) }
-            }
-            Spacer()
-            if state.recording {
-                Text(String(format: "%02d:%02d", Int(state.elapsed) / 60, Int(state.elapsed) % 60)).font(.system(size: 11, design: .monospaced))
-                Button { state.finish() } label: { Image(systemName: "stop.fill") }.buttonStyle(.plain).help(L("Stop recording"))
-            }
-            if state.busy { Button { state.cancel() } label: { Image(systemName: "xmark") }.buttonStyle(.plain).help(L("Cancel")) }
-        }.padding(18).frame(width: 480).foregroundStyle(.white)
-            .background(Color(red: 0.12, green: 0.16, blue: 0.14), in: RoundedRectangle(cornerRadius: 18))
-            .preferredColorScheme(.dark)
     }
 }

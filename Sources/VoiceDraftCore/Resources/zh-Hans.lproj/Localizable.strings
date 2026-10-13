@@ -290,3 +290,4 @@
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "将发送 {0} 个词条。强度 0–100 映射为权重 1–5；前 50 个优先词条使用权重 50。";
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ 空格  在任意 App 中开始或结束";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  翻译      ⌃ ⌥ E  修改选中文本      ⌃ ⌥ A  问答";
+"The connection is too slow for live transcription. Please try again." = "网络连接过慢，无法继续实时识别。请重试。";

@@ -10,6 +10,7 @@ struct InputTarget {
     let range: CFRange?
     let selection: String
     let secure: Bool
+    let editable: Bool
 }
 
 @MainActor
@@ -35,7 +36,16 @@ enum TextInsertion {
         let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
         let secure = element.flatMap { attribute($0, kAXSubroleAttribute) as? String } == "AXSecureTextField"
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
-                           element: element, range: range, selection: selection, secure: secure)
+                           element: element, range: range, selection: selection, secure: secure,
+                           editable: element.map(isEditable) ?? false)
+    }
+    private static func isEditable(_ element: AXUIElement) -> Bool {
+        guard attribute(element, kAXEnabledAttribute) as? Bool != false else { return false }
+        var selected = DarwinBoolean(false), value = DarwinBoolean(false)
+        _ = AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &selected)
+        _ = AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &value)
+        let role = attribute(element, kAXRoleAttribute) as? String ?? ""
+        return selected.boolValue || (["AXTextField", "AXTextArea", "AXComboBox"].contains(role) && value.boolValue)
     }
     static func requestAccess() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
@@ -44,7 +54,7 @@ enum TextInsertion {
     static func insert(_ text: String, into target: InputTarget) async throws {
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
-        guard let current = capture(), current.pid == target.pid,
+        guard target.editable, let current = capture(), current.editable, current.pid == target.pid,
               let original = target.element, let focused = current.element, CFEqual(original, focused),
               current.selection == target.selection,
               rangesMatch(current.range, target.range) else {

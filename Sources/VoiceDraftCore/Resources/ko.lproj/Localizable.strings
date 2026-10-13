@@ -290,3 +290,4 @@
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "단어 {0}개를 전송합니다. 강도 0–100은 가중치 1–5로 변환되며, 처음 50개 우선 단어에는 가중치 50을 사용합니다.";
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  모든 앱에서 시작/종료";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  번역      ⌃ ⌥ E  선택 텍스트 수정      ⌃ ⌥ A  질문";
+"The connection is too slow for live transcription. Please try again." = "연결이 너무 느려 실시간 받아쓰기를 계속할 수 없습니다. 다시 시도하세요.";

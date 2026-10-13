@@ -290,3 +290,4 @@
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "{0} 個の用語を送信します。強度 0–100 は重み 1–5 に変換され、最初の優先用語 50 個には重み 50 を使用します。";
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  どのアプリでも開始／終了";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  翻訳      ⌃ ⌥ E  選択テキストを編集      ⌃ ⌥ A  質問";
+"The connection is too slow for live transcription. Please try again." = "接続が遅すぎるため、リアルタイム認識を続けられません。もう一度お試しください。";

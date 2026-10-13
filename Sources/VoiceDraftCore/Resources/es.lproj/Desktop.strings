@@ -58,3 +58,9 @@
 "Automatic insertion" = "Inserción automática";
 "Accessibility" = "Accesibilidad";
 "Start with your models" = "Empieza con tus modelos";
+"Live transcript" = "Transcripción en directo";
+"Say corrections before finishing" = "Di las correcciones antes de terminar";
+"Finish dictation" = "Terminar dictado";
+"Could not finish" = "No se pudo terminar";
+"Copy last transcript" = "Copiar última transcripción";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "Elige un modelo compatible. Los modelos Message muestran texto mientras hablas; los HTTP reconocen al terminar. El diccionario se adapta al modelo elegido.";

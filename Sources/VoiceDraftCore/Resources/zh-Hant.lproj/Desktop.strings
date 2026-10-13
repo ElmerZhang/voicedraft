@@ -58,3 +58,9 @@
 "Automatic insertion" = "自動插入";
 "Accessibility" = "輔助使用";
 "Start with your models" = "先設定你的模型";
+"Live transcript" = "即時辨識";
+"Say corrections before finishing" = "結束前可直接說出修改";
+"Finish dictation" = "完成聽寫";
+"Could not finish" = "未能完成";
+"Copy last transcript" = "複製本次辨識結果";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "先選擇支援的模型。Message 模型會在說話時即時顯示文字；HTTP 模型在結束錄音後辨識。詞典會自動適配所選模型。";

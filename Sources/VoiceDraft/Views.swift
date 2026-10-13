@@ -222,7 +222,7 @@ struct ModelsView: View {
 struct ProfileEditor: View {
     @ObservedObject var state: AppState
     @State var profile: ModelProfile
-    @State private var key = ""
+    @State private var keyDraft = APIKeyDraft(hasSavedKey: false)
     @State private var problem = ""
     @State private var testing = false
     @Environment(\.dismiss) private var dismiss
@@ -233,8 +233,26 @@ struct ProfileEditor: View {
                 LabeledContent("Profile name") { SingleLineField("Profile name", text: $profile.name) }
                 LabeledContent("Full endpoint URL") { SingleLineField("Full endpoint URL", text: $profile.endpoint) }
                 LabeledContent("Model ID") { SingleLineField("Model ID", text: $profile.model) }
-                LabeledContent("Bailian API key") { SingleLineField("Bailian API key", text: $key, secure: true) }
+                LabeledContent("Bailian API key") {
+                    SingleLineField("Bailian API key", text: $keyDraft.replacement, secure: true,
+                                    placeholder: keyDraft.showsSavedKey ? "••••••••••••" : nil)
+                }
             }.textFieldStyle(.roundedBorder)
+            if keyDraft.hasSavedKey {
+                HStack {
+                    Text(keyDraft.removeSavedKey && keyDraft.credentialUpdate == ""
+                         ? "The saved API key will be removed when you save."
+                         : (keyDraft.credentialUpdate == nil
+                            ? "API key saved on this Mac. Enter a new key to replace it."
+                            : "The new API key will replace the saved key when you save."))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(keyDraft.removeSavedKey ? "Keep saved key" : "Remove saved key") {
+                        keyDraft.removeSavedKey.toggle()
+                        keyDraft.replacement = ""
+                    }.disabled(testing)
+                }
+            }
             Text("Advanced request parameters (JSON)").font(.headline)
             TextEditor(text: $profile.extraJSON).font(.system(size: 12, design: .monospaced)).frame(height: 85).border(.gray.opacity(0.2))
             Text("API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region.").font(.caption).foregroundStyle(.secondary)
@@ -253,6 +271,7 @@ struct ProfileEditor: View {
                         Task {
                             defer { testing = false }
                             do {
+                                let key = try keyDraft.keyForRequest { try state.key(for: profile) }
                                 let request = try QwenRequests.writing(profile: profile, key: key, text: "Reply with OK.", mode: .ask, settings: SharedSettings())
                                 _ = try await HTTPTransport().complete(request); problem = "Connection successful."
                             } catch { problem = error.localizedDescription }
@@ -265,14 +284,16 @@ struct ProfileEditor: View {
                     if let i = copy.profiles.firstIndex(where: { $0.id == profile.id }) { copy.profiles[i] = profile }
                     else { copy.profiles.append(profile) }
                     do {
-                        try copy.validate(); state.error = ""; state.save(copy, credential: (profile.id, key))
+                        try copy.validate(); state.error = ""
+                        state.save(copy, credential: keyDraft.credentialUpdate.map { (profile.id, $0) })
                         if state.error.isEmpty { dismiss() } else { problem = state.error }
                     } catch { problem = error.localizedDescription }
                 }.buttonStyle(.borderedProminent).disabled(testing)
             }
         }.padding(28).frame(width: 600).onAppear {
             profile = profile.normalizedInput
-            do { key = try state.key(for: profile) } catch { problem = error.localizedDescription }
+            do { keyDraft = APIKeyDraft(hasSavedKey: try state.hasKey(for: profile)) }
+            catch { problem = "\(error.localizedDescription) The existing key will be kept unless you enter a replacement." }
         }
     }
 }

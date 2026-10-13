@@ -190,7 +190,9 @@ struct StudioView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {
                         Text(L("Make room for your voice")).font(.headline)
-                        Text(L("Allow Accessibility for insertion. Microphone permission is requested when you record."))
+                        Text(state.insertionAuthorized
+                             ? L("Allow Accessibility for insertion. Microphone permission is requested when you record.")
+                             : L("Enable Accessibility to paste into other apps. The result is available here."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()

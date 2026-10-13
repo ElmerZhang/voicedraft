@@ -88,7 +88,7 @@ struct RecordingHUD: View {
                 Button { state.dismissHUD() } label: { Image(systemName: "xmark").font(.system(size: 15)) }
                     .buttonStyle(.plain).foregroundStyle(.white.opacity(0.5)).help(D("Dismiss")).accessibilityLabel(D("Dismiss"))
             }
-            if state.hudKind == .failure {
+            if state.hudKind == .failure || !state.error.isEmpty {
                 Text(L(state.error)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65))
                     .lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
             }

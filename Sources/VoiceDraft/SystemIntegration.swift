@@ -40,12 +40,18 @@ enum TextInsertion {
                            editable: element.map(isEditable) ?? false)
     }
     private static func isEditable(_ element: AXUIElement) -> Bool {
-        guard attribute(element, kAXEnabledAttribute) as? Bool != false else { return false }
-        var selected = DarwinBoolean(false), value = DarwinBoolean(false)
-        _ = AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &selected)
-        _ = AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &value)
-        let role = attribute(element, kAXRoleAttribute) as? String ?? ""
-        return selected.boolValue || (["AXTextField", "AXTextArea", "AXComboBox"].contains(role) && value.boolValue)
+        func isSettable(_ name: String) -> Bool {
+            var value = DarwinBoolean(false)
+            return AXUIElementIsAttributeSettable(element, name as CFString, &value) == .success && value.boolValue
+        }
+        return TextInputCapabilities(
+            role: attribute(element, kAXRoleAttribute) as? String ?? "",
+            enabled: attribute(element, kAXEnabledAttribute) as? Bool != false,
+            secure: attribute(element, kAXSubroleAttribute) as? String == "AXSecureTextField",
+            canReplaceSelection: isSettable(kAXSelectedTextAttribute),
+            canSetValue: isSettable(kAXValueAttribute),
+            canSetSelectionRange: isSettable(kAXSelectedTextRangeAttribute)
+        ).acceptsInsertion
     }
     static func requestAccess() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]

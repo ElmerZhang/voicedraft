@@ -1,5 +1,9 @@
 # Validation record
 
+## 2026-10-13 · Explicit dictation cleanup
+
+The writing prompt and tests cover hesitation, stutters, restarts, quoted wording and meaningful repetition.
+
 ## 2026-10-13 · Dismiss the HUD when paste is sent
 
 - Added a synchronous `onPasteSent` callback after both Command-V events are posted. AppState checks the run identity and hides the HUD immediately in that callback. Removed the delayed-success timer. Receipt polling and conditional clipboard restoration retain their existing timing with the run still busy; missing targets and errors before posting retain the Copy fallback. No ASR, focus eligibility, clipboard lifetime, or retry policy was changed.

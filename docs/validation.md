@@ -1,5 +1,23 @@
 # Validation record
 
+## 2026-10-13 · Explicit dictation cleanup
+
+- The user's Polish history contained `帮我把这个 Commit 丢丢丢掉吧，没用了。` unchanged in both transcript and result, using `qwen3.7-flash`. The old prompt said to remove repetition but gave no stutter examples or distinction between tone and disfluency.
+- Polish and Translate now share explicit cleanup rules and Chinese/English examples for stutters, accidental duplication, phrase restarts and spoken corrections. Meaningful reduplication/emphasis, quoted verbatim speech, negation, uncertainty, conditions, numbers and identifiers are protected. Translation examples describe source cleanup, not the output language. No extra model call, ASR change, blanket text replacement or model setting change was added.
+- `python3 scripts/test-all.py` passed all 74 Swift and 6 Python tests, including both localhost integrations. Two new request-contract tests cover cleanup mode scope, translation target, retained style/vocabulary, and intact structured transcript data. Both localization checks (301 shared / 65 desktop messages in eight languages), release packaging, signature/Info.plist and diff checks passed. Automated tests used no real audio, selections, credentials or provider calls, and do not establish model quality.
+- Relaunched the package with 35 history entries, four active vocabulary terms, both selected Qwen models and Wireless Mic Rx preserved. Renewed the current ad-hoc bundle's existing Accessibility authorization and verified the running app's refreshed permission indicator. No signing requirement was changed.
+- Real-model acceptance remains pending. The following cases are expected behavior for a manual quality check, not measured results. Also check Chinese-to-English/Japanese translation and confirm Verbatim stays literal.
+
+| Input | Expected Polish behavior |
+| --- | --- |
+| 帮我把这个 Commit 丢丢丢掉吧，没用了。 | 帮我把这个 Commit 丢掉吧，没用了。 |
+| 麻麻麻烦把这个 PR 关掉，还没有合并。 | Remove the stutter; preserve the request and “还没有合并”. |
+| 嗯，我觉得，我觉得先不发布，可能还需要测试。 | Remove the hesitation/restart; preserve negation and uncertainty. |
+| 先发到 dev，不对，是 staging，只在测试通过后发。 | Use staging, omit the correction, retain the condition; never claim deployment happened. |
+| 慢慢看看，人人都知道这件事非常非常重要。 | Preserve meaningful reduplication and emphasis. |
+| 不不不，别删。编号是 111222，变量是 foo_bar。 | Preserve emphatic negation, exact digits and identifier. |
+| 他原话是“丢丢丢掉”，我不确定是不是要删。 | Preserve the quoted wording and uncertainty. |
+
 ## 2026-10-13 · Dismiss the HUD when paste is sent
 
 - The user confirmed that `aefbae6` inserts into Codex and dismisses the HUD without Copy, but reported a 1–2 second delay after the text arrived. The code still kept the HUD visible during the bounded 1.5-second receipt wait; confirmed/terminal outcomes also had a 1.2-second success-display delay.

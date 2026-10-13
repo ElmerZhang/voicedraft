@@ -17,11 +17,11 @@ Requirements: macOS 13 or newer, Xcode/Swift for source builds. The included bui
 
 The build script packages the icon directly, checks all ten image representations with macOS ImageIO, and verifies the app signature and Info.plist before reporting success. It does not require `iconutil` conversion.
 
-1. Open **Models**, edit the speech and writing profiles, and enter a Bailian API key in each. They may share a key or use separate keys.
+1. Open **Settings → Models**, edit the speech and writing profiles, and enter a Bailian API key in each. They may share a key or use separate keys.
 2. Select a model first, then configure its endpoint and model parameters. Defaults remain `qwen3-asr-flash` for speech and `qwen-plus` for writing. The catalog supports Qwen3-ASR-Flash (HTTP context), Qwen-Audio-3.0/3.1-ASR-Flash (HTTP weighted hotwords), and Qwen-Audio-3.1-ASR-Flash-Message (WebSocket weighted hotwords). Other ASR IDs require an adapter before use.
 3. Use your region/workspace domain and the selected model’s endpoint. **Use model endpoint** fixes the scheme and path while keeping your host. Message uses `wss://WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference`; it cannot use `/chat/completions`. Already-saved API keys appear as masked dots. Leaving the replacement blank keeps the stored key.
-4. Use **Test connection** on the writing profile. This sends a small real request using your key. Test ASR by recording in Studio.
-5. Allow Microphone when recording. Allow Accessibility from Studio to insert into other applications.
+4. Use **Test connection** on the writing profile. This sends a small real request using your key. Test ASR by recording in the **Home → Try it here** workspace.
+5. Allow Microphone when recording. Allow Accessibility from Home to insert into other applications.
 6. Click a text field in another app and press **Control + Option + Space**, speak, then press the shortcut again.
 
 | Shortcut | Behavior |
@@ -31,9 +31,16 @@ The build script packages the icon directly, checks all ten image representation
 | Control + Option + E | Speak an editing instruction for selected editable text |
 | Control + Option + A | Ask a question, optionally using selected text; show result in the app |
 
-Studio also supports plain transcription and manually entered text, useful for testing writing prompts independently of audio. Recordings are limited to four minutes per take. This version transcribes after recording stops. Choose **Input device** in Studio: follow the system default or select a microphone. The recording panel shows the actual device used for each take. Device selection is local and does not change macOS Sound settings.
+The Home testing workspace also supports plain transcription and manually entered text, useful for testing writing prompts independently of audio. Recordings are limited to four minutes per take. This version transcribes after recording stops. Choose **Input device** in Home or Settings: follow the system default or select a microphone. The recording panel shows the actual device used for each take. Device selection is local and does not change macOS Sound settings.
 
 The floating recording panel does not take keyboard focus. If the original field or selection changes while the model is working, the result remains in VoiceDraft for manual copying. Accessibility support varies between applications; password fields are blocked. No automatic Enter/send keystroke is generated.
+
+## Pages
+
+- **Home**: shortcut guide, local usage counts, and the full recording/text-testing workspace. Transcribe, polish, translate, edit selection, and ask modes are preserved.
+- **History**: records grouped by day, search, dictation/question filters, original transcript details, copy, deletion, and the local-history toggle.
+- **Dictionary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
+- **Settings** (sidebar or **Command-comma**): language, microphone, insertion and history preferences, plus Personalization, Models, Sync, About, and Help. Save writing style and translation target in Personalization.
 
 ## Start configuration sync locally
 
@@ -55,9 +62,9 @@ Localhost is only reachable from the same machine. For multiple physical devices
 - Multiple saved Qwen model profiles; speech and writing are selected independently.
 - Model catalog, protocol-specific endpoints, separate API keys, read-only vocabulary adaptation previews, and advanced JSON parameters.
 - Dictation cleanup, spoken self-corrections, structured formatting, translation, selected-text editing, and text-only question answering through Qwen.
-- One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Vocabulary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
+- One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Dictionary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
-- Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in the sidebar or following the system. This choice is local and separate from the translation target.
+- Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
 - A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
 - No external Swift packages or Python packages; model calls go directly from Mac to the configured endpoint.
 
@@ -65,6 +72,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 
 ```sh
 python3 scripts/check-localizations.py
+python3 scripts/check-desktop-localizations.py
 python3 scripts/test-all.py
 ```
 
@@ -76,7 +84,7 @@ Settings now use schema v3. v1/v2 profiles and vocabulary migrate in memory whil
 
 ## Adding a language
 
-Add its case and matching rules in `AppLanguage`/`L10n`, provide complete `Localizable.strings` and `InfoPlist.strings` catalogs, and include the locale in the packaging and localization checks. UI labels and app errors use `L` / `LocalizedMessage`; never localize protocol values or saved user content. Run the catalog checker, Swift tests, and inspect the packaged UI before shipping.
+Add its case and matching rules in `AppLanguage`/`L10n`, provide complete `Localizable.strings`, `Desktop.strings`, and `InfoPlist.strings` catalogs, and include the locale in the packaging and localization checks. UI labels and app errors use `L` / `LocalizedMessage`; never localize protocol values or saved user content. Run the catalog checker, Swift tests, and inspect the packaged UI before shipping.
 
 ## Official API references
 

@@ -14,6 +14,18 @@ SwiftUI views
 
 Views submit changes through AppState; they do not write storage. The model adapter owns provider protocol details; the coordinator owns capture, cancellation, output delivery, and history. The server stores opaque encrypted configuration and does not proxy inference, receive audio, or manage model billing.
 
+## Desktop navigation and editing
+
+The main shell has Home, History, and Dictionary navigation. Home embeds the existing Studio recording and text-testing workspace, including all five modes, microphone selection, selection input, transcript processing, editable output, copying, and Accessibility controls. Shortcut hints show the actual Control-Option bindings; the UI does not register new shortcuts.
+
+Settings is an in-window modal with its own navigation for general settings, Personalization, Models, Sync, About, and Help. The sidebar and Command-comma open the same modal. While it is open, the underlying page is disabled and `AppState.page` is `Settings`, preserving the existing pause on periodic configuration sync while forms are edited. Closing restores the previous page. Models and Sync retain their existing editors and coordinator calls.
+
+Dictionary searches terms and aliases and filters enabled/disabled entries; automatic term discovery is not implemented. Add/edit, bulk add, enable, and delete actions update a fresh copy of shared settings through `AppState.save`. Entries retain their stable IDs and all rich vocabulary fields. Successful edits save immediately; validation/persistence errors keep the editor open. Writing style and translation target have an explicit Save action in Personalization.
+
+History groups saved entries by local calendar date, supports text search and dictation/question filters, and retains original-transcript details, copy, single-entry deletion, clear-all confirmation, and future-history opt-out. The existing 500-entry limit is unchanged. Home counts are derived from retained local history and the active dictionary, not lifetime usage or estimates of time saved. No history cloud-sync or provider zero-retention claim is made.
+
+Page copy uses the `Desktop.strings` table in the same eight language bundles as existing controls. `VOICEDRAFT_PREVIEW=1` opens an isolated interactive preview; `VOICEDRAFT_CAPTURE_PREVIEWS=<directory>` renders all six main destinations and exits. Both skip persisted configuration, Keychain reads, and global shortcut registration. `VOICEDRAFT_PREVIEW_FIXTURES=1` adds synthetic dictionary/history data only inside preview mode. Preview edits remain in memory; do not use provider, credential, or permission actions during visual checks.
+
 ## Models and inference
 
 `ModelProfile` has a stable UUID, role, name, full endpoint, model ID, explicit adapter and additional JSON parameters. `ModelCatalog` lists only supported ASR models; each entry specifies its adapter and vocabulary capability. Text models use the chat adapter with a model picker and a custom Qwen text deployment option. A saved profile's UUID also identifies its local Keychain credential. Speech and writing profiles can have different accounts, endpoints, regions, and models. Additional JSON cannot override messages, model, streaming mode, or authentication.

@@ -11,21 +11,21 @@ Baseline reviewed against the public [Typeless quickstart](https://www.typeless.
 | Translation | Configurable target language | Favorite targets and fast switching |
 | Voice editing of selected text | Accessibility selection plus Qwen rewrite | Rich text preservation, undo integration, broader editor coverage |
 | Ask anything | Text-only answer with optional selected text | Search integrations and explicit action execution |
-| Personal dictionary | Context or weighted hotwords by model; per-profile weights and overrides | Automatic term suggestions, import/export, supported provider-specific dictionaries |
+| Personal dictionary | One rich app vocabulary with adapter projections and migration | Automatic term suggestions, file import/export, additional provider adapters |
 | Personal style | User-edited global style prompt | Learning from corrections with explicit controls |
 | Per-application tone | App name available as context | Editable application-specific rules and routing |
 | Multilingual speech | Delegated to the chosen Qwen ASR model | Measured language coverage and language controls; no promise of Typeless's advertised count |
 | History | Local search, copy, delete, opt-out; maximum 500 entries | Export, retention controls, optional encrypted history sync |
-| Model configuration | Model-first Qwen ASR/LLM profiles, adapter-specific options, saved-key indicators, schema v1 migration | Other vendors only after individual adapter work |
+| Model configuration | Model-first Qwen ASR/LLM profiles, adapter-specific options, saved-key indicators, schema v1/v2 migration | Other vendors only after individual adapter work |
 | Cross-device model and hotword sync | Implemented, end-to-end encrypted including API keys | Field-level conflict resolution, device management, key rotation |
 | Sync service | Self-hosted single vault, SQLite, token, Docker configuration | Production hosting, multi-user accounts, organizations, audit and recovery workflows |
 | Live partial transcription | Not included; recognize after stop | Streaming ASR, endpoint detection/VAD, network reconnection |
 | Long dictation | Four-minute takes | Chunking, long-session recovery, audio interruption handling |
-| Microphone controls | Uses macOS default input | In-app input selection and device hotplug handling |
+| Microphone controls | App input picker, per-take device binding and HUD device name | Real microphone/device-disconnect validation |
 | Offline mode | Settings/history work offline | Local ASR/LLM adapters and queue/retry options |
 | macOS distribution | Locally signed Apple Silicon app | Developer ID signing, notarization, updater, Intel builds, login item |
 | Windows, iOS, Android | No clients yet | Platform-specific capture/input, shared sync protocol implementations |
-| Product polish | Native English UI, model editor, sync setup, recording state, application icon | Localization, onboarding, accessibility review |
+| Product polish | Eight interface languages, model editor, sync setup, recording state, application icon | Native-language copy review, onboarding, accessibility review |
 
 ## Suggested delivery sequence
 

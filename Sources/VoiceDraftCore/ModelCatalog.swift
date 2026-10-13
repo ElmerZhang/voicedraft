@@ -5,10 +5,10 @@ public enum ModelAdapter: String, Codable {
 
     public var title: String {
         switch self {
-        case .qwenChatSpeech, .qwenChatWriting: return "HTTP · Chat Completions"
-        case .qwenAudioHTTP: return "HTTP · Qwen Audio"
-        case .qwenMessageWebSocket: return "WebSocket · Qwen ASR Message"
-        case .unconfigured: return "Choose a supported model"
+        case .qwenChatSpeech, .qwenChatWriting: return L("HTTP · Chat Completions")
+        case .qwenAudioHTTP: return L("HTTP · Qwen Audio")
+        case .qwenMessageWebSocket: return L("WebSocket · Qwen ASR Message")
+        case .unconfigured: return L("Choose a supported model")
         }
     }
     public var path: String {
@@ -63,45 +63,19 @@ public enum ModelCatalog {
     }
 }
 
-public struct WeightedHotword: Codable, Equatable, Identifiable {
+// Decode-only schema-v2 vocabulary. Profiles never encode or use these at runtime.
+struct LegacyWeightedHotword: Decodable, Equatable {
     public var id = UUID()
     public var text: String
     public var weight: Int
     public init(text: String = "", weight: Int = 3) { self.text = text; self.weight = weight }
 }
 
-public struct SpeechOptions: Codable, Equatable {
+struct LegacySpeechOptions: Decodable, Equatable {
     public var useVocabulary = true
     public var defaultWeight = 3
-    public var hotwords: [WeightedHotword] = []
+    public var hotwords: [LegacyWeightedHotword] = []
     public init() {}
-
-    public func validate() throws {
-        guard (1...5).contains(defaultWeight), hotwords.count <= 2000,
-              Set(hotwords.map(\.id)).count == hotwords.count,
-              hotwords.allSatisfy({ (1...5).contains($0.weight) || $0.weight == 50 }),
-              hotwords.filter({ $0.weight == 50 }).count <= 50,
-              hotwords.allSatisfy({ !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.text.count <= 100 && !$0.text.contains(where: \.isNewline) }) else {
-            throw VoiceDraftError.message("Use nonempty single-line hotwords (up to 100 characters), weights 1–5 or 50, and at most 50 super hotwords.")
-        }
-        let words = hotwords.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
-        guard Set(words).count == words.count else { throw VoiceDraftError.message("Remove duplicate custom hotwords.") }
-    }
-
-    public func weightedVocabulary(_ personalWords: String) throws -> [String: Int] {
-        try validate()
-        guard useVocabulary else { return [:] }
-        var result: [String: Int] = [:]
-        for word in personalWords.split(whereSeparator: \.isNewline) {
-            let term = word.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !term.isEmpty { result[term] = defaultWeight }
-        }
-        for word in hotwords { result[word.text.trimmingCharacters(in: .whitespacesAndNewlines)] = word.weight }
-        guard result.count <= 2000, result.keys.allSatisfy({ $0.count <= 100 }) else {
-            throw VoiceDraftError.message("This model accepts up to 2,000 hotwords. Keep each word or phrase within 100 characters.")
-        }
-        return result
-    }
 }
 
 extension ModelProfile {
@@ -116,7 +90,6 @@ extension ModelProfile {
             extraJSON = role == .writing ? "{\"enable_thinking\": false}" : "{}"
         }
         model = id; adapter = next
-        speechOptions = SpeechOptions()
     }
 
     public func validateForInference() throws {
@@ -134,7 +107,6 @@ extension ModelProfile {
             }
         }
         _ = try modelParameters()
-        try speechOptions.validate()
     }
 
     public func modelParameters() throws -> [String: Any] {
@@ -145,13 +117,13 @@ extension ModelProfile {
         case .qwenChatSpeech: allowed = ["asr_options"]
         case .qwenAudioHTTP:
             allowed = model == "qwen-audio-3.1-asr-flash"
-                ? ["language_hints", "keep_dialect", "speaker_diarization_enabled", "vocabulary_id"]
-                : ["language_hints", "vocabulary_id"]
+                ? ["language_hints", "keep_dialect", "speaker_diarization_enabled"]
+                : ["language_hints"]
         case .qwenMessageWebSocket:
-            allowed = ["language_hints", "disfluency_removal_enabled", "keep_dialect", "vad_model", "max_sentence_silence", "heartbeat", "speech_noise_threshold", "vocabulary_id"]
+            allowed = ["language_hints", "disfluency_removal_enabled", "keep_dialect", "vad_model", "max_sentence_silence", "heartbeat", "speech_noise_threshold"]
         }
         guard Set(parameters.keys).isSubset(of: allowed) else {
-            throw VoiceDraftError.message("Advanced parameters do not match this model. Supported keys: \(allowed.sorted().joined(separator: ", ")). Configure hotwords in the vocabulary controls.")
+            throw VoiceDraftError.message("Advanced parameters do not match this model. Supported keys: \(allowed.sorted().joined(separator: ", ")). Manage hotwords in the app vocabulary.")
         }
         return parameters
     }

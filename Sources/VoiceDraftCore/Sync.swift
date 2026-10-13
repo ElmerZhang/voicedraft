@@ -52,7 +52,9 @@ public enum SyncCrypto {
         let status = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
         guard status == errSecSuccess else { throw VoiceDraftError.message("Could not generate encryption randomness.") }
         let secret = try key(passphrase: passphrase, salt: salt, iterations: rounds)
-        let sealed = try AES.GCM.seal(JSONEncoder().encode(snapshot), using: secret, authenticating: aad)
+        let plaintext = try JSONEncoder().encode(snapshot)
+        guard plaintext.count <= 700_000 else { throw VoiceDraftError.message("The configuration is too large to sync. Reduce vocabulary or advanced parameter data before syncing.") }
+        let sealed = try AES.GCM.seal(plaintext, using: secret, authenticating: aad)
         return EncryptedEnvelope(version: 1, algorithm: "PBKDF2-SHA256+AES-256-GCM", iterations: rounds,
                                  salt: salt.base64EncodedString(), ciphertext: sealed.combined!.base64EncodedString())
     }

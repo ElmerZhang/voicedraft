@@ -18,7 +18,7 @@ Requirements: macOS 13 or newer, Xcode/Swift for source builds. The included bui
 The build script packages the icon directly, checks all ten image representations with macOS ImageIO, and verifies the app signature and Info.plist before reporting success. It does not require `iconutil` conversion.
 
 1. Open **Models**, edit the speech and writing profiles, and enter a Bailian API key in each. They may share a key or use separate keys.
-2. Select a model first, then configure its endpoint and vocabulary options. Defaults remain `qwen3-asr-flash` for speech and `qwen-plus` for writing. The catalog supports Qwen3-ASR-Flash (HTTP context), Qwen-Audio-3.0/3.1-ASR-Flash (HTTP weighted hotwords), and Qwen-Audio-3.1-ASR-Flash-Message (WebSocket weighted hotwords). Other ASR IDs require an adapter before use.
+2. Select a model first, then configure its endpoint and model parameters. Defaults remain `qwen3-asr-flash` for speech and `qwen-plus` for writing. The catalog supports Qwen3-ASR-Flash (HTTP context), Qwen-Audio-3.0/3.1-ASR-Flash (HTTP weighted hotwords), and Qwen-Audio-3.1-ASR-Flash-Message (WebSocket weighted hotwords). Other ASR IDs require an adapter before use.
 3. Use your region/workspace domain and the selected model’s endpoint. **Use model endpoint** fixes the scheme and path while keeping your host. Message uses `wss://WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference`; it cannot use `/chat/completions`. Already-saved API keys appear as masked dots. Leaving the replacement blank keeps the stored key.
 4. Use **Test connection** on the writing profile. This sends a small real request using your key. Test ASR by recording in Studio.
 5. Allow Microphone when recording. Allow Accessibility from Studio to insert into other applications.
@@ -31,7 +31,7 @@ The build script packages the icon directly, checks all ten image representation
 | Control + Option + E | Speak an editing instruction for selected editable text |
 | Control + Option + A | Ask a question, optionally using selected text; show result in the app |
 
-Studio also supports plain transcription and manually entered text, useful for testing writing prompts independently of audio. Recordings are limited to four minutes per take. This version transcribes after recording stops. Select the input microphone in macOS Sound settings.
+Studio also supports plain transcription and manually entered text, useful for testing writing prompts independently of audio. Recordings are limited to four minutes per take. This version transcribes after recording stops. Choose **Input device** in Studio: follow the system default or select a microphone. The recording panel shows the actual device used for each take. Device selection is local and does not change macOS Sound settings.
 
 The floating recording panel does not take keyboard focus. If the original field or selection changes while the model is working, the result remains in VoiceDraft for manual copying. Accessibility support varies between applications; password fields are blocked. No automatic Enter/send keystroke is generated.
 
@@ -53,16 +53,18 @@ Localhost is only reachable from the same machine. For multiple physical devices
 ## Included
 
 - Multiple saved Qwen model profiles; speech and writing are selected independently.
-- Model catalog, protocol-specific endpoints, separate API keys, capability-aware vocabulary controls, and advanced JSON parameters.
+- Model catalog, protocol-specific endpoints, separate API keys, read-only vocabulary adaptation previews, and advanced JSON parameters.
 - Dictation cleanup, spoken self-corrections, structured formatting, translation, selected-text editing, and text-only question answering through Qwen.
-- Personal vocabulary as recognition context or weighted hotwords, depending on the model, plus writing style guidance. Recognition is not guaranteed to use every supplied term.
+- One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Vocabulary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
-- A menu bar entry, recording HUD, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
+- Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in the sidebar or following the system. This choice is local and separate from the translation target.
+- A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
 - No external Swift packages or Python packages; model calls go directly from Mac to the configured endpoint.
 
 ## Verification
 
 ```sh
+python3 scripts/check-localizations.py
 python3 scripts/test-all.py
 ```
 
@@ -70,10 +72,15 @@ This starts an isolated localhost service and tests encryption, two-device synch
 
 See [architecture](docs/architecture.md), [deployment](docs/server.md), [feature parity and roadmap](docs/roadmap.md), and [validation](docs/validation.md).
 
-Settings now use schema v2. Existing profiles migrate in memory while keeping their IDs and keys; the next save persists v2. Upgrade other syncing clients before sharing the new settings.
+Settings now use schema v3. v1/v2 profiles and vocabulary migrate in memory while keeping profile IDs and keys; the next save persists v3. Global lines and all profile terms are merged, with active-profile overrides winning conflicts. Remote vocabulary IDs are preserved as recovery references until their contents are imported. Upgrade other syncing clients before sharing the new settings.
+
+## Adding a language
+
+Add its case and matching rules in `AppLanguage`/`L10n`, provide complete `Localizable.strings` and `InfoPlist.strings` catalogs, and include the locale in the packaging and localization checks. UI labels and app errors use `L` / `LocalizedMessage`; never localize protocol values or saved user content. Run the catalog checker, Swift tests, and inspect the packaged UI before shipping.
 
 ## Official API references
 
+- [Qwen vocabulary formats and limits](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)
 - [Qwen Audio HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-flash-recorded-speech-recognition-http-api)
 - [Qwen ASR Message WebSocket API](https://help.aliyun.com/zh/model-studio/qwen-asr-message-websocket-api)
 - [Qwen ASR Message client events](https://help.aliyun.com/zh/model-studio/qwen-asr-message-client-events)

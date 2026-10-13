@@ -20,12 +20,12 @@ public enum ProviderFailure {
     public static func http(status: Int, code: String? = nil, requestID: String? = nil) -> VoiceDraftError {
         let hint: String
         switch status {
-        case 401, 403: hint = "Check the API key, its region, and model access."
-        case 404: hint = "Check the full endpoint URL and selected model."
-        case 429: hint = "Rate limit or quota reached. Try again later."
-        case 400: hint = "Check the selected model, its protocol, and advanced parameters in Models."
-        case 300..<400: hint = "Redirects are blocked. Use the provider's direct endpoint."
-        default: hint = "Try again or check the provider console."
+        case 401, 403: hint = L("Check the API key, its region, and model access.")
+        case 404: hint = L("Check the full endpoint URL and selected model.")
+        case 429: hint = L("Rate limit or quota reached. Try again later.")
+        case 400: hint = L("Check the selected model, its protocol, and advanced parameters in Models.")
+        case 300..<400: hint = L("Redirects are blocked. Use the provider's direct endpoint.")
+        default: hint = L("Try again or check the provider console.")
         }
         return .message("Model request failed (HTTP \(status)). \(hint)\(details(code: code, requestID: requestID))")
     }
@@ -34,8 +34,8 @@ public enum ProviderFailure {
     }
     private static func details(code: String?, requestID: String?) -> String {
         var result = ""
-        if let code, codes.contains(code) { result += " Provider code: \(code)." }
-        if let requestID, let uuid = UUID(uuidString: requestID) { result += " Request ID: \(uuid.uuidString)." }
+        if let code, codes.contains(code) { result += L(" Provider code: \(code).") }
+        if let requestID, let uuid = UUID(uuidString: requestID) { result += L(" Request ID: \(uuid.uuidString).") }
         return result
     }
 }

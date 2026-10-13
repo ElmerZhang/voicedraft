@@ -1,22 +1,21 @@
 import Foundation
 
 public enum SpeechClient {
-    public static func transcribe(profile: ModelProfile, key: String, wav: Data, hotwords: String) async throws -> String {
+    public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) async throws -> String {
         try profile.validateForInference()
         switch profile.adapter {
         case .qwenChatSpeech:
-            let context = profile.speechOptions.useVocabulary
-                ? hotwords.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: ", ") : ""
-            return try await HTTPTransport().complete(QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: context))
+            let request = try QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
+            return try await HTTPTransport().complete(request)
         case .qwenAudioHTTP:
-            let request = try AudioHTTPRequests.speech(profile: profile, key: key, wav: wav, hotwords: hotwords)
+            let request = try AudioHTTPRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
             return try AudioHTTPRequests.parse(data)
         case .qwenMessageWebSocket:
             let request = try MessageASRRequests.connection(profile: profile, key: key)
             let taskID = UUID().uuidString
-            let start = try MessageASRRequests.start(profile: profile, hotwords: hotwords, taskID: taskID)
+            let start = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID)
             try QwenRequests.validateAudio(wav)
             let socket = NativeASRWebSocket(request: request)
             return try await MessageASRSession.transcribe(socket: socket, start: start, wav: wav, taskID: taskID)
@@ -26,13 +25,14 @@ public enum SpeechClient {
 }
 
 public enum AudioHTTPRequests {
-    public static func speech(profile: ModelProfile, key: String, wav: Data, hotwords: String) throws -> URLRequest {
+    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) throws -> URLRequest {
         try profile.validateForInference()
         guard profile.adapter == .qwenAudioHTTP else { throw VoiceDraftError.message("This model does not use the Qwen Audio HTTP adapter.") }
         try QwenRequests.validateAudio(wav)
         var parameters = try profile.modelParameters()
         parameters["format"] = "wav"; parameters["sample_rate"] = "16000"
-        let words = try profile.speechOptions.weightedVocabulary(hotwords)
+        try vocabulary.validate()
+        let words = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability).weighted
         if !words.isEmpty { parameters["vocabulary"] = words }
         let body: [String: Any] = ["input": ["messages": [["role": "user", "content": [
             ["type": "input_audio", "input_audio": ["data": "data:audio/wav;base64,\(wav.base64EncodedString())"]]
@@ -58,13 +58,14 @@ public enum MessageASRRequests {
         request.setValue("Bearer \(try QwenRequests.validKey(key, name: profile.name))", forHTTPHeaderField: "Authorization")
         return request
     }
-    public static func start(profile: ModelProfile, hotwords: String, taskID: String) throws -> String {
+    public static func start(profile: ModelProfile, vocabulary: AppVocabulary, taskID: String) throws -> String {
         try profile.validateForInference()
         guard profile.adapter == .qwenMessageWebSocket else { throw VoiceDraftError.message("Choose a Message speech model.") }
         var parameters = try profile.modelParameters()
         parameters["format"] = "wav"; parameters["sample_rate"] = 16000
         parameters["intermediate_result_enabled"] = false
-        let words = try profile.speechOptions.weightedVocabulary(hotwords)
+        try vocabulary.validate()
+        let words = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability).weighted
         if !words.isEmpty { parameters["vocabulary"] = words }
         return try json([
             "header": ["action": "run-task", "task_id": taskID, "streaming": "duplex"],

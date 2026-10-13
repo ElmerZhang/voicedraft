@@ -40,13 +40,15 @@ public enum QwenRequests {
         return request
     }
 
-    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: String) throws -> URLRequest {
+    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) throws -> URLRequest {
         guard profile.role == .speech else { throw VoiceDraftError.message("Choose a speech recognition profile.") }
         try profile.validateForInference()
         guard profile.adapter == .qwenChatSpeech else { throw VoiceDraftError.message("This speech model does not use Chat Completions. Choose its matching adapter in Models.") }
         try validateAudio(wav)
         var messages: [[String: Any]] = []
-        if profile.speechOptions.useVocabulary && !vocabulary.isEmpty { messages.append(["role": "system", "content": vocabulary]) }
+        try vocabulary.validate()
+        let context = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability).context
+        if !context.isEmpty { messages.append(["role": "system", "content": context]) }
         messages.append(["role": "user", "content": [
             ["type": "input_audio", "input_audio": ["data": "data:audio/wav;base64,\(wav.base64EncodedString())"]]
         ]])
@@ -77,7 +79,7 @@ public enum QwenRequests {
         You are a careful voice writing assistant. \(instruction)
         Return only the requested text, without a preamble or wrapping quotation marks.
         Writing preferences: \(settings.stylePrompt)
-        Vocabulary (spell these terms accurately when relevant; do not insert them gratuitously): \(settings.vocabulary)
+        Vocabulary (spell these terms accurately when relevant; do not insert them gratuitously): \(settings.vocabulary.writingContext)
         """
         let input = try JSONSerialization.data(withJSONObject: ["transcript": text, "selected_text": selection, "application": application])
         var body = try extras(profile.extraJSON)

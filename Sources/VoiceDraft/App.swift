@@ -12,7 +12,9 @@ struct VoiceDraftApp: App {
 }
 
 private struct EditingCommands: Commands {
+    @AppStorage("interfaceLanguage") private var language = AppLanguage.system.rawValue
     var body: some Commands {
+        let _ = language
         CommandGroup(replacing: .undoRedo) {
             command("Undo", action: "undo:", key: "z")
             command("Redo", action: "redo:", key: "z", modifiers: [.command, .shift])
@@ -27,7 +29,7 @@ private struct EditingCommands: Commands {
 
     private func command(_ title: String, action: String, key: KeyEquivalent,
                          modifiers: EventModifiers = .command) -> some View {
-        Button(title) {
+        Button(L10n.text(title)) {
             // The windows are hosted by AppKit, so route to the key window's
             // first responder, including the field editor in a model sheet.
             NSApp.sendAction(Selector(action), to: nil, from: nil)
@@ -42,6 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hud: NSPanel!
     private var statusItem: NSStatusItem!
     private let shortcuts = GlobalShortcuts()
+    private var menuKeys: [ObjectIdentifier: String] = [:]
+    private var menuObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -54,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: RootView(state: state))
         window.center()
-        hud = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 446, height: 72), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        hud = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 516, height: 102), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         hud.level = .floating; hud.isOpaque = false; hud.backgroundColor = .clear; hud.hasShadow = true
         hud.hidesOnDeactivate = false
         hud.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -64,24 +68,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.hideHUD = { [weak self] in self?.hud.orderOut(nil) }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "VoiceDraft")
-        let menu = NSMenu()
-        let open = NSMenuItem(title: "Open VoiceDraft", action: #selector(showWindow), keyEquivalent: "")
-        open.target = self; menu.addItem(open)
-        let record = NSMenuItem(title: "Start / stop dictation", action: #selector(toggleRecording), keyEquivalent: "")
-        record.target = self; menu.addItem(record)
-        menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit VoiceDraft", action: #selector(quitApp), keyEquivalent: "q")
-        quit.target = self; menu.addItem(quit); statusItem.menu = menu
+        updateStatusMenu()
+        state.languageChanged = { [weak self] in self?.updateStatusMenu(); self?.updateMainMenu() }
+        menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.updateMainMenu() }
+        }
+        DispatchQueue.main.async { [weak self] in self?.updateMainMenu() }
         shortcuts.onTrigger = { [weak self] id in
             guard let self else { return }
             let modes: [WritingMode] = [.polish, .translate, .edit, .ask]
             self.state.toggle(mode: modes[min(Int(id), 3)], external: true)
         }
         if previewDirectory == nil {
-            do { try shortcuts.install() } catch { state.error = error.localizedDescription }
+            do { try shortcuts.install() } catch { state.error = .init(error: error) }
         }
         showWindow()
         if let previewDirectory { capturePreviews(to: previewDirectory) }
+    }
+    private func updateStatusMenu() {
+        let menu = NSMenu()
+        let open = NSMenuItem(title: L("Open VoiceDraft"), action: #selector(showWindow), keyEquivalent: "")
+        open.target = self; menu.addItem(open)
+        let record = NSMenuItem(title: L("Start / stop dictation"), action: #selector(toggleRecording), keyEquivalent: "")
+        record.target = self; menu.addItem(record)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: L("Quit VoiceDraft"), action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self; menu.addItem(quit); statusItem.menu = menu
+    }
+    private func updateMainMenu() {
+        // Relabel the existing menus; SwiftUI retains ownership and the native responder chain.
+        let names = ["File", "Edit", "View", "Window", "Help", "Services", "Settings…"]
+        let actions = ["orderFrontStandardAboutPanel:": "About VoiceDraft", "hide:": "Hide VoiceDraft",
+                       "hideOtherApplications:": "Hide Others", "unhideAllApplications:": "Show All",
+                       "terminate:": "Quit VoiceDraft", "performClose:": "Close Window",
+                       "performMiniaturize:": "Minimize", "performZoom:": "Zoom", "arrangeInFront:": "Bring All to Front"]
+        func update(_ menu: NSMenu) {
+            for item in menu.items {
+                let identity = ObjectIdentifier(item)
+                if menuKeys[identity] == nil {
+                    if let action = item.action, let key = actions[NSStringFromSelector(action)] { menuKeys[identity] = key }
+                    else if let key = names.first(where: { key in
+                        AppLanguage.allCases.contains { L10n.render(.init(key: key), language: $0) == item.title }
+                    }) { menuKeys[identity] = key }
+                }
+                if let key = menuKeys[identity] { item.title = L10n.text(key); item.submenu?.title = item.title }
+                if let submenu = item.submenu, menuKeys[identity] != "Services" { update(submenu) }
+            }
+        }
+        if let menu = NSApp.mainMenu { update(menu) }
     }
     private func capturePreviews(to path: String) {
         Task {

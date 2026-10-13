@@ -50,6 +50,7 @@ class IntegrationHandler(SyncHandler):
 
 def main():
     os.chdir(ROOT)
+    subprocess.run([sys.executable, "scripts/check-localizations.py"], check=True)
     subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "server", "-v"], check=True)
     with tempfile.TemporaryDirectory(prefix="voicedraft-test-") as directory:
         token = secrets.token_urlsafe(32)

@@ -5,7 +5,34 @@ import VoiceDraftCore
 @main
 struct VoiceDraftApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    var body: some Scene { Settings { EmptyView() } }
+    var body: some Scene {
+        Settings { EmptyView() }
+            .commands { EditingCommands() }
+    }
+}
+
+private struct EditingCommands: Commands {
+    var body: some Commands {
+        CommandGroup(replacing: .undoRedo) {
+            command("Undo", action: "undo:", key: "z")
+            command("Redo", action: "redo:", key: "z", modifiers: [.command, .shift])
+        }
+        CommandGroup(replacing: .pasteboard) {
+            command("Cut", action: "cut:", key: "x")
+            command("Copy", action: "copy:", key: "c")
+            command("Paste", action: "paste:", key: "v")
+            command("Select All", action: "selectAll:", key: "a")
+        }
+    }
+
+    private func command(_ title: String, action: String, key: KeyEquivalent,
+                         modifiers: EventModifiers = .command) -> some View {
+        Button(title) {
+            // The windows are hosted by AppKit, so route to the key window's
+            // first responder, including the field editor in a model sheet.
+            NSApp.sendAction(Selector(action), to: nil, from: nil)
+        }.keyboardShortcut(key, modifiers: modifiers)
+    }
 }
 
 @MainActor
@@ -45,7 +72,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit VoiceDraft", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit); statusItem.menu = menu
-        installMainMenu()
         shortcuts.onTrigger = { [weak self] id in
             guard let self else { return }
             let modes: [WritingMode] = [.polish, .translate, .edit, .ask]
@@ -76,17 +102,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch { fputs("Preview capture failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }
-    }
-    private func installMainMenu() {
-        let main = NSMenu()
-        let appItem = NSMenuItem(); let app = NSMenu()
-        app.addItem(withTitle: "Quit VoiceDraft", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        appItem.submenu = app; main.addItem(appItem)
-        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: ""); let edit = NSMenu(title: "Edit")
-        for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
-            edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
-        }
-        editItem.submenu = edit; main.addItem(editItem); NSApp.mainMenu = main
     }
     @objc func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     private func showHUD() {

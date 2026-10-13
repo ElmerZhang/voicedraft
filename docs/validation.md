@@ -1,5 +1,13 @@
 # Validation record
 
+## Editing shortcuts — 2026-10-13
+
+- Reproduced the missing Edit menu in the running app: the launch delegate's manually assigned main menu was replaced by SwiftUI's scene menu. Editing commands now belong to the SwiftUI scene and dispatch to the key window's first responder.
+- Rebuilt and relaunched `dist/VoiceDraft.app`; confirmed the Edit menu remains present with a model configuration sheet open.
+- In an unsaved new profile, pasted synthetic text into Profile name, used Command-Z to restore the original name, and Command-Shift-Z to restore the pasted text.
+- In Advanced request parameters, verified Command-A, paste, and Command-Z, observing the JSON return to `{}`. Cancelled the sheet without saving any test configuration. No model request or recording was made.
+- Seven standalone Swift tests passed; two HTTP integration tests remained skipped. The release build, icon validation, signature verification, and Info.plist validation passed. The previously recorded sandbox restriction on the service tests is unchanged.
+
 ## Migration check — 2026-10-13
 
 Environment: Apple Silicon macOS 26.5, Apple Swift 6.2.3, Xcode toolchain, Python 3.14.6.

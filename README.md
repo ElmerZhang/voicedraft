@@ -15,6 +15,8 @@ open dist/VoiceDraft.app
 
 Requirements: macOS 13 or newer, Xcode/Swift for source builds. The included build is for the build machine's architecture (Apple Silicon). The preview is locally ad-hoc signed; public distribution and notarization are not included.
 
+The build script packages the icon directly, checks all ten image representations with macOS ImageIO, and verifies the app signature and Info.plist before reporting success. It does not require `iconutil` conversion.
+
 1. Open **Models**, edit the speech and writing profiles, and enter a Bailian API key in each. They may share a key or use separate keys.
 2. Set each full endpoint URL and model ID. Defaults are the Beijing-compatible endpoint, `qwen3-asr-flash` for speech, and `qwen-plus` for writing. The ASR adapter implements the Qwen3-ASR-Flash HTTP protocol; not every Qwen-branded audio model uses this protocol.
 3. If using another Bailian region or a workspace domain, replace the endpoint with the complete URL shown in that workspace. Region and key must match. For example: `https://WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions`.

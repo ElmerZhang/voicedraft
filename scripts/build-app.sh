@@ -8,8 +8,7 @@ BIN_DIR="$(swift build -c release --show-bin-path --disable-sandbox)"
 APP="$PWD/dist/VoiceDraft.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/VoiceDraft" "$APP/Contents/MacOS/VoiceDraft"
-swift scripts/make-icon.swift "$PWD/.build/VoiceDraft.iconset"
-iconutil -c icns "$PWD/.build/VoiceDraft.iconset" -o "$APP/Contents/Resources/VoiceDraft.icns"
+swift scripts/make-icon.swift "$PWD/.build/VoiceDraft.iconset" "$APP/Contents/Resources/VoiceDraft.icns"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -29,4 +28,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 codesign --force --sign - "$APP"
+codesign --verify --deep --strict "$APP"
+plutil -lint "$APP/Contents/Info.plist"
 printf 'Built %s\n' "$APP"

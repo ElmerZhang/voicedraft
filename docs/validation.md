@@ -1,5 +1,19 @@
 # Validation record
 
+## Migration check — 2026-10-13
+
+Environment: Apple Silicon macOS 26.5, Apple Swift 6.2.3, Xcode toolchain, Python 3.14.6.
+
+- `swift test --disable-sandbox` with repository-local module caches compiled the app and passed seven standalone tests. The two HTTP integration tests were explicitly skipped because no test server was available.
+- `python3 scripts/test-all.py` could not complete: all six service tests failed during setup because this execution sandbox denies localhost socket binding (`PermissionError: Operation not permitted`). Sandbox escalation was unavailable. The Python service and HTTP integration checks have not been revalidated on this Mac.
+- The original release build compiled but stopped at `iconutil` with `Invalid Iconset`, despite correctly sized PNGs. The icon generator now writes the PNG-backed ICNS elements directly and validates all ten representations using the system ImageIO decoder. No additional dependency is required. The existing iconset-only invocation remains supported.
+- `./scripts/build-app.sh` completed, including all ten icon representations, ad-hoc signing, `codesign --verify --deep --strict`, and `plutil -lint`.
+- The packaged app launched into the native Studio screen. Real microphone capture, permission changes, Bailian requests, and cross-application insertion remain unverified; recording was not started.
+
+The earlier full-suite results below describe the original development environment, not this migration check.
+
+## Original checks — 2026-10-12
+
 Environment: Apple Silicon macOS, Apple Swift 6.4, Xcode toolchain. Date: 2026-10-12.
 
 ## Automated checks

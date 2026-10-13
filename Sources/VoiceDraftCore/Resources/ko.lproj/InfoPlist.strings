@@ -1,1 +1,1 @@
-"NSMicrophoneUsageDescription" = "VoiceDraft는 받아쓰기를 시작하면 녹음하고, 설정한 Alibaba Cloud 음성 인식 모델로 녹음을 전송합니다.";
+"NSMicrophoneUsageDescription" = "VoiceDraft는 받아쓰기를 시작하면 녹음하고 설정한 음성 인식 서비스로 전송합니다.";

@@ -1,1 +1,1 @@
-"NSMicrophoneUsageDescription" = "VoiceDraft enregistre lorsque vous démarrez la dictée et envoie l’enregistrement au modèle vocal Alibaba Cloud que vous avez configuré.";
+"NSMicrophoneUsageDescription" = "VoiceDraft enregistre lorsque vous démarrez la dictée et envoie l’enregistrement au service de reconnaissance vocale configuré.";

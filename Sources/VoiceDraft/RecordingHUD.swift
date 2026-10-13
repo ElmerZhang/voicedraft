@@ -23,9 +23,9 @@ struct RecordingHUD: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Circle().fill(state.recording ? Color.green : Color.white.opacity(0.5)).frame(width: 6, height: 6)
-                        Text(D("Live transcript")).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.65))
+                        Text(state.recording ? D("Live transcript") : F("Writing result", "写作结果")).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.65))
                         Spacer()
-                        Text(D("Say corrections before finishing")).font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
+                        Text(state.recording ? D("Say corrections before finishing") : F("Streaming…", "生成中…")).font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
                     }
                     ScrollViewReader { reader in
                         ScrollView {
@@ -53,7 +53,12 @@ struct RecordingHUD: View {
                     .frame(width: 36, height: 36).background(.white.opacity(0.20), in: Circle())
             }.buttonStyle(.plain).help(L("Cancel")).accessibilityLabel(L("Cancel"))
             Group {
-                if state.recording { waveform }
+                if state.recording {
+                    VStack(spacing: 2) {
+                        waveform
+                        if state.recordingLocked { Text(F("Locked", "已锁定")).font(.system(size: 9)).foregroundStyle(.white.opacity(0.7)) }
+                    }
+                }
                 else if state.busy { ProgressView().controlSize(.small).tint(.white).frame(width: 76, height: 28) }
                 else { Image(systemName: "checkmark").font(.system(size: 18, weight: .medium)).frame(width: 76, height: 28) }
             }.help(L(state.status))

@@ -218,7 +218,7 @@
 "The new API key will replace the saved key when you save." = "保存すると、新しい API キーで保存済みキーを置き換えます。";
 "The recording could not be finalized. Please try again." = "録音を完了できませんでした。再試行してください。";
 "The recording format is unsupported. Choose another audio input device." = "録音形式が非対応です。別の入力デバイスを選んでください。";
-"The recording is empty or too large. Record up to 4 minutes per take." = "録音が空、または大きすぎます。1 回の録音は 4 分以内にしてください。";
+"The recording is empty or too large. Record up to 10 minutes per take." = "録音が空、または大きすぎます。1 回の録音は 10 分以内にしてください。";
 "The recording was too short. Try again." = "録音が短すぎます。再試行してください。";
 "The saved API key will be removed when you save." = "保存すると、保存済み API キーを削除します。";
 "The selected audio input is unavailable. Reconnect it or choose another device." = "選択した入力デバイスを使用できません。接続し直すか、別のデバイスを選んでください。";
@@ -299,3 +299,5 @@
 "The focused input changed. Copy the result when ready." = "入力先が変わりました。準備ができたら結果をコピーしてください。";
 "The text selection changed. Copy the result when ready." = "選択範囲またはカーソル位置が変わりました。準備ができたら結果をコピーしてください。";
 "Paste sent · check the input field" = "貼り付けを送信しました。入力欄を確認してください";
+"Delete" = "削除";
+"Save" = "保存";

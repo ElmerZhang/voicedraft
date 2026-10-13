@@ -50,18 +50,6 @@ enum KeychainStore {
     }
 }
 
-struct DeviceSettings: Codable {
-    var inputDeviceID: String? = nil
-    var inputDeviceName: String? = nil
-    var serverURL = "http://127.0.0.1:8765"
-    var autoSync = false
-    var autoPaste = true
-    var keepHistory = true
-    var syncRevision = 0
-    var syncIdentity = ""
-    var dirty = true
-}
-
 final class LocalStore {
     let directory: URL
     init() throws {
@@ -80,5 +68,32 @@ final class LocalStore {
         let data = try JSONEncoder().encode(value)
         try data.write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+}
+
+extension LocalStore {
+    func audioURL(_ id: UUID) -> URL { directory.appendingPathComponent("Audio", isDirectory: true).appendingPathComponent(id.uuidString + ".wav") }
+    func saveAudio(_ data: Data) throws -> UUID {
+        _ = try WaveAudio.decode(data)
+        let id = UUID(), url = audioURL(id)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return id
+    }
+    func deleteAudio(_ id: UUID) throws {
+        let url = audioURL(id)
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+    }
+}
+
+extension LocalStore {
+    func removeOrphanedAudio(referenced: Set<UUID>) throws {
+        let audioDirectory = directory.appendingPathComponent("Audio", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: audioDirectory.path) else { return }
+        for url in try FileManager.default.contentsOfDirectory(at: audioDirectory, includingPropertiesForKeys: nil) {
+            guard url.pathExtension == "wav", let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent), !referenced.contains(id) else { continue }
+            try FileManager.default.removeItem(at: url)
+        }
     }
 }

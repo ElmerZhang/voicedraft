@@ -16,6 +16,38 @@ from server import SyncHandler, SyncServer, VaultStore
 
 class IntegrationHandler(SyncHandler):
     def do_POST(self):
+        if self.path.startswith("/mock/stream/"):
+            adapter = self.path.rsplit("/", 1)[-1]
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            assert body["stream"] is True
+            if adapter == "anthropic":
+                assert self.headers.get("x-api-key") == "test-only-key"
+                events = [
+                    {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "你好"}},
+                    {"type": "content_block_delta", "delta": {"type": "text_delta", "text": " VoiceDraft"}},
+                    {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
+                    {"type": "message_stop"},
+                ]
+            elif adapter == "responses":
+                assert body["store"] is False
+                events = [
+                    {"type": "response.output_text.delta", "delta": "你好"},
+                    {"type": "response.output_text.delta", "delta": " VoiceDraft"},
+                    {"type": "response.completed", "response": {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "你好 VoiceDraft"}]}]}},
+                ]
+            else:
+                events = [{"choices": [{"delta": {"content": "你好"}}]}]
+                if adapter != "truncated":
+                    events += [{"choices": [{"delta": {"content": " VoiceDraft"}, "finish_reason": "stop"}]}]
+            wire = "".join("data: " + json.dumps(event, ensure_ascii=False) + "\n\n" for event in events).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(wire)))
+            self.end_headers()
+            # Split inside multibyte UTF-8 and JSON/SSE boundaries.
+            for offset in range(0, len(wire), 7):
+                self.wfile.write(wire[offset:offset+7]); self.wfile.flush()
+            return
         if self.path == "/mock/redirect":
             self.send_response(307)
             self.send_header("Location", "/mock/leaked")
@@ -69,7 +101,7 @@ def main():
         try:
             subprocess.run(["swift", "test", "--disable-sandbox"], env=environment, check=True)
             assert not server.leaked, "The client followed a credential-bearing redirect"
-            print("All checks passed, including encrypted two-device sync and the simulated Qwen pipeline.")
+            print("All checks passed, including encrypted two-device sync and simulated Qwen / multi-provider writing streams.")
         finally:
             server.shutdown()
             server.server_close()

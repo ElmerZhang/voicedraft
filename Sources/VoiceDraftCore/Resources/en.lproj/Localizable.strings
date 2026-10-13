@@ -218,7 +218,7 @@
 "The new API key will replace the saved key when you save." = "The new API key will replace the saved key when you save.";
 "The recording could not be finalized. Please try again." = "The recording could not be finalized. Please try again.";
 "The recording format is unsupported. Choose another audio input device." = "The recording format is unsupported. Choose another audio input device.";
-"The recording is empty or too large. Record up to 4 minutes per take." = "The recording is empty or too large. Record up to 4 minutes per take.";
+"The recording is empty or too large. Record up to 10 minutes per take." = "The recording is empty or too large. Record up to 10 minutes per take.";
 "The recording was too short. Try again." = "The recording was too short. Try again.";
 "The saved API key will be removed when you save." = "The saved API key will be removed when you save.";
 "The selected audio input is unavailable. Reconnect it or choose another device." = "The selected audio input is unavailable. Reconnect it or choose another device.";
@@ -299,3 +299,5 @@
 "The focused input changed. Copy the result when ready." = "The focused input changed. Copy the result when ready.";
 "The text selection changed. Copy the result when ready." = "The text selection changed. Copy the result when ready.";
 "Paste sent · check the input field" = "Paste sent · check the input field";
+"Delete" = "Delete";
+"Save" = "Save";

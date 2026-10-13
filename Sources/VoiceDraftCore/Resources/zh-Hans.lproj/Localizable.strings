@@ -218,7 +218,7 @@
 "The new API key will replace the saved key when you save." = "保存后，新 API Key 将替换已保存的 Key。";
 "The recording could not be finalized. Please try again." = "录音无法完成收尾，请重试。";
 "The recording format is unsupported. Choose another audio input device." = "录音格式不受支持，请选择其他音频输入设备。";
-"The recording is empty or too large. Record up to 4 minutes per take." = "录音为空或过大，每次最多录制 4 分钟。";
+"The recording is empty or too large. Record up to 10 minutes per take." = "录音为空或过大，每次最多录制 10 分钟。";
 "The recording was too short. Try again." = "录音太短，请重试。";
 "The saved API key will be removed when you save." = "保存后将移除已保存的 API Key。";
 "The selected audio input is unavailable. Reconnect it or choose another device." = "所选音频输入设备不可用。请重新连接或选择其他设备。";
@@ -299,3 +299,5 @@
 "The focused input changed. Copy the result when ready." = "焦点所在的输入框已改变。准备好后可复制结果。";
 "The text selection changed. Copy the result when ready." = "选中的文字或光标位置已改变。准备好后可复制结果。";
 "Paste sent · check the input field" = "已发送粘贴，请查看输入框";
+"Delete" = "删除";
+"Save" = "保存";

@@ -62,6 +62,7 @@ struct DesktopRootView: View {
         .frame(minWidth: 1080, minHeight: 740)
         .background(.white).foregroundStyle(DesktopTheme.ink).tint(DesktopTheme.blue)
         .preferredColorScheme(.light).environment(\.locale, L10n.locale)
+        .sheet(isPresented: $state.showingOnboarding) { OnboardingView(state: state) }
         .onReceive(NotificationCenter.default.publisher(for: .voiceDraftOpenSettings)) { _ in openSettings() }
     }
 
@@ -221,7 +222,7 @@ private struct DesktopHomeView: View {
                     Text(detail).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                KeyCaps(keys: ["⌃", "⌥", key])
+                Text(state.shortcutLabel(mode == .translate ? .translate : mode == .ask ? .ask : .dictate)).font(.system(.caption, design: .monospaced))
             }.padding(.horizontal, 20).padding(.vertical, 18).contentShape(Rectangle())
         }.buttonStyle(.plain).disabled(state.busy).help(D("Choose a mode in the testing workspace"))
     }
@@ -273,6 +274,10 @@ private struct DesktopDictionaryView: View {
             (filter == 0 || (filter == 1 ? $0.origin == .automatic : $0.origin == .manual)) &&
             (statusFilter == 0 || (statusFilter == 1 ? $0.enabled : !$0.enabled)) &&
             (term.isEmpty || $0.text.localizedCaseInsensitiveContains(term) || $0.aliases.contains { $0.localizedCaseInsensitiveContains(term) })
+        }.sorted {
+            if $0.priority != $1.priority { return $0.priority }
+            if $0.useCount != $1.useCount { return $0.useCount > $1.useCount }
+            return $0.text.localizedStandardCompare($1.text) == .orderedAscending
         }
     }
     var body: some View {
@@ -285,6 +290,7 @@ private struct DesktopDictionaryView: View {
                         .foregroundStyle(.white).background(DesktopTheme.ink, in: Capsule())
                 }.buttonStyle(.plain)
             }
+            DictionaryFileControls(state: state)
             HStack(spacing: 16) {
                 FilterPills(labels: [D("All"), D("Auto-added"), D("Manually-added")], selection: $filter)
                 Spacer()
@@ -306,6 +312,7 @@ private struct DesktopDictionaryView: View {
                                 Image(systemName: entry.origin == .automatic ? "sparkle" : "leaf.fill")
                                     .foregroundStyle(entry.origin == .automatic ? Color.teal : Color.gray.opacity(0.65)).font(.system(size: 13))
                                     .accessibilityLabel(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"))
+                                Text("\(entry.useCount)").font(.caption).foregroundStyle(.secondary).help(F("Uses", "使用次数"))
                                 Text(entry.text).font(.system(size: 15)).lineLimit(1)
                                 Spacer(minLength: 0)
                                 if entry.priority { Image(systemName: "star.fill").foregroundStyle(.orange) }
@@ -420,7 +427,7 @@ private struct DesktopHistoryView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {
                         Label(D("Keep history"), systemImage: "internaldrive").font(.system(size: 15, weight: .semibold))
-                        Text(D("Keep your latest 500 entries on this device.")).font(.system(size: 13)).foregroundStyle(.secondary)
+                        Text(F("Keep history for your chosen retention period.", "按设置的期限保留历史。")).font(.system(size: 13)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Toggle(L("Save future transcripts on this Mac"), isOn: Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) }))
@@ -428,7 +435,7 @@ private struct DesktopHistoryView: View {
                 }
                 Divider()
                 Label(D("Your history stays on your device"), systemImage: "lock").font(.system(size: 15, weight: .semibold))
-                Text(D("History is not included in configuration sync. Audio is sent to your speech provider for recognition, then the local recording is deleted."))
+                Text(F("History and retained recordings stay on this Mac. Manage audio retention in Settings.", "历史与保留的录音只存储在本机。可在设置中管理录音保存和保留期限。"))
                     .font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(4)
             }.padding(22).background(DesktopTheme.surface, in: RoundedRectangle(cornerRadius: 16))
             HStack {
@@ -472,6 +479,14 @@ private struct DesktopHistoryView: View {
             }
             if expanded.contains(entry.id) {
                 VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        if entry.audioID != nil {
+                            Button(state.playingAudioID == entry.audioID ? F("Stop audio", "停止播放") : F("Play audio", "播放录音")) { state.play(entry) }
+                            Button(F("Transcribe again", "重新识别")) { state.reprocess(entry, transcribeAgain: true) }
+                        }
+                        Button(F("Rewrite transcript", "重新处理文字")) { state.reprocess(entry, transcribeAgain: false) }
+                        Text(F("Uses current models and style", "使用当前模型和风格")).font(.caption).foregroundStyle(.secondary)
+                    }.disabled(state.busy)
                     Label("\(entry.mode.title) · \(entry.application)", systemImage: entry.mode.icon).font(.caption).foregroundStyle(.secondary)
                     if entry.original != entry.result {
                         Text(L("Original transcript")).font(.caption.weight(.semibold))
@@ -545,12 +560,9 @@ private struct DesktopSettingsView: View {
     }
     private var general: some View {
         VStack(alignment: .leading, spacing: 30) {
-            settingsSection(D("Shortcuts"), icon: "keyboard") {
-                shortcutRow(D("Dictate"), detail: D("Press to start and stop dictation."), key: "Space")
-                shortcutRow(L("Translate"), detail: D("Press to start and stop translation."), key: "T")
-                shortcutRow(L("Edit selection"), detail: D("Speak an instruction for selected text."), key: "E")
-                shortcutRow(D("Ask anything"), detail: D("Ask a question with optional selected text."), key: "A")
-            }
+            settingsSection(D("Shortcuts"), icon: "keyboard") { ShortcutPreferences(state: state) }
+            RecordingPreferences(state: state)
+            UpdatePreferences(state: state)
             settingsSection(D("Language"), icon: "globe") {
                 settingsRow(L("Interface language"), detail: D("Choose the language used in VoiceDraft.")) {
                     Picker(L("Interface language"), selection: Binding(get: { state.interfaceLanguage }, set: { state.setLanguage($0) })) {
@@ -614,11 +626,11 @@ private struct DesktopSettingsView: View {
         VStack(alignment: .leading, spacing: 24) {
             Image(systemName: "waveform").font(.system(size: 42, weight: .bold)).foregroundStyle(DesktopTheme.blue)
             Text("VoiceDraft").font(.system(size: 30, weight: .bold, design: .rounded))
-            Text(L("MAC PREVIEW  ·  0.1.0")).font(.caption).foregroundStyle(.secondary)
+            Text(F("Version ", "版本 ") + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0")).font(.caption).foregroundStyle(.secondary)
             Text(D("Your models. Your vocabulary. A little less typing.")).font(.title3)
             DesktopSurface(shaded: true) {
                 Label(L("Your models. Your words."), systemImage: "lock.shield").font(.headline)
-                Text(L("The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint."))
+                Text(F("The sync server stores encrypted settings. Model calls go directly to your configured providers; history and retained audio stay on this Mac.", "同步服务器只保存加密配置。模型调用直接发送到你配置的服务商；历史和保留的录音留在本机。"))
                     .font(.callout).foregroundStyle(.secondary).lineSpacing(5)
             }
         }.padding(.top, 14)
@@ -627,7 +639,7 @@ private struct DesktopSettingsView: View {
         VStack(alignment: .leading, spacing: 22) {
             DesktopSurface(shaded: true) {
                 Text(D("Start with your models")).font(.headline)
-                Text(L("Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys."))
+                Text(F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
                     .font(.callout).foregroundStyle(.secondary)
                 Button(L("Models")) { tab = "Models" }
             }
@@ -651,6 +663,8 @@ private struct DesktopPersonalizationView: View {
     @State private var language = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            StyleLibraryView(state: state)
+            Divider()
             Text(L("Your writing style")).font(.system(size: 16, weight: .semibold))
             TextEditor(text: $style).font(.body).frame(height: 180).padding(10)
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(DesktopTheme.line))

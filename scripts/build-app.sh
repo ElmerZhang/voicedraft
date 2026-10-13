@@ -32,11 +32,13 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleVersion</key><string>1</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>NSMicrophoneUsageDescription</key><string>VoiceDraft records when you start dictation and sends the recording to your configured Alibaba Cloud speech model.</string>
+<key>NSMicrophoneUsageDescription</key><string>VoiceDraft records when you start dictation and sends the recording to your configured speech recognition provider.</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
 PLIST
-codesign --force --sign - "$APP"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VOICEDRAFT_VERSION:-0.2.0}" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VOICEDRAFT_BUILD:-2}" "$APP/Contents/Info.plist"
+codesign --force --sign "${VOICEDRAFT_CODESIGN_IDENTITY:--}" "$APP"
 codesign --verify --deep --strict "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 printf 'Built %s\n' "$APP"

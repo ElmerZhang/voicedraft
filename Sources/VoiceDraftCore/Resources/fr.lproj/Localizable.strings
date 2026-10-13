@@ -218,7 +218,7 @@
 "The new API key will replace the saved key when you save." = "La nouvelle clé API remplacera l’ancienne lors de l’enregistrement.";
 "The recording could not be finalized. Please try again." = "Impossible de finaliser l’enregistrement. Réessayez.";
 "The recording format is unsupported. Choose another audio input device." = "Le format d’enregistrement n’est pas pris en charge. Choisissez une autre entrée audio.";
-"The recording is empty or too large. Record up to 4 minutes per take." = "L’enregistrement est vide ou trop volumineux. Limitez chaque prise à 4 minutes.";
+"The recording is empty or too large. Record up to 10 minutes per take." = "L’enregistrement est vide ou trop volumineux. Limitez chaque prise à 10 minutes.";
 "The recording was too short. Try again." = "L’enregistrement était trop court. Réessayez.";
 "The saved API key will be removed when you save." = "La clé API enregistrée sera supprimée lors de l’enregistrement.";
 "The selected audio input is unavailable. Reconnect it or choose another device." = "L’entrée audio sélectionnée est indisponible. Reconnectez-la ou choisissez un autre périphérique.";
@@ -299,3 +299,5 @@
 "The focused input changed. Copy the result when ready." = "Le champ de saisie actif a changé. Copiez le résultat quand vous êtes prêt.";
 "The text selection changed. Copy the result when ready." = "La sélection ou la position du curseur a changé. Copiez le résultat quand vous êtes prêt.";
 "Paste sent · check the input field" = "Collage envoyé · vérifiez le champ de saisie";
+"Delete" = "Supprimer";
+"Save" = "Enregistrer";

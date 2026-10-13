@@ -18,7 +18,7 @@ final class VocabularyLearningTests: XCTestCase {
         json["vocabulary"] = vocabulary
         let data = try JSONSerialization.data(withJSONObject: json)
         let first = try JSONDecoder().decode(SharedSettings.self, from: data)
-        XCTAssertEqual(first.schemaVersion, 4)
+        XCTAssertEqual(first.schemaVersion, 5)
         XCTAssertEqual(first, try JSONDecoder().decode(SharedSettings.self, from: data))
         XCTAssertEqual(first.vocabulary.entries, settings.vocabulary.entries)
         XCTAssertTrue(first.vocabulary.learnFromCorrections)

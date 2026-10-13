@@ -1,5 +1,7 @@
 # Architecture
 
+Current feature expansion and migration details: [selected-features.md](selected-features.md). The original sections below document the initial Qwen architecture; where they describe v4/four-minute/500-entry limits, the v5 rules in the expansion take precedence.
+
 ## Boundaries
 
 ```text
@@ -8,7 +10,7 @@ SwiftUI views
         -> AppKit / AVFoundation (shortcuts, audio, focus, insertion)
         -> LocalStore / KeychainStore (local persistence)
         -> VoiceDraftCore
-            -> SpeechClient / QwenRequests -> HTTPTransport / WebSocket session -> user's Bailian endpoint
+            -> SpeechClient / WritingClient -> HTTPTransport / WebSocket session -> configured provider
             -> SyncCrypto -> SyncClient -> encrypted configuration server
 ```
 
@@ -16,7 +18,7 @@ Views submit changes through AppState; they do not write storage. The model adap
 
 ## Desktop navigation and editing
 
-The main shell has Home, History, and Dictionary navigation. Home embeds the existing Studio recording and text-testing workspace, including all five modes, microphone selection, selection input, transcript processing, editable output, copying, and Accessibility controls. Shortcut hints show the actual Control-Option bindings; the UI does not register new shortcuts.
+The main shell has Home, History, and Dictionary navigation. Home embeds the existing Studio recording and text-testing workspace, including all five modes, microphone selection, selection input, transcript processing, editable output, copying, and Accessibility controls. Shortcut hints show the saved bindings. Carbon receives press/release events; an explicitly configured Fn key uses an Accessibility event tap. The pure RecordingGesture state machine distinguishes hold-to-talk from tap-to-lock, including microphone startup.
 
 Settings is an in-window modal with its own navigation for general settings, Personalization, Models, Sync, About, and Help. The sidebar and Command-comma open the same modal. While it is open, the underlying page is disabled and `AppState.page` is `Settings`, preserving the existing pause on periodic configuration sync while forms are edited. Closing (including Escape) restores the previous page. Models and Sync retain their existing editors and coordinator calls.
 
@@ -120,3 +122,13 @@ HTTPS is mandatory except loopback development. HTTP redirects are rejected to a
 ## Extension path
 
 Add catalog entries only alongside a protocol adapter, capability definitions, and request/response/cancellation fixtures. Do not assume a changed model ID makes ASR protocols compatible. Keep live microphone and recorded-file capture lifecycles separate when adding adapters, preserving current HTTP behavior. Future clients must reproduce encryption test vectors and sync revision behavior before being released.
+
+## October 2026 expansion
+
+SharedSettings v5 adds WritingStyle records, the selected style and application bundle-ID routing; schema v1–v4 migrate in memory before validation. DeviceSettings gains DesktopOptions with safe defaults for older files. Captured settings/style/credentials remain fixed for an inference run. Recent context is a non-encoded snapshot field and a bounded, expiring in-memory buffer; it never enters the encrypted vault. Vocabulary counts merge by stable ID after background matching.
+
+WritingClient adapts the existing structured writing/learning prompt into Chat Completions, Anthropic Messages or Responses. SSE framing preserves empty event delimiters and split UTF-8; provider parsers require a successful terminal state. Partial output is presentation-only. Existing focus/selection/insertion receipt checks still guard all external replacement, including style-only selection edits.
+
+Audio remains 16 kHz mono PCM. Qwen HTTP and Google inline limits are handled with local sample-preserving chunks chosen near quiet boundaries. LiveAudioFeed archives PCM only when retention is opted in. Private WAV files are referenced by generated UUIDs in local HistoryEntry records; deletion and retention operate only on those local references. Historical retries use a fresh settings snapshot and never auto-paste into a stale destination.
+
+The optional update client is separate from inference and encrypted sync. It trusts a configured Ed25519 key, requires HTTPS, validates SHA-256 and ZIP paths/size, checks bundle metadata and code signature, and stages replacement outside the running bundle. No third-party package was introduced: CVoiceDraft is a small wrapper around macOS system zlib for bounded gzip decoding. See [updates.md](updates.md).

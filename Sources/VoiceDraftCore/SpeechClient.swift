@@ -3,7 +3,28 @@ import Foundation
 public enum SpeechClient {
     public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) async throws -> String {
         try profile.validateForInference()
+        try QwenRequests.validateAudio(wav)
+        // These Qwen HTTP models accept at most five minutes / 10 MB per request.
+        // Keep generous room for WAV headers and split only complete PCM samples.
+        if [.qwenChatSpeech, .qwenAudioHTTP].contains(profile.adapter), wav.count > 8_640_044 {
+            let chunks = WaveAudio.chunks(try WaveAudio.decode(wav), limit: 8_640_000)
+            var transcripts: [String] = []
+            for chunk in chunks {
+                try Task.checkCancellation()
+                transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary))
+            }
+            return try QwenRequests.nonempty(transcripts.joined(separator: "\n"))
+        }
         switch profile.adapter {
+        case .whisper:
+            let request = try WhisperRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
+            let (data, response) = try await HTTPTransport().send(request)
+            try ProviderFailure.check(data, response: response)
+            return try WhisperRequests.parse(data)
+        case .googleSpeech:
+            return try await GoogleSpeech.transcribe(profile: profile, credential: key, wav: wav, vocabulary: vocabulary)
+        case .doubao:
+            return try await DoubaoSpeech.transcribe(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
         case .qwenChatSpeech:
             let request = try QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
             return try await HTTPTransport().complete(request)

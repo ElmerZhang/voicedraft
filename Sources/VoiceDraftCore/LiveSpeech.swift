@@ -8,7 +8,11 @@ public final class LiveAudioFeed: @unchecked Sendable {
     private let lock = NSLock()
     private var pending = Data()
     private var ended = false
-    public init(bufferedFrames: Int = 50) {
+    private var archive = Data()
+    private let retainAudio: Bool
+    public var archivedWAV: Data? { lock.withLock { retainAudio && !archive.isEmpty ? WaveAudio.encode(archive) : nil } }
+    public init(bufferedFrames: Int = 50, retainAudio: Bool = false) {
+        self.retainAudio = retainAudio
         var producer: AsyncThrowingStream<Data, Error>.Continuation!
         stream = AsyncThrowingStream(bufferingPolicy: .bufferingOldest(max(1, bufferedFrames))) { producer = $0 }
         continuation = producer
@@ -18,6 +22,10 @@ public final class LiveAudioFeed: @unchecked Sendable {
             guard !ended else { throw CancellationError() }
             guard pcm.count <= 64_000, pcm.count.isMultiple(of: 2) else {
                 throw VoiceDraftError.message("The recording format is unsupported. Choose another audio input device.")
+            }
+            if retainAudio {
+                guard archive.count + pcm.count <= 19_300_000 else { throw FeatureError("Recording exceeded 10 minutes.") }
+                archive.append(pcm)
             }
             pending.append(pcm)
             while pending.count >= 3200 {
@@ -57,6 +65,9 @@ extension SpeechClient {
                                       vocabulary: AppVocabulary,
                                       onReady: @escaping @Sendable () async throws -> Void,
                                       onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+        if profile.adapter == .doubao {
+            return try await DoubaoSpeech.live(profile: profile, key: key, audio: audio, vocabulary: vocabulary, onReady: onReady, onUpdate: onUpdate)
+        }
         let request = try MessageASRRequests.connection(profile: profile, key: key)
         let taskID = UUID().uuidString
         let start = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, live: true)
@@ -75,7 +86,7 @@ private final class LiveUploadFence: @unchecked Sendable {
 extension MessageASRSession {
     static func transcribeLive(socket: any ASRWebSocket, start: String, audio: AsyncThrowingStream<Data, Error>, taskID: String,
                                startTimeout: UInt64 = 15_000_000_000, finishTimeout: UInt64 = 30_000_000_000,
-                               totalTimeout: UInt64 = 300_000_000_000,
+                               totalTimeout: UInt64 = 660_000_000_000,
                                onReady: @escaping @Sendable () async throws -> Void = {},
                                onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
         try await withTaskCancellationHandler {

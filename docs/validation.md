@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-10-13 · Do not prompt Copy after an unconfirmed paste
+
+- The user verified that `398fa01` now inserts into herdr in Warp and into Codex, but Codex still displayed Copy after the text arrived. The post-send path previously threw an error whenever the 1.5-second AX value/caret observation did not produce an exact receipt; that conflated missing confirmation with failed delivery.
+- Introduced a distinct sent-without-confirmation outcome. It closes the HUD immediately, without a success checkmark or a duplicate-copy prompt, and reports Paste sent · check the input field on Home. The output remains available on Home and in enabled History. Confirmed insertion, Warp feedback, missing-focus Copy, and pre-send failure handling keep their existing behavior. No receipt test was loosened, and no automatic paste retry was added.
+- All 72 Swift tests and 6 Python server tests passed through `python3 scripts/test-all.py`, including both isolated localhost integrations. Existing receipt tests still reject unchanged values and invalid/unknown ranges. Shared localization (301 messages) and desktop localization (65 messages) passed in eight languages, along with release packaging, signature/Info.plist validation and diff checks. No real audio, selection or provider credentials were used by automated tests.
+- Relaunched the packaged build with 25 history entries, four active terms, selected models, Wireless Mic Rx and automatic insertion preserved. The old ad-hoc Accessibility entry was removed under the user's existing authorization. Native UI attempts to add the new bundle did not complete, including after refreshing System Settings and the UI tool; restoring the permission was handed to the user. Authorization is pending verification at this point.
+- The user's report establishes successful input in both destinations on the preceding build. Native tool access to Codex remains blocked, so this change's final live HUD behavior still needs user observation; automated core tests are not an end-to-end claim.
+
 ## 2026-10-13 · Rich-editor focus and Warp keyboard delivery
 
 - The user confirmed that the previous fix inserts successfully in Google Translate, but Codex and herdr (a terminal program running in Warp) still showed Copy without inserting. The running app's error was the pre-paste focus/selection guard, not an unconfirmed paste receipt. A later empty-ASR result was separate: the user subsequently confirmed the waveform returned and attributed it to their audio device. No ASR/capture changes were made for that report.

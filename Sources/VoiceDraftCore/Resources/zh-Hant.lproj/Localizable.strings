@@ -298,3 +298,4 @@
 "The active window changed. Copy the result when ready." = "目前視窗已變更。準備好後可複製結果。";
 "The focused input changed. Copy the result when ready." = "焦點所在的輸入欄位已變更。準備好後可複製結果。";
 "The text selection changed. Copy the result when ready." = "選取的文字或游標位置已變更。準備好後可複製結果。";
+"Paste sent · check the input field" = "已傳送貼上，請查看輸入欄位";

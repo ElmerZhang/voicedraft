@@ -298,3 +298,4 @@
 "The active window changed. Copy the result when ready." = "当前窗口已改变。准备好后可复制结果。";
 "The focused input changed. Copy the result when ready." = "焦点所在的输入框已改变。准备好后可复制结果。";
 "The text selection changed. Copy the result when ready." = "选中的文字或光标位置已改变。准备好后可复制结果。";
+"Paste sent · check the input field" = "已发送粘贴，请查看输入框";

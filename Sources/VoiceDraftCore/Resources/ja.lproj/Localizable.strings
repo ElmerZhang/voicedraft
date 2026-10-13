@@ -298,3 +298,4 @@
 "The active window changed. Copy the result when ready." = "使用中のウィンドウが変わりました。準備ができたら結果をコピーしてください。";
 "The focused input changed. Copy the result when ready." = "入力先が変わりました。準備ができたら結果をコピーしてください。";
 "The text selection changed. Copy the result when ready." = "選択範囲またはカーソル位置が変わりました。準備ができたら結果をコピーしてください。";
+"Paste sent · check the input field" = "貼り付けを送信しました。入力欄を確認してください";

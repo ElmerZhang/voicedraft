@@ -1,1 +1,1 @@
-"NSMicrophoneUsageDescription" = "VoiceDraft 會在你開始聽寫時錄音，並將錄音傳送至你設定的阿里雲語音辨識模型。";
+"NSMicrophoneUsageDescription" = "VoiceDraft 在你開始聽寫時錄音，並將錄音傳送至你設定的語音辨識服務。";

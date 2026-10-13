@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hudPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_HUD_PREVIEWS"]
         let hudPreview = ProcessInfo.processInfo.environment["VOICEDRAFT_HUD_PREVIEW"]
         hudPreviewOnly = hudPreview != nil
-        let isolatedPreview = previewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
+        let isolatedPreview = (Bundle.main.object(forInfoDictionaryKey: "VoiceDraftPreviewMode") as? Bool == true) || previewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
         state = AppState(preview: isolatedPreview)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -90,18 +90,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in self?.updateMainMenu() }
         }
         DispatchQueue.main.async { [weak self] in self?.updateMainMenu() }
-        shortcuts.onTrigger = { [weak self] id in
-            guard let self else { return }
-            let modes: [WritingMode] = [.polish, .translate, .edit, .ask]
-            self.state.toggle(mode: modes[min(Int(id), 3)], external: true)
+        shortcuts.onEvent = { [weak self] action, down in self?.state.shortcutEvent(action, down: down) }
+        state.configureShortcuts = { [weak self] bindings in
+            guard let self, !isolatedPreview else { return }
+            let previous = self.state.device.features.shortcuts
+            do { try self.shortcuts.install(bindings) }
+            catch { try? self.shortcuts.install(previous); throw error }
         }
+        state.chooseSelectionStyle = { [weak self] in self?.showStyleMenu() }
         if !isolatedPreview {
-            do { try shortcuts.install() } catch { state.error = .init(error: error) }
+            do { try shortcuts.install(state.device.features.shortcuts) } catch { state.error = .init(error: error) }
         }
         if !hudPreviewOnly { showWindow() }
         if let previewDirectory { capturePreviews(to: previewDirectory) }
         else if let hudPreviewDirectory { captureHUDPreviews(to: hudPreviewDirectory) }
         else if let hudPreview { state.prepareHUDPreview(hudPreview); showHUD() }
+    }
+    private func showStyleMenu() {
+        state.pendingStyleTarget = TextInsertion.capture()
+        let menu = NSMenu()
+        let options: [(String, String)] = [(F("Default style", "默认风格"), "default")] + state.settings.styles.map { ($0.name, $0.id.uuidString) }
+        for (name, id) in options {
+            let item = NSMenuItem(title: name, action: #selector(applySelectionStyle(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = id; menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        state.pendingStyleTarget = nil
+    }
+    @objc private func applySelectionStyle(_ item: NSMenuItem) {
+        state.applyStyleToSelection((item.representedObject as? String).flatMap(UUID.init(uuidString:)))
     }
     private func updateStatusMenu() {
         let menu = NSMenu()
@@ -201,7 +218,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quitApp() { state.cancel(); NSApp.terminate(nil) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
-    func applicationWillTerminate(_ notification: Notification) { state.cancel() }
+    func applicationWillTerminate(_ notification: Notification) { shortcuts.uninstall(); state.cancel() }
 }
 
 // The recording/result controls must never replace the original editor's keyboard focus.

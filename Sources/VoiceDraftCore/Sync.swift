@@ -11,7 +11,7 @@ public struct SyncSnapshot: Codable, Equatable {
     public func validate() throws {
         try settings.validate()
         guard Set(credentials.keys).isSubset(of: Set(settings.profiles.map { $0.id.uuidString })),
-              credentials.values.allSatisfy({ $0.utf8.count <= 8192 }) else {
+              credentials.values.allSatisfy({ $0.utf8.count <= 64_000 }) else {
             throw VoiceDraftError.message("Invalid credential set in synchronized configuration.")
         }
     }

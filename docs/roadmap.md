@@ -1,5 +1,7 @@
 # Feature parity and roadmap
 
+The 2026-10-13 user-selected Typeflux additions are tracked in [selected-features.md](selected-features.md), including delivered behavior and real-environment acceptance boundaries. The original first-release comparison below is retained as historical scope, not the current implementation status.
+
 Baseline reviewed against the public [Typeless quickstart](https://www.typeless.com/help/quickstart), [Translate guide](https://www.typeless.com/help/quickstart/translate), and [Ask anything](https://www.typeless.com/ask-anything) on 2026-10-12. This is a public-behavior comparison, not a claim to reproduce proprietary internals or a guarantee that every feature has been discovered.
 
 | Capability | First release | Remaining work |

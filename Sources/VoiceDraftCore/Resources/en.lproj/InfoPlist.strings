@@ -1,1 +1,1 @@
-"NSMicrophoneUsageDescription" = "VoiceDraft records when you start dictation and sends the recording to your configured Alibaba Cloud speech model.";
+"NSMicrophoneUsageDescription" = "VoiceDraft records when you start dictation and sends the recording to your configured speech recognition provider.";

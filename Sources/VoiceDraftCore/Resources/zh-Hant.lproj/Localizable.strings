@@ -218,7 +218,7 @@
 "The new API key will replace the saved key when you save." = "保存後，新 API Key 將替換已保存的 Key。";
 "The recording could not be finalized. Please try again." = "錄音無法完成收尾，請重試。";
 "The recording format is unsupported. Choose another audio input device." = "錄音格式不受支持，請選擇其他音頻輸入設備。";
-"The recording is empty or too large. Record up to 4 minutes per take." = "錄音為空或過大，每次最多錄制 4 分鐘。";
+"The recording is empty or too large. Record up to 10 minutes per take." = "錄音為空或過大，每次最多錄制 10 分鐘。";
 "The recording was too short. Try again." = "錄音太短，請重試。";
 "The saved API key will be removed when you save." = "保存後將移除已保存的 API Key。";
 "The selected audio input is unavailable. Reconnect it or choose another device." = "所選音頻輸入設備不可用。請重新連接或選擇其他設備。";
@@ -299,3 +299,5 @@
 "The focused input changed. Copy the result when ready." = "焦點所在的輸入欄位已變更。準備好後可複製結果。";
 "The text selection changed. Copy the result when ready." = "選取的文字或游標位置已變更。準備好後可複製結果。";
 "Paste sent · check the input field" = "已傳送貼上，請查看輸入欄位";
+"Delete" = "刪除";
+"Save" = "儲存";

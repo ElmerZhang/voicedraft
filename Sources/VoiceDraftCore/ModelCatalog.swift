@@ -1,6 +1,7 @@
 import Foundation
 
-public enum ModelAdapter: String, Codable {
+public enum ModelAdapter: String, Codable, CaseIterable {
+    case whisper, doubao, googleSpeech, chatCompletions, anthropic, responses
     case qwenChatSpeech, qwenAudioHTTP, qwenMessageWebSocket, qwenChatWriting, unconfigured
 
     public var title: String {
@@ -8,6 +9,12 @@ public enum ModelAdapter: String, Codable {
         case .qwenChatSpeech, .qwenChatWriting: return L("HTTP · Chat Completions")
         case .qwenAudioHTTP: return L("HTTP · Qwen Audio")
         case .qwenMessageWebSocket: return L("WebSocket · Qwen ASR Message")
+        case .whisper: return "Whisper compatible · HTTP"
+        case .doubao: return "Doubao · WebSocket"
+        case .googleSpeech: return "Google Speech v2 · HTTP"
+        case .chatCompletions: return "Chat Completions"
+        case .anthropic: return "Anthropic Messages"
+        case .responses: return "Responses"
         case .unconfigured: return L("Choose a supported model")
         }
     }
@@ -15,10 +22,18 @@ public enum ModelAdapter: String, Codable {
         switch self {
         case .qwenMessageWebSocket: return "/api-ws/v1/inference"
         case .qwenAudioHTTP: return "/api/v1/services/aigc/multimodal-generation/generation"
+        case .whisper: return "/v1/audio/transcriptions"
+        case .doubao: return "/api/v3/sauc/bigmodel"
+        case .googleSpeech: return "/v2/projects/PROJECT/locations/global/recognizers/_:recognize"
+        case .chatCompletions: return "/v1/chat/completions"
+        case .anthropic: return "/v1/messages"
+        case .responses: return "/v1/responses"
         default: return "/compatible-mode/v1/chat/completions"
         }
     }
-    public var isWebSocket: Bool { self == .qwenMessageWebSocket }
+    public var isWebSocket: Bool { self == .qwenMessageWebSocket || self == .doubao }
+    public var isWriting: Bool { [.qwenChatWriting, .chatCompletions, .anthropic, .responses].contains(self) }
+    public var isGeneric: Bool { [.whisper, .doubao, .googleSpeech, .chatCompletions, .anthropic, .responses].contains(self) }
 }
 
 public enum VocabularyCapability { case none, context, weighted }
@@ -80,7 +95,7 @@ struct LegacySpeechOptions: Decodable, Equatable {
 
 extension ModelProfile {
     public var catalogModel: CatalogModel? { ModelCatalog.find(model, role: role) }
-    public var vocabularyCapability: VocabularyCapability { catalogModel?.vocabulary ?? .none }
+    public var vocabularyCapability: VocabularyCapability { adapter == .whisper || adapter == .doubao || adapter == .googleSpeech ? .context : (catalogModel?.vocabulary ?? .none) }
 
     public mutating func selectModel(_ id: String) {
         guard model != id else { return }
@@ -95,12 +110,12 @@ extension ModelProfile {
     public func validateForInference() throws {
         let profile = normalizedInput
         guard profile.adapter != .unconfigured,
-              profile.adapter == ModelCatalog.adapter(for: profile.model, role: profile.role),
+              (profile.adapter.isGeneric ? (profile.adapter.isWriting == (profile.role == .writing)) : profile.adapter == ModelCatalog.adapter(for: profile.model, role: profile.role)),
               !profile.model.isEmpty else {
             throw VoiceDraftError.message("Choose a supported model for \(name) in Models. This model has no matching adapter.")
         }
         _ = try Endpoint.validate(profile.endpoint, webSocket: adapter.isWebSocket)
-        if let url = URL(string: profile.endpoint), let host = url.host,
+        if !adapter.isGeneric, let url = URL(string: profile.endpoint), let host = url.host,
            host == "dashscope.aliyuncs.com" || host == "dashscope-intl.aliyuncs.com" || host.hasSuffix(".maas.aliyuncs.com") {
             guard url.path == adapter.path else {
                 throw VoiceDraftError.message("\(model) requires \(adapter.title) at \(adapter.path). Use the model endpoint in Models.")
@@ -113,7 +128,7 @@ extension ModelProfile {
         let parameters = try QwenRequests.extras(extraJSON)
         let allowed: Set<String>
         switch adapter {
-        case .qwenChatWriting, .unconfigured: return parameters
+        case .qwenChatWriting, .unconfigured, .chatCompletions, .anthropic, .responses, .whisper, .googleSpeech, .doubao: return parameters
         case .qwenChatSpeech: allowed = ["asr_options"]
         case .qwenAudioHTTP:
             allowed = model == "qwen-audio-3.1-asr-flash"

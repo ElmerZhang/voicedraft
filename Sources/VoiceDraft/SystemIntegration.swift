@@ -203,32 +203,3 @@ enum TextInsertion {
         }
     }
 }
-
-@MainActor
-final class GlobalShortcuts {
-    private var refs: [EventHotKeyRef] = []
-    private var handler: EventHandlerRef?
-    var onTrigger: ((UInt32) -> Void)?
-    func install() throws {
-        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        let context = Unmanaged.passUnretained(self).toOpaque()
-        let status = InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
-            guard let event, let context else { return OSStatus(eventNotHandledErr) }
-            var id = EventHotKeyID()
-            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
-                              MemoryLayout<EventHotKeyID>.size, nil, &id)
-            let owner = Unmanaged<GlobalShortcuts>.fromOpaque(context).takeUnretainedValue()
-            MainActor.assumeIsolated { owner.onTrigger?(id.id) }
-            return noErr
-        }, 1, &spec, context, &handler)
-        guard status == noErr else { throw VoiceDraftError.message("Could not install keyboard shortcuts.") }
-        let keys = [kVK_Space, kVK_ANSI_T, kVK_ANSI_E, kVK_ANSI_A]
-        for (index, code) in keys.enumerated() {
-            var ref: EventHotKeyRef?
-            let result = RegisterEventHotKey(UInt32(code), UInt32(controlKey | optionKey),
-                EventHotKeyID(signature: 0x56445246, id: UInt32(index)), GetApplicationEventTarget(), 0, &ref)
-            guard result == noErr, let ref else { throw VoiceDraftError.message("A VoiceDraft shortcut is already in use by another app.") }
-            refs.append(ref)
-        }
-    }
-}

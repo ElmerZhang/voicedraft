@@ -15,11 +15,12 @@ public struct VocabularyEntry: Codable, Equatable, Identifiable {
     public var aliases: [String] = []
     public var pronunciation = "" // IPA; retained for adapters that support pronunciation lexicons.
     public var origin: VocabularyOrigin = .manual
+    public var useCount = 0
     public init(text: String = "", boost: Int = 50, priority: Bool = false) {
         self.text = text; self.boost = boost; self.priority = priority
     }
     private enum CodingKeys: String, CodingKey {
-        case id, text, enabled, boost, priority, language, displayAs, aliases, pronunciation, origin
+        case id, text, enabled, boost, priority, language, displayAs, aliases, pronunciation, origin, useCount
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -32,6 +33,7 @@ public struct VocabularyEntry: Codable, Equatable, Identifiable {
         displayAs = try c.decode(String.self, forKey: .displayAs)
         aliases = try c.decode([String].self, forKey: .aliases)
         pronunciation = try c.decode(String.self, forKey: .pronunciation)
+        useCount = max(0, min(1_000_000_000, try c.decodeIfPresent(Int.self, forKey: .useCount) ?? 0))
         origin = try c.decodeIfPresent(VocabularyOrigin.self, forKey: .origin) ?? .manual
     }
     public var normalized: Self {
@@ -187,6 +189,7 @@ public struct VocabularyProjection: Equatable {
         let sorted = source.entries.enumerated().filter { $0.element.enabled }.sorted {
             if $0.element.priority != $1.element.priority { return $0.element.priority }
             if $0.element.boost != $1.element.boost { return $0.element.boost > $1.element.boost }
+            if $0.element.useCount != $1.element.useCount { return $0.element.useCount > $1.element.useCount }
             return $0.offset < $1.offset
         }
         var seen = Set<String>(), priorityCount = 0, contextSize = 0

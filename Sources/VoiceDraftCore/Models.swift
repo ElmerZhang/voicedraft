@@ -100,25 +100,30 @@ public enum WritingMode: String, Codable, CaseIterable, Identifiable {
 }
 
 public struct SharedSettings: Codable, Equatable {
-    public var schemaVersion = 4
+    public var schemaVersion = 5
     public var profiles: [ModelProfile]
     public var speechID: UUID
     public var writingID: UUID
     public var vocabulary = AppVocabulary()
     public var stylePrompt = "Preserve my tone and meaning. Be concise. Keep technical terms and mixed languages intact."
     public var targetLanguage = "English"
+    public var styles: [WritingStyle] = []
+    public var selectedStyleID: UUID?
+    public var applicationStyles: [String: UUID] = [:]
+    /// Per-run only. Never encoded into the shared vault.
+    public var recentInputContext = ""
 
     public init() {
         let speech = ModelProfile.qwen(.speech), writing = ModelProfile.qwen(.writing)
         profiles = [speech, writing]; speechID = speech.id; writingID = writing.id
     }
 
-    private enum CodingKeys: String, CodingKey { case schemaVersion, profiles, speechID, writingID, hotwords, vocabulary, stylePrompt, targetLanguage }
+    private enum CodingKeys: String, CodingKey { case schemaVersion, profiles, speechID, writingID, hotwords, vocabulary, stylePrompt, targetLanguage, styles, selectedStyleID, applicationStyles }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let version = try c.decode(Int.self, forKey: .schemaVersion)
-        guard (1...4).contains(version) else { throw VoiceDraftError.message("This configuration needs a newer app.") }
-        schemaVersion = 4
+        guard (1...5).contains(version) else { throw VoiceDraftError.message("This configuration needs a newer app.") }
+        schemaVersion = 5
         profiles = try c.decode([ModelProfile].self, forKey: .profiles)
         speechID = try c.decode(UUID.self, forKey: .speechID)
         writingID = try c.decode(UUID.self, forKey: .writingID)
@@ -130,6 +135,9 @@ public struct SharedSettings: Codable, Equatable {
         }
         stylePrompt = try c.decode(String.self, forKey: .stylePrompt)
         targetLanguage = try c.decode(String.self, forKey: .targetLanguage)
+        styles = try c.decodeIfPresent([WritingStyle].self, forKey: .styles) ?? []
+        selectedStyleID = try c.decodeIfPresent(UUID.self, forKey: .selectedStyleID)
+        applicationStyles = try c.decodeIfPresent([String: UUID].self, forKey: .applicationStyles) ?? [:]
     }
 
     public var speech: ModelProfile? { profiles.first { $0.id == speechID && $0.role == .speech } }
@@ -141,14 +149,23 @@ public struct SharedSettings: Codable, Equatable {
         try c.encode(speechID, forKey: .speechID); try c.encode(writingID, forKey: .writingID)
         try c.encode(vocabulary, forKey: .vocabulary)
         try c.encode(stylePrompt, forKey: .stylePrompt); try c.encode(targetLanguage, forKey: .targetLanguage)
+        try c.encode(styles, forKey: .styles); try c.encodeIfPresent(selectedStyleID, forKey: .selectedStyleID)
+        try c.encode(applicationStyles, forKey: .applicationStyles)
     }
 
     public func validate() throws {
-        guard schemaVersion == 4 else { throw VoiceDraftError.message("This configuration needs a newer app.") }
+        guard schemaVersion == 5 else { throw VoiceDraftError.message("This configuration needs a newer app.") }
         guard !profiles.isEmpty, profiles.count <= 50,
               Set(profiles.map(\.id)).count == profiles.count,
               speech != nil, writing != nil else {
             throw VoiceDraftError.message("Select a valid speech profile and writing profile.")
+        }
+        let styleIDs = Set(styles.map(\.id))
+        guard styles.count <= 40, styleIDs.count == styles.count,
+              styles.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.name.count <= 100 && $0.prompt.utf8.count <= 20_000 }),
+              selectedStyleID.map({ styleIDs.contains($0) }) ?? true,
+              applicationStyles.count <= 200, applicationStyles.allSatisfy({ !$0.key.isEmpty && styleIDs.contains($0.value) }) else {
+            throw FeatureError("Check writing styles and application assignments.")
         }
         try vocabulary.validate()
         guard stylePrompt.utf8.count <= 20_000,
@@ -177,6 +194,10 @@ public struct HistoryEntry: Codable, Identifiable {
     public var result: String
     public var application: String
     public var duration: Double
+    public var audioID: UUID?
+    public var speechModel: String?
+    public var writingModel: String?
+    public var styleName: String?
     public init(mode: WritingMode, original: String, result: String, application: String, duration: Double) {
         self.mode = mode; self.original = original; self.result = result
         self.application = application; self.duration = duration

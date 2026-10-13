@@ -35,7 +35,7 @@ struct RootView: View {
                 Spacer()
                 VStack(alignment: .leading, spacing: 9) {
                     Label(L("Your models. Your words."), systemImage: "lock.shield").font(.system(size: 11, weight: .medium))
-                    Text(L("Qwen on Alibaba Cloud\nEncrypted configuration sync"))
+                    Text(F("Your models\nEncrypted configuration sync", "自选模型\n加密配置同步"))
                         .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -132,7 +132,7 @@ struct StudioView: View {
                         .accessibilityLabel(state.recording ? L("Stop recording") : L("Start recording"))
                     VStack(alignment: .leading, spacing: 8) {
                         Text(L(state.status)).font(.system(size: 18, weight: .medium))
-                        Text(state.recording ? String(format: L("%02d:%02d · tap to finish"), Int(state.elapsed) / 60, Int(state.elapsed) % 60) : L("⌃ ⌥ Space  to start or finish in any app"))
+                        Text(state.recording ? String(format: L("%02d:%02d · tap to finish"), Int(state.elapsed) / 60, Int(state.elapsed) % 60) : state.shortcutLabel(.dictate) + " · " + F("Hold to talk / tap to lock", "按住说话 / 轻按锁定"))
                             .font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary)
                         if state.recording { ProgressView(value: state.level).frame(width: 190) }
                     }
@@ -202,7 +202,7 @@ struct StudioView: View {
                     Button(L("Allow Accessibility")) { TextInsertion.requestAccess() }
                 }
                 Toggle(L("Insert into the original app after recording"), isOn: Binding(get: { state.device.autoPaste }, set: { state.saveDevice(autoPaste: $0, history: state.device.keepHistory) }))
-                Text(L("⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask")).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                Text(state.shortcutLabel(.translate) + "  " + L("Translate") + "    " + state.shortcutLabel(.edit) + "  " + L("Edit selection") + "    " + state.shortcutLabel(.ask) + "  " + L("Ask")).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
             }
         }
     }
@@ -223,7 +223,7 @@ struct ModelsView: View {
     var body: some View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: 18) {
-            PageHeading(title: L("Choose how you think."), detail: L("Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys."))
+            PageHeading(title: L("Choose how you think."), detail: F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
             ForEach(ModelRole.allCases) { role in
                 HStack {
                     Text(role.title.uppercased()).font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
@@ -267,6 +267,7 @@ struct ProfileEditor: View {
     @State private var keyDraft = APIKeyDraft(hasSavedKey: false)
     @State private var problem = ""
     @State private var testing = false
+    @State private var discoveredModels: [String] = []
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         let _ = interfaceLocale
@@ -275,15 +276,51 @@ struct ProfileEditor: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Form {
-                        Picker(L("Model"), selection: modelChoice) {
-                            if profile.role == .speech && profile.catalogModel == nil {
-                                Text(L("Unsupported: \(profile.model)")).tag(profile.model)
+                        Picker(F("Protocol", "服务接口"), selection: Binding(get: { profile.adapter }, set: { adapter in
+                            profile.adapter = adapter; discoveredModels = []; profile.extraJSON = "{}"
+                            switch adapter {
+                            case .whisper: profile.endpoint = "https://api.openai.com/v1/audio/transcriptions"; profile.model = "whisper-1"
+                            case .doubao: profile.endpoint = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel"; profile.model = "bigmodel"
+                            case .googleSpeech: profile.endpoint = "https://speech.googleapis.com/v2/projects/PROJECT/locations/global/recognizers/_:recognize"; profile.model = "chirp_3"
+                            case .chatCompletions: profile.endpoint = "https://api.openai.com/v1/chat/completions"; profile.model = ""
+                            case .responses: profile.endpoint = "https://api.openai.com/v1/responses"; profile.model = ""
+                            case .anthropic: profile.endpoint = "https://api.anthropic.com/v1/messages"; profile.model = ""
+                            default:
+                                if let model = ModelCatalog.models.first(where: { $0.adapter == adapter }) {
+                                    profile.model = model.id; profile.endpoint = "https://dashscope.aliyuncs.com" + adapter.path
+                                    if adapter.isWebSocket { profile.endpoint = "wss://dashscope.aliyuncs.com" + adapter.path }
+                                }
                             }
-                            ForEach(ModelCatalog.models(for: profile.role)) { model in Text(model.id).tag(model.id) }
-                            if profile.role == .writing { Text(L("Other Qwen text model…")).tag("__custom") }
+                        })) {
+                            ForEach(ModelAdapter.allCases.filter { $0 != .unconfigured && $0.isWriting == (profile.role == .writing) }, id: \.self) { adapter in Text(adapter.title).tag(adapter) }
                         }
-                        if profile.role == .writing && profile.catalogModel == nil {
+                        if !profile.adapter.isGeneric {
+                            Picker(L("Model"), selection: modelChoice) {
+                                ForEach(ModelCatalog.models(for: profile.role)) { model in Text(model.id).tag(model.id) }
+                                if profile.role == .writing { Text(L("Other Qwen text model…")).tag("__custom") }
+                            }
+                        }
+                        if profile.adapter.isGeneric || (profile.role == .writing && profile.catalogModel == nil) {
                             LabeledContent(L("Model ID")) { SingleLineField(L("Model ID"), text: $profile.model) }
+                        }
+                        if !profile.adapter.isWebSocket && profile.adapter != .googleSpeech {
+                            HStack {
+                                Button(F("Fetch model list", "在线获取模型列表")) {
+                                    testing = true; problem = ""
+                                    Task {
+                                        defer { testing = false }
+                                        do { discoveredModels = try await ModelDiscovery.fetch(profile: profile, key: keyDraft.keyForRequest { try state.key(for: profile) }) }
+                                        catch { problem = error.localizedDescription }
+                                    }
+                                }
+                                if !discoveredModels.isEmpty {
+                                    Menu(F("Choose fetched model", "选择在线模型")) {
+                                        ForEach(discoveredModels, id: \.self) { id in Button(id) {
+                                            if profile.adapter.isGeneric { profile.model = id } else { profile.selectModel(id) }
+                                        } }
+                                    }
+                                }
+                            }
                         }
                         LabeledContent(L("Connection")) { Text(profile.adapter.title).foregroundStyle(.secondary) }
                         LabeledContent(L("Profile name")) { SingleLineField(L("Profile name"), text: $profile.name) }
@@ -295,11 +332,28 @@ struct ProfileEditor: View {
                                 Button(L("Use model endpoint")) { profile.endpoint = ModelCatalog.endpoint(profile.endpoint, for: profile.adapter) }
                             }
                         }
-                        LabeledContent(L("Bailian API key")) {
-                            SingleLineField(L("Bailian API key"), text: $keyDraft.replacement, secure: true,
+                        LabeledContent(F("API key / credential", "API 密钥 / 凭证")) {
+                            SingleLineField(F("API key / credential", "API 密钥 / 凭证"), text: $keyDraft.replacement, secure: true,
                                             placeholder: keyDraft.showsSavedKey ? "••••••••••••" : nil)
                         }
                     }.textFieldStyle(.roundedBorder)
+                    if profile.adapter == .googleSpeech {
+                        Text(F("Replace PROJECT in the endpoint with your Google Cloud project. Paste a service account JSON key or OAuth access token. Set languageCodes in advanced options, for example [\"en-US\"].", "将地址中的 PROJECT 替换为 Google Cloud 项目 ID。凭证可使用服务账号 JSON 密钥或 OAuth access token；在高级参数中设置 languageCodes，例如 [\"cmn-Hans-CN\"]。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button(F("Import service account JSON", "导入服务账号 JSON")) {
+                            let panel = NSOpenPanel(); panel.allowsMultipleSelection = false; panel.canChooseDirectories = false
+                            if panel.runModal() == .OK, let url = panel.url {
+                                do {
+                                    guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) <= 64_000 else { throw FeatureError("Credential file too large.") }
+                                    keyDraft.replacement = try String(contentsOf: url, encoding: .utf8)
+                                } catch { problem = error.localizedDescription }
+                            }
+                        }
+                    }
+                    if profile.adapter == .doubao {
+                        Text(F("Use the new console API key. Legacy credentials: put app_id in advanced options and the access token in the credential field. Optional resource_id selects your purchased speech resource.", "新版控制台直接填写 API Key。旧版凭证可在高级参数中填写 app_id，密钥栏填写 Access Token；resource_id 可选择已开通的语音资源。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     if keyDraft.hasSavedKey {
                         HStack {
                             Text(keyDraft.removeSavedKey && keyDraft.credentialUpdate == ""
@@ -342,7 +396,7 @@ struct ProfileEditor: View {
                             do {
                                 let key = try keyDraft.keyForRequest { try state.key(for: profile) }
                                 let request = try QwenRequests.writing(profile: profile, key: key, text: "Reply with OK.", mode: .ask, settings: SharedSettings())
-                                _ = try await HTTPTransport().complete(request); problem = L("Connection successful.")
+                                _ = try await WritingClient.complete(request, profile: profile, key: key); problem = L("Connection successful.")
                             } catch { problem = error.localizedDescription }
                         }
                     }.disabled(testing)
@@ -558,7 +612,7 @@ struct SyncView: View {
             PageHeading(title: L("One setup. Every device."), detail: L("Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase."))
             Card {
                 Label(L("End-to-end encrypted"), systemImage: "lock.shield").font(.headline).foregroundStyle(accent)
-                Text(L("The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint."))
+                Text(F("The sync server stores encrypted settings. Model calls go directly to your configured providers; history and retained audio stay on this Mac.", "同步服务器只保存加密配置。模型调用直接发送到你配置的服务商；历史和保留的录音留在本机。"))
                     .font(.callout).foregroundStyle(.secondary).lineSpacing(5)
             }
             Card {
@@ -601,7 +655,7 @@ struct HistoryView: View {
     var body: some View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: 18) {
-            PageHeading(title: L("A thought worth keeping."), detail: L("Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read."))
+            PageHeading(title: L("A thought worth keeping."), detail: F("History and optional recordings, saved only on this Mac.", "历史与可选保留的录音，只存储在本机。"))
             HStack {
                 SingleLineField(L("Search your words"), text: $query)
                 Button(L("Clear history…"), role: .destructive) { confirmClear = true }.disabled(state.history.isEmpty)

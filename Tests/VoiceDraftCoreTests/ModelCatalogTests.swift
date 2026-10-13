@@ -17,7 +17,7 @@ final class ModelCatalogTests: XCTestCase {
         object["profiles"] = profiles
         let old = try JSONSerialization.data(withJSONObject: object)
         let migrated = try JSONDecoder().decode(SharedSettings.self, from: old)
-        XCTAssertEqual(migrated.schemaVersion, 4)
+        XCTAssertEqual(migrated.schemaVersion, 5)
         XCTAssertEqual(migrated.speechID, settings.speechID)
         XCTAssertEqual(migrated.writingID, settings.writingID)
         XCTAssertEqual(migrated.vocabulary.entries.map(\.text), ["VoiceDraft", "百炼"])

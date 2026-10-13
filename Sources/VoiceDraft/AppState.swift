@@ -40,6 +40,7 @@ final class AppState: ObservableObject {
     @Published private(set) var hudText = ""
     @Published private(set) var hudCopied = false
     private var runAutoPaste = false
+    private var runExternal = false
     @Published private(set) var inputDevices: [AudioInputDevice] = []
     @Published private(set) var defaultInputID: String?
     @Published private(set) var recordingDeviceName = ""
@@ -71,6 +72,7 @@ final class AppState: ObservableObject {
     var hideHUD: (() -> Void)?
     var busy: Bool { phase != "idle" }
     var recording: Bool { phase == "recording" }
+    var insertionAuthorized: Bool { preview || AXIsProcessTrusted() }
 
     /// Synthetic UI fixtures only; this path cannot load keys, record, or call a model.
     func prepareHUDPreview(_ name: String) {
@@ -250,7 +252,7 @@ final class AppState: ObservableObject {
         error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact
         generation = UUID(); let id = generation
         target = external ? TextInsertion.capture() : nil
-        runMode = mode; runSettings = settings; runAutoPaste = device.autoPaste
+        runMode = mode; runSettings = settings; runAutoPaste = device.autoPaste; runExternal = external
         runSelection = external ? (target?.selection ?? "") : selection
         do {
             if target?.secure == true { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
@@ -368,7 +370,10 @@ final class AppState: ObservableObject {
         result = output
         saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
         var inserted = false
-        if let destination, destination.editable, runAutoPaste, mode != .ask {
+        if runExternal, runAutoPaste, mode != .ask, !insertionAuthorized {
+            self.error = "Enable Accessibility to paste into other apps. The result is available here."
+            status = "Result ready · open VoiceDraft to copy"
+        } else if let destination, destination.editable, runAutoPaste, mode != .ask {
             status = "Inserting text…"
             do {
                 try await TextInsertion.insert(output, into: destination)

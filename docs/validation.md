@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-10-13 · Web input eligibility and missing Accessibility authorization
+
+- Extended focused-text eligibility to accept writable selection ranges on text input roles. Browser editors can support caret movement and keyboard paste even when AX cannot replace their selected text or value. Non-text roles, disabled controls, and password inputs remain excluded; app/element/selection/range revalidation before insertion is unchanged.
+- Added four regression tests covering clipboard-capable web text areas/fields/comboboxes, existing native insertion, selectable page content/non-input controls, and disabled/password controls. `python3 scripts/test-all.py` passed all 59 Swift tests and all 6 Python server tests, including isolated localhost integration. No real audio, selections, or model credentials were sent. Both localization checks, release packaging/signature verification, and diff checks passed.
+- Used an isolated Phi agent page to inspect Google Translate's Source text field: it is a focused, enabled, editable TEXTAREA exposed as a combobox. This browser inspection is not proof of OS-level VoiceDraft insertion.
+- The packaged development app has an ad-hoc designated requirement containing its code hash. After restarting the fixed build, the new Home authorization indicator reported `AXIsProcessTrusted() == false`, while automatic insertion was enabled. Missing authorization is now stated on Home and on a completed copy card instead of silently appearing to be absent input focus. Existing 12 history entries, models, microphone, and vocabulary were preserved.
+- Actual VoiceDraft-to-Google-Translate insertion remains unverified pending the user's renewed macOS Accessibility authorization; no security permissions or signing requirements were changed by the agent.
+
 ## 2026-10-13 · Compact HUD, copy fallback, and live Message ASR
 
 - Added 13 synthetic tests for live request parameters, sentence revisions, incomplete final tails, live updates before stop, exact PCM frame/tail delivery, cancellation during handshake/capture/upload/final wait, deadlines, early completion/disconnect/send errors, capture startup failure, bounded-buffer overflow, spoken-correction writing requests, and negotiated PCM validation/metering.

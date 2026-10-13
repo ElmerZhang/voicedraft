@@ -2,6 +2,45 @@ import XCTest
 @testable import VoiceDraftCore
 
 final class CoreTests: XCTestCase {
+    func testPastedModelWhitespaceDoesNotReachProviderRequests() throws {
+        for role in ModelRole.allCases {
+            var profile = ModelProfile.qwen(role)
+            let expectedModel = profile.model
+            profile.model = " \t" + expectedModel + "\r\n\u{2028}\u{2029} "
+            profile.endpoint += "\r\n"
+            let request: URLRequest
+            if role == .speech {
+                request = try QwenRequests.speech(profile: profile, key: "test-only-key\n", wav: Data([1]), vocabulary: "")
+            } else {
+                request = try QwenRequests.writing(profile: profile, key: "test-only-key\n", text: "Test", mode: .polish, settings: SharedSettings())
+            }
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+            XCTAssertEqual(body["model"] as? String, expectedModel)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-only-key")
+            XCTAssertEqual(request.url?.absoluteString, ModelProfile.qwen(role).endpoint)
+            profile.model = "\r\n\u{2028} "
+            if role == .speech {
+                XCTAssertThrowsError(try QwenRequests.speech(profile: profile, key: "test-only-key", wav: Data([1]), vocabulary: ""))
+            } else {
+                XCTAssertThrowsError(try QwenRequests.writing(profile: profile, key: "test-only-key", text: "Test", mode: .polish, settings: SharedSettings()))
+            }
+        }
+    }
+
+    func testProfileInputCleanupPreservesAdvancedMultilineJSON() throws {
+        var profile = ModelProfile.qwen(.writing)
+        let originalID = profile.id
+        profile.name = " \n中文 Writing\n "
+        profile.model = " qwen-plus\r\n"
+        profile.extraJSON = "{\n  \"enable_thinking\": false\n}"
+        let clean = profile.normalizedInput
+        XCTAssertEqual(clean.id, originalID)
+        XCTAssertEqual(clean.name, "中文 Writing")
+        XCTAssertEqual(clean.model, "qwen-plus")
+        XCTAssertEqual(clean.extraJSON, profile.extraJSON)
+        XCTAssertEqual(try QwenRequests.extras(clean.extraJSON)["enable_thinking"] as? Bool, false)
+    }
+
     func testEncryptedVaultRoundTripHidesSecrets() throws {
         var settings = SharedSettings()
         settings.hotwords = "Project-A\nCustomer-B"

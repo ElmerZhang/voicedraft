@@ -1,5 +1,13 @@
 # Validation record
 
+## Single-line inputs — 2026-10-13
+
+- Audited all nine single-line fields: profile name, endpoint, Model ID, API key, translation language, sync URL, sync token, sync passphrase, and history search. All now use the shared native single-line control; there are no remaining direct SwiftUI `TextField` or `SecureField` inputs.
+- In the running packaged app, pasted synthetic values containing LF, CRLF, and Unicode line/paragraph separators across those fields. Accessibility values and visual inspection confirmed a single horizontal line, including masked secure fields. Model ID and translation-language paste could be undone; Option-Return did not insert a line in search. Chinese text paste was checked; interactive IME composition was not separately tested.
+- Model tests used an unsaved new profile; all settings tests were cancelled or left without saving. No real keys, recordings, provider requests, or server requests were used for these checks.
+- Regression tests verify that both ASR and writing request bodies contain a trimmed model ID, blank IDs fail before a request, and profile cleanup preserves multiline advanced JSON. Nine standalone Swift tests passed; the two HTTP integration tests remain skipped because the execution sandbox cannot bind a local server port.
+- The final release bundle passed icon, signature, and Info.plist checks, then launched successfully. The app was left on Models with the user's saved profiles still present and no test profile saved.
+
 ## Editing shortcuts — 2026-10-13
 
 - Reproduced the missing Edit menu in the running app: the launch delegate's manually assigned main menu was replaced by SwiftUI's scene menu. Editing commands now belong to the SwiftUI scene and dispatch to the key window's first responder.

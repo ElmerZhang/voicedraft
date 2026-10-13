@@ -32,6 +32,14 @@ public struct ModelProfile: Codable, Identifiable, Equatable {
                      model: role == .speech ? "qwen3-asr-flash" : "qwen-plus",
                      extraJSON: role == .speech ? "{}" : "{\"enable_thinking\": false}")
     }
+
+    public var normalizedInput: ModelProfile {
+        var copy = self
+        copy.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.endpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        return copy
+    }
 }
 
 public enum WritingMode: String, Codable, CaseIterable, Identifiable {

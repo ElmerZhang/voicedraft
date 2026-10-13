@@ -493,7 +493,7 @@ private struct DesktopSettingsView: View {
                     Text(title(tab)).font(.system(size: 26, weight: .bold))
                     Spacer()
                     Button(action: close) { Image(systemName: "xmark").font(.system(size: 14)).frame(width: 28, height: 28) }
-                        .buttonStyle(.plain).foregroundStyle(.secondary).help(D("Close settings")).accessibilityLabel(D("Close settings"))
+                        .keyboardShortcut(.cancelAction).buttonStyle(.plain).foregroundStyle(.secondary).help(D("Close settings")).accessibilityLabel(D("Close settings"))
                 }.padding(.horizontal, 30).padding(.top, 28).padding(.bottom, 20)
                 if !state.error.isEmpty {
                     Text(L(state.error)).font(.caption).foregroundStyle(.red).textSelection(.enabled).padding(.horizontal, 30).padding(.bottom, 12)

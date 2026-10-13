@@ -1,5 +1,14 @@
 # Validation record
 
+## Desktop visual and interaction acceptance — 2026-10-13
+
+- Rendered Home, History, Dictionary, Settings, Models, and Sync in the native app. Compared the four primary layouts with the supplied reference screenshots: white content, rounded light-gray sidebar, large headings, key caps, word grid, daily history rows, and a dimmed settings overlay. Home retains the full Studio test workspace. The sidebar Models button was removed by the parallel navigation change; its settings entry remains available.
+- In a separately identified packaged preview using synthetic in-memory data and Simplified Chinese, verified new-word save, trimmed search, disabled-word filtering, history question filtering, original-transcript expansion, Command-comma, settings close restoring the history filter, Personalization save reflecting in Settings, and opening/cancelling the nested model editor. Entered a synthetic sentence in Home's Transcribe mode and confirmed Process text produced the same editable output and a new in-memory history entry.
+- The final combined tree passed 40 Swift tests, with 2 existing localhost integration tests skipped and 0 failures. Both localization checks passed: 292 shared and 59 desktop messages in eight languages. All six Python server tests passed after an authorized run outside the socket-restricted sandbox; the initial sandbox run failed at binding localhost.
+- Added an explicit cancel keyboard shortcut to the settings close button after native testing showed that `onExitCommand` alone did not receive Escape from an unfocused AppKit hosting window. Verified Command-comma → Escape restores Home in the final packaged preview. Release build, icon, signature, Info.plist, and diff whitespace checks passed. Final synthetic Chinese screenshots are in `dist/ui-previews/`.
+- Relaunched the regular `dist/VoiceDraft.app` after isolated acceptance. Confirmed the redesigned Home opened with the existing speech/writing model selections, five saved history entries, and the actual system-default microphone. No test fixture appeared in the regular app.
+- No real microphone recording, model request, credential save, or provider-accuracy test was performed. Preview fixtures and test edits were not written to the user's configuration or history. Native-language copy review remains pending.
+
 ## Desktop navigation and model entry — 2026-10-13
 
 - Added Home, History, Dictionary, and the settings modal with its eight-language desktop catalog. Models remain accessible through Settings; the sidebar card no longer has a Models button. Interactive/capture preview modes use synthetic in-memory data and avoid persisted settings, Keychain reads, and global shortcuts.

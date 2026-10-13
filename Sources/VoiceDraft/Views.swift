@@ -230,10 +230,10 @@ struct ProfileEditor: View {
         VStack(alignment: .leading, spacing: 16) {
             Text(profile.role.title).font(.title2.weight(.semibold))
             Form {
-                TextField("Profile name", text: $profile.name)
-                TextField("Full endpoint URL", text: $profile.endpoint)
-                TextField("Model ID", text: $profile.model)
-                SecureField("Bailian API key", text: $key)
+                LabeledContent("Profile name") { SingleLineField("Profile name", text: $profile.name) }
+                LabeledContent("Full endpoint URL") { SingleLineField("Full endpoint URL", text: $profile.endpoint) }
+                LabeledContent("Model ID") { SingleLineField("Model ID", text: $profile.model) }
+                LabeledContent("Bailian API key") { SingleLineField("Bailian API key", text: $key, secure: true) }
             }.textFieldStyle(.roundedBorder)
             Text("Advanced request parameters (JSON)").font(.headline)
             TextEditor(text: $profile.extraJSON).font(.system(size: 12, design: .monospaced)).frame(height: 85).border(.gray.opacity(0.2))
@@ -271,6 +271,7 @@ struct ProfileEditor: View {
                 }.buttonStyle(.borderedProminent).disabled(testing)
             }
         }.padding(28).frame(width: 600).onAppear {
+            profile = profile.normalizedInput
             do { key = try state.key(for: profile) } catch { problem = error.localizedDescription }
         }
     }
@@ -293,7 +294,7 @@ struct VocabularyView: View {
             Card {
                 Text("Your writing style").font(.headline)
                 TextEditor(text: $style).font(.body).frame(height: 85).scrollContentBackground(.hidden)
-                TextField("Translation target language", text: $language).textFieldStyle(.roundedBorder)
+                SingleLineField("Translation target language", text: $language)
             }
             HStack {
                 Text("Vocabulary and preferences are included in encrypted sync.").font(.caption).foregroundStyle(.secondary)
@@ -325,9 +326,9 @@ struct SyncView: View {
                     .font(.callout).foregroundStyle(.secondary).lineSpacing(5)
             }
             Card {
-                TextField("Sync server URL", text: $url)
-                SecureField("Server access token", text: $token)
-                SecureField("Sync passphrase · at least 12 characters", text: $passphrase)
+                SingleLineField("Sync server URL", text: $url)
+                SingleLineField("Server access token", text: $token, secure: true)
+                SingleLineField("Sync passphrase · at least 12 characters", text: $passphrase, secure: true)
                 Text("Use the same three values on each device. The passphrase is never sent to the server; losing it means the server copy cannot be recovered.").font(.caption).foregroundStyle(.secondary)
                 Toggle("Sync automatically every 30 seconds and after saving", isOn: $automatic)
                 HStack {
@@ -357,13 +358,14 @@ struct HistoryView: View {
     @State private var query = ""
     @State private var confirmClear = false
     private var entries: [HistoryEntry] {
-        state.history.filter { query.isEmpty || $0.result.localizedCaseInsensitiveContains(query) || $0.original.localizedCaseInsensitiveContains(query) }
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return state.history.filter { term.isEmpty || $0.result.localizedCaseInsensitiveContains(term) || $0.original.localizedCaseInsensitiveContains(term) }
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             PageHeading(title: "A thought worth keeping.", detail: "Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read.")
             HStack {
-                TextField("Search your words", text: $query).textFieldStyle(.roundedBorder)
+                SingleLineField("Search your words", text: $query)
                 Button("Clear history…", role: .destructive) { confirmClear = true }.disabled(state.history.isEmpty)
             }
             Toggle("Save future transcripts on this Mac", isOn: Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) }))

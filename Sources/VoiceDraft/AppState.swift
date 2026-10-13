@@ -66,6 +66,10 @@ final class AppState: ObservableObject {
 
     func save(_ settings: SharedSettings, credential: (UUID, String)? = nil) {
         do {
+            var settings = settings
+            settings.profiles = settings.profiles.map(\.normalizedInput)
+            settings.targetLanguage = settings.targetLanguage.trimmingCharacters(in: .whitespacesAndNewlines)
+            let credential = credential.map { ($0.0, $0.1.trimmingCharacters(in: .whitespacesAndNewlines)) }
             try settings.validate()
             let previousKey = try credential.map { try KeychainStore.read($0.0.uuidString) }
             do {
@@ -86,6 +90,8 @@ final class AppState: ObservableObject {
     }
     func configureSync(url: String, token: String, passphrase: String, automatic: Bool) {
         do {
+            let url = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !syncing else { throw VoiceDraftError.message("Wait for the current sync to finish before changing the connection.") }
             _ = try SyncClient(baseURL: url, token: token)
             guard passphrase.count >= 12 else { throw VoiceDraftError.message("Choose a sync passphrase with at least 12 characters.") }

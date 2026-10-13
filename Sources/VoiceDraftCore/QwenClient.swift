@@ -14,6 +14,10 @@ public enum QwenRequests {
     }
 
     private static func request(profile: ModelProfile, key: String, body: [String: Any]) throws -> URLRequest {
+        let model = profile.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !model.isEmpty else { throw VoiceDraftError.message("Add a model ID for \(profile.name) in Models.") }
+        var body = body
+        body["model"] = model
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, !key.contains("\n"), !key.contains("\r") else {
             throw VoiceDraftError.message("Add an API key for \(profile.name) in Models.")
@@ -38,7 +42,7 @@ public enum QwenRequests {
         ]])
         var body = try extras(profile.extraJSON)
         if body["asr_options"] == nil { body["asr_options"] = ["enable_itn": true] }
-        body["model"] = profile.model; body["messages"] = messages; body["stream"] = false
+        body["messages"] = messages; body["stream"] = false
         return try request(profile: profile, key: key, body: body)
     }
 
@@ -66,7 +70,7 @@ public enum QwenRequests {
         """
         let input = try JSONSerialization.data(withJSONObject: ["transcript": text, "selected_text": selection, "application": application])
         var body = try extras(profile.extraJSON)
-        body["model"] = profile.model; body["stream"] = false
+        body["stream"] = false
         body["messages"] = [["role": "system", "content": system],
                             ["role": "user", "content": String(decoding: input, as: UTF8.self)]]
         return try request(profile: profile, key: key, body: body)

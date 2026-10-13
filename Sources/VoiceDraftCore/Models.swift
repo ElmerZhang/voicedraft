@@ -20,10 +20,37 @@ public struct ModelProfile: Codable, Identifiable, Equatable {
     public var endpoint: String
     public var model: String
     public var extraJSON: String
+    public var adapter: ModelAdapter
+    public var speechOptions: SpeechOptions
 
-    public init(id: UUID = UUID(), name: String, role: ModelRole, endpoint: String, model: String, extraJSON: String = "{}") {
+    public init(id: UUID = UUID(), name: String, role: ModelRole, endpoint: String, model: String, extraJSON: String = "{}", adapter: ModelAdapter? = nil, speechOptions: SpeechOptions = SpeechOptions()) {
         self.id = id; self.name = name; self.role = role
         self.endpoint = endpoint; self.model = model; self.extraJSON = extraJSON
+        self.adapter = adapter ?? ModelCatalog.adapter(for: model, role: role)
+        self.speechOptions = speechOptions
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, role, endpoint, model, extraJSON, adapter, speechOptions }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        role = try c.decode(ModelRole.self, forKey: .role)
+        endpoint = try c.decode(String.self, forKey: .endpoint)
+        model = try c.decode(String.self, forKey: .model).trimmingCharacters(in: .whitespacesAndNewlines)
+        extraJSON = try c.decode(String.self, forKey: .extraJSON)
+        speechOptions = try c.decodeIfPresent(SpeechOptions.self, forKey: .speechOptions) ?? SpeechOptions()
+        if let saved = try c.decodeIfPresent(ModelAdapter.self, forKey: .adapter) {
+            adapter = saved
+        } else {
+            adapter = ModelCatalog.adapter(for: model, role: role)
+            // v1 allowed arbitrary ASR IDs but always sent chat HTTP. Repair known mismatches,
+            // retaining the origin, UUID, key association, and advanced parameters.
+            let oldPaths = [ModelAdapter.qwenChatSpeech.path, ModelAdapter.qwenAudioHTTP.path, ModelAdapter.qwenMessageWebSocket.path]
+            if adapter != .unconfigured, let url = URL(string: endpoint), oldPaths.contains(url.path) {
+                endpoint = ModelCatalog.endpoint(endpoint, for: adapter)
+            }
+        }
     }
 
     public static func qwen(_ role: ModelRole) -> ModelProfile {
@@ -66,7 +93,7 @@ public enum WritingMode: String, Codable, CaseIterable, Identifiable {
 }
 
 public struct SharedSettings: Codable, Equatable {
-    public var schemaVersion = 1
+    public var schemaVersion = 2
     public var profiles: [ModelProfile]
     public var speechID: UUID
     public var writingID: UUID
@@ -79,6 +106,20 @@ public struct SharedSettings: Codable, Equatable {
         profiles = [speech, writing]; speechID = speech.id; writingID = writing.id
     }
 
+    private enum CodingKeys: String, CodingKey { case schemaVersion, profiles, speechID, writingID, hotwords, stylePrompt, targetLanguage }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try c.decode(Int.self, forKey: .schemaVersion)
+        guard (1...2).contains(version) else { throw VoiceDraftError.message("This configuration needs a newer app.") }
+        schemaVersion = 2
+        profiles = try c.decode([ModelProfile].self, forKey: .profiles)
+        speechID = try c.decode(UUID.self, forKey: .speechID)
+        writingID = try c.decode(UUID.self, forKey: .writingID)
+        hotwords = try c.decode(String.self, forKey: .hotwords)
+        stylePrompt = try c.decode(String.self, forKey: .stylePrompt)
+        targetLanguage = try c.decode(String.self, forKey: .targetLanguage)
+    }
+
     public var speech: ModelProfile? { profiles.first { $0.id == speechID && $0.role == .speech } }
     public var writing: ModelProfile? { profiles.first { $0.id == writingID && $0.role == .writing } }
     public var vocabulary: String {
@@ -87,7 +128,7 @@ public struct SharedSettings: Codable, Equatable {
     }
 
     public func validate() throws {
-        guard schemaVersion == 1 else { throw VoiceDraftError.message("This configuration needs a newer app.") }
+        guard schemaVersion == 2 else { throw VoiceDraftError.message("This configuration needs a newer app.") }
         guard !profiles.isEmpty, profiles.count <= 50,
               Set(profiles.map(\.id)).count == profiles.count,
               speech != nil, writing != nil else {
@@ -98,12 +139,16 @@ public struct SharedSettings: Codable, Equatable {
             throw VoiceDraftError.message("Check the dictionary, style prompt, and target language.")
         }
         for p in profiles {
-            _ = try Endpoint.validate(p.endpoint)
+            // Keep legacy/custom addresses editable even when they need protocol repair.
+            // Inference performs the stricter adapter/scheme/path validation before reading audio.
+            let scheme = URL(string: p.endpoint.trimmingCharacters(in: .whitespacesAndNewlines))?.scheme
+            _ = try Endpoint.validate(p.endpoint, webSocket: scheme == "wss" || scheme == "ws")
             guard !p.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !p.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw VoiceDraftError.message("Every profile needs a name and model ID.")
             }
             _ = try QwenRequests.extras(p.extraJSON)
+            try p.speechOptions.validate()
         }
     }
 }
@@ -123,12 +168,14 @@ public struct HistoryEntry: Codable, Identifiable {
 }
 
 public enum Endpoint {
-    public static func validate(_ value: String) throws -> URL {
+    public static func validate(_ value: String, webSocket: Bool = false) throws -> URL {
         guard let url = URL(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
               let host = url.host, !host.isEmpty, url.user == nil, url.password == nil,
               url.fragment == nil, url.query == nil,
-              url.scheme == "https" || (url.scheme == "http" && ["localhost", "127.0.0.1", "[::1]"].contains(host)) else {
-            throw VoiceDraftError.message("Use a full HTTPS endpoint, or HTTP on localhost for development. Do not put credentials in the URL.")
+              url.scheme == (webSocket ? "wss" : "https") || (url.scheme == (webSocket ? "ws" : "http") && ["localhost", "127.0.0.1", "[::1]"].contains(host)) else {
+            throw VoiceDraftError.message(webSocket
+                ? "Use a full WSS endpoint, or WS on localhost for development. Do not put credentials in the URL."
+                : "Use a full HTTPS endpoint, or HTTP on localhost for development. Do not put credentials in the URL.")
         }
         return url
     }

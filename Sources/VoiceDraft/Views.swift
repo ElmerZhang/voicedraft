@@ -209,11 +209,11 @@ struct ModelsView: View {
                             }
                             Button("Edit") { editing = profile }
                         }
-                        Text(profile.endpoint).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+                        Text("\(profile.adapter.title) · \(profile.endpoint)").font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
                     }
                 }
             }
-            Text("Use the complete /chat/completions URL for your Bailian region or workspace. ASR profiles currently use the Qwen3-ASR-Flash HTTP protocol. Other providers will be added later.")
+            Text("Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and shows the vocabulary options it supports. Recognition starts after you stop recording. Other model families require their own adapters.")
                 .font(.caption).foregroundStyle(.secondary).lineSpacing(4)
         }.sheet(item: $editing) { profile in ProfileEditor(state: state, profile: profile) }
     }
@@ -229,33 +229,59 @@ struct ProfileEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(profile.role.title).font(.title2.weight(.semibold))
-            Form {
-                LabeledContent("Profile name") { SingleLineField("Profile name", text: $profile.name) }
-                LabeledContent("Full endpoint URL") { SingleLineField("Full endpoint URL", text: $profile.endpoint) }
-                LabeledContent("Model ID") { SingleLineField("Model ID", text: $profile.model) }
-                LabeledContent("Bailian API key") {
-                    SingleLineField("Bailian API key", text: $keyDraft.replacement, secure: true,
-                                    placeholder: keyDraft.showsSavedKey ? "••••••••••••" : nil)
-                }
-            }.textFieldStyle(.roundedBorder)
-            if keyDraft.hasSavedKey {
-                HStack {
-                    Text(keyDraft.removeSavedKey && keyDraft.credentialUpdate == ""
-                         ? "The saved API key will be removed when you save."
-                         : (keyDraft.credentialUpdate == nil
-                            ? "API key saved on this Mac. Enter a new key to replace it."
-                            : "The new API key will replace the saved key when you save."))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button(keyDraft.removeSavedKey ? "Keep saved key" : "Remove saved key") {
-                        keyDraft.removeSavedKey.toggle()
-                        keyDraft.replacement = ""
-                    }.disabled(testing)
-                }
-            }
-            Text("Advanced request parameters (JSON)").font(.headline)
-            TextEditor(text: $profile.extraJSON).font(.system(size: 12, design: .monospaced)).frame(height: 85).border(.gray.opacity(0.2))
-            Text("API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region.").font(.caption).foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Form {
+                        Picker("Model", selection: modelChoice) {
+                            if profile.role == .speech && profile.catalogModel == nil {
+                                Text("Unsupported: \(profile.model)").tag(profile.model)
+                            }
+                            ForEach(ModelCatalog.models(for: profile.role)) { model in Text(model.id).tag(model.id) }
+                            if profile.role == .writing { Text("Other Qwen text model…").tag("__custom") }
+                        }
+                        if profile.role == .writing && profile.catalogModel == nil {
+                            LabeledContent("Model ID") { SingleLineField("Model ID", text: $profile.model) }
+                        }
+                        LabeledContent("Connection") { Text(profile.adapter.title).foregroundStyle(.secondary) }
+                        LabeledContent("Profile name") { SingleLineField("Profile name", text: $profile.name) }
+                        LabeledContent("Full endpoint URL") { SingleLineField("Full endpoint URL", text: $profile.endpoint) }
+                        if profile.adapter != .unconfigured {
+                            HStack {
+                                Text("Endpoint must match your key's region or workspace.").font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Use model endpoint") { profile.endpoint = ModelCatalog.endpoint(profile.endpoint, for: profile.adapter) }
+                            }
+                        }
+                        LabeledContent("Bailian API key") {
+                            SingleLineField("Bailian API key", text: $keyDraft.replacement, secure: true,
+                                            placeholder: keyDraft.showsSavedKey ? "••••••••••••" : nil)
+                        }
+                    }.textFieldStyle(.roundedBorder)
+                    if keyDraft.hasSavedKey {
+                        HStack {
+                            Text(keyDraft.removeSavedKey && keyDraft.credentialUpdate == ""
+                                 ? "The saved API key will be removed when you save."
+                                 : (keyDraft.credentialUpdate == nil
+                                    ? "API key saved on this Mac. Enter a new key to replace it."
+                                    : "The new API key will replace the saved key when you save."))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button(keyDraft.removeSavedKey ? "Keep saved key" : "Remove saved key") {
+                                keyDraft.removeSavedKey.toggle()
+                                keyDraft.replacement = ""
+                            }.disabled(testing)
+                        }
+                    }
+                    if profile.role == .speech { speechControls }
+                    Text("Advanced model parameters (JSON)").font(.headline)
+                    if profile.adapter == .qwenMessageWebSocket || profile.adapter == .qwenAudioHTTP {
+                        Text("Optional parameters for the selected model, such as language_hints. Selecting a different protocol resets this JSON.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    TextEditor(text: $profile.extraJSON).font(.system(size: 12, design: .monospaced)).frame(height: 85).border(.gray.opacity(0.2))
+                    Text("API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region.").font(.caption).foregroundStyle(.secondary)
+                }.padding(.trailing, 4)
+            }.frame(maxHeight: 560).disabled(testing)
             if !problem.isEmpty { Text(problem).font(.callout).foregroundStyle(.orange).textSelection(.enabled) }
             HStack {
                 if state.settings.profiles.contains(where: { $0.id == profile.id }),
@@ -284,16 +310,59 @@ struct ProfileEditor: View {
                     if let i = copy.profiles.firstIndex(where: { $0.id == profile.id }) { copy.profiles[i] = profile }
                     else { copy.profiles.append(profile) }
                     do {
+                        try profile.validateForInference()
+                        if profile.vocabularyCapability == .weighted { _ = try profile.speechOptions.weightedVocabulary(copy.hotwords) }
                         try copy.validate(); state.error = ""
                         state.save(copy, credential: keyDraft.credentialUpdate.map { (profile.id, $0) })
                         if state.error.isEmpty { dismiss() } else { problem = state.error }
                     } catch { problem = error.localizedDescription }
                 }.buttonStyle(.borderedProminent).disabled(testing)
             }
-        }.padding(28).frame(width: 600).onAppear {
+        }.padding(28).frame(width: 680).onAppear {
             profile = profile.normalizedInput
             do { keyDraft = APIKeyDraft(hasSavedKey: try state.hasKey(for: profile)) }
             catch { problem = "\(error.localizedDescription) The existing key will be kept unless you enter a replacement." }
+        }
+    }
+
+    private var modelChoice: Binding<String> {
+        Binding(get: { profile.role == .writing && profile.catalogModel == nil ? "__custom" : profile.model },
+                set: { profile.selectModel($0 == "__custom" ? "" : $0) })
+    }
+
+    @ViewBuilder private var speechControls: some View {
+        switch profile.vocabularyCapability {
+        case .weighted:
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle("Use personal vocabulary and custom hotwords", isOn: $profile.speechOptions.useVocabulary)
+                if profile.speechOptions.useVocabulary {
+                    Picker("Personal vocabulary weight", selection: $profile.speechOptions.defaultWeight) {
+                        ForEach(1...5, id: \.self) { Text(String($0)).tag($0) }
+                    }
+                    Text("Words from Vocabulary use this weight. Custom words below can override it. Higher values increase preference; 50 is a super hotword (up to 50 words).")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach($profile.speechOptions.hotwords) { $word in
+                        HStack {
+                            SingleLineField("Custom hotword", text: $word.text)
+                            Picker("Weight", selection: $word.weight) {
+                                ForEach(1...5, id: \.self) { Text(String($0)).tag($0) }
+                                Text("50 · Super").tag(50)
+                            }.frame(width: 160)
+                            Button {
+                                profile.speechOptions.hotwords.removeAll { $0.id == word.id }
+                            } label: { Image(systemName: "minus.circle") }.help("Remove custom hotword")
+                        }
+                    }
+                    Button("Add custom hotword") { profile.speechOptions.hotwords.append(WeightedHotword()) }
+                }
+            }
+        case .context:
+            Toggle("Use personal vocabulary as recognition context", isOn: $profile.speechOptions.useVocabulary)
+            Text("This model accepts vocabulary as context. Weighted hotwords are not supported.")
+                .font(.caption).foregroundStyle(.secondary)
+        case .none:
+            Text("Choose a supported ASR model to configure its recognition and vocabulary options.")
+                .font(.caption).foregroundStyle(.orange)
         }
     }
 }
@@ -309,7 +378,7 @@ struct VocabularyView: View {
             PageHeading(title: "Sounds like you.", detail: "Names, products, and phrases that matter. Shared securely across your devices.")
             Card {
                 Text("Personal vocabulary").font(.headline)
-                Text("One word or phrase per line. Used as recognition context and spelling guidance, without forcing substitutions.").font(.caption).foregroundStyle(.secondary)
+                Text("One word or phrase per line. Used as context or weighted hotwords according to the selected speech model, and as spelling guidance for writing. Configure recognition weights in Models.").font(.caption).foregroundStyle(.secondary)
                 TextEditor(text: $words).font(.system(size: 14)).frame(height: 170).scrollContentBackground(.hidden)
             }
             Card {

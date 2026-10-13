@@ -1,6 +1,19 @@
 import Foundation
 
 public enum QwenRequests {
+    static func validKey(_ value: String, name: String) throws -> String {
+        let key = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !key.contains(where: { $0.isNewline }) else {
+            throw VoiceDraftError.message("Add an API key for \(name) in Models.")
+        }
+        return key
+    }
+    static func validateAudio(_ wav: Data) throws {
+        guard !wav.isEmpty, wav.count <= 9_500_000 else {
+            throw VoiceDraftError.message("The recording is empty or too large. Record up to 4 minutes per take.")
+        }
+    }
+
     public static func extras(_ string: String) throws -> [String: Any] {
         guard let data = string.data(using: .utf8), data.count <= 20_000,
               let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -13,15 +26,12 @@ public enum QwenRequests {
         return object
     }
 
-    private static func request(profile: ModelProfile, key: String, body: [String: Any]) throws -> URLRequest {
+    static func request(profile: ModelProfile, key: String, body: [String: Any]) throws -> URLRequest {
         let model = profile.model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !model.isEmpty else { throw VoiceDraftError.message("Add a model ID for \(profile.name) in Models.") }
         var body = body
         body["model"] = model
-        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty, !key.contains("\n"), !key.contains("\r") else {
-            throw VoiceDraftError.message("Add an API key for \(profile.name) in Models.")
-        }
+        let key = try validKey(key, name: profile.name)
         var request = URLRequest(url: try Endpoint.validate(profile.endpoint), timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
@@ -32,11 +42,11 @@ public enum QwenRequests {
 
     public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: String) throws -> URLRequest {
         guard profile.role == .speech else { throw VoiceDraftError.message("Choose a speech recognition profile.") }
-        guard !wav.isEmpty, wav.count <= 9_500_000 else {
-            throw VoiceDraftError.message("The recording is empty or too large. Record up to 4 minutes per take.")
-        }
+        try profile.validateForInference()
+        guard profile.adapter == .qwenChatSpeech else { throw VoiceDraftError.message("This speech model does not use Chat Completions. Choose its matching adapter in Models.") }
+        try validateAudio(wav)
         var messages: [[String: Any]] = []
-        if !vocabulary.isEmpty { messages.append(["role": "system", "content": vocabulary]) }
+        if profile.speechOptions.useVocabulary && !vocabulary.isEmpty { messages.append(["role": "system", "content": vocabulary]) }
         messages.append(["role": "user", "content": [
             ["type": "input_audio", "input_audio": ["data": "data:audio/wav;base64,\(wav.base64EncodedString())"]]
         ]])
@@ -48,6 +58,7 @@ public enum QwenRequests {
 
     public static func writing(profile: ModelProfile, key: String, text: String, mode: WritingMode,
                                settings: SharedSettings, selection: String = "", application: String = "") throws -> URLRequest {
+        try profile.validateForInference()
         guard profile.role == .writing else { throw VoiceDraftError.message("Choose a writing profile.") }
         let instruction: String
         switch mode {
@@ -90,6 +101,10 @@ public enum QwenRequests {
         else if let content = message["content"] as? [[String: Any]] {
             text = content.compactMap { $0["text"] as? String }.joined()
         } else { text = "" }
+        return try nonempty(text)
+    }
+
+    static func nonempty(_ text: String) throws -> String {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw VoiceDraftError.message("No text was returned. Check microphone input or try again.")
         }
@@ -116,17 +131,7 @@ public final class HTTPTransport: NSObject, URLSessionTaskDelegate, @unchecked S
 
     public func complete(_ request: URLRequest) async throws -> String {
         let (data, response) = try await send(request)
-        guard (200..<300).contains(response.statusCode) else {
-            let hint: String
-            switch response.statusCode {
-            case 401, 403: hint = "Check the API key, its region, and model access."
-            case 404: hint = "Check the full endpoint URL and model ID."
-            case 429: hint = "Rate limit or quota reached. Try again later."
-            case 400: hint = "Check model ID, audio format, and advanced parameters."
-            default: hint = "Try again or check the provider console."
-            }
-            throw VoiceDraftError.message("Model request failed (HTTP \(response.statusCode)). \(hint)")
-        }
+        try ProviderFailure.check(data, response: response)
         return try QwenRequests.parse(data)
     }
 }

@@ -184,6 +184,9 @@ final class AppState: ObservableObject {
             guard let speech = settings.speech, let writing = settings.writing else {
                 throw VoiceDraftError.message("Choose your speech and writing models.")
             }
+            try speech.validateForInference()
+            if speech.vocabularyCapability == .weighted { _ = try speech.speechOptions.weightedVocabulary(settings.hotwords) }
+            if mode != .verbatim { try writing.validateForInference() }
             runSpeechKey = try key(for: speech); runWritingKey = try key(for: writing)
             guard !runSpeechKey.isEmpty else { throw VoiceDraftError.message("Add your Bailian API key in Models first.") }
             if mode != .verbatim, runWritingKey.isEmpty { throw VoiceDraftError.message("Add an API key for the writing model first.") }
@@ -217,8 +220,7 @@ final class AppState: ObservableObject {
             do {
                 let wav = try recorder.stop()
                 guard duration >= 0.25 else { throw VoiceDraftError.message("The recording was too short. Try again.") }
-                let request = try QwenRequests.speech(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary)
-                let raw = try await HTTPTransport().complete(request)
+                let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, hotwords: configuration.hotwords)
                 try Task.checkCancellation(); guard generation == id else { return }
                 transcript = raw; result = ""
                 var output = raw

@@ -17,7 +17,7 @@ final class ModelCatalogTests: XCTestCase {
         object["profiles"] = profiles
         let old = try JSONSerialization.data(withJSONObject: object)
         let migrated = try JSONDecoder().decode(SharedSettings.self, from: old)
-        XCTAssertEqual(migrated.schemaVersion, 3)
+        XCTAssertEqual(migrated.schemaVersion, 4)
         XCTAssertEqual(migrated.speechID, settings.speechID)
         XCTAssertEqual(migrated.writingID, settings.writingID)
         XCTAssertEqual(migrated.vocabulary.entries.map(\.text), ["VoiceDraft", "百炼"])
@@ -30,7 +30,7 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertEqual(try SyncCrypto.decrypt(encrypted, passphrase: "test-passphrase-only"), snapshot)
         let roundTrip = try JSONDecoder().decode(SharedSettings.self, from: JSONEncoder().encode(migrated))
         XCTAssertEqual(roundTrip, migrated)
-        object["schemaVersion"] = 4
+        object["schemaVersion"] = 5
         XCTAssertThrowsError(try JSONDecoder().decode(SharedSettings.self, from: JSONSerialization.data(withJSONObject: object)))
     }
 

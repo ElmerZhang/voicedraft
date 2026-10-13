@@ -64,3 +64,13 @@
 "Could not finish" = "完了できませんでした";
 "Copy last transcript" = "認識結果をコピー";
 "Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "対応モデルを選択してください。Message モデルは話している間に文字を表示し、HTTP モデルは録音終了後に認識します。辞書は選択したモデルに合わせて適用されます。";
+"Auto-added" = "自動追加";
+"Manually-added" = "手動追加";
+"Word status" = "単語の状態";
+"All statuses" = "すべての状態";
+"Learn from corrections" = "修正から学習";
+"Discover words from dictation" = "音声入力から単語を発見";
+"Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "音声入力後に文章モデルで固有名詞や専門用語を学習します。修正語は直接追加され、新しい候補はアプリ起動中の別々の音声入力で2回出現すると追加されます。";
+"For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "挿入後45秒間、対応エディタで音声入力文への修正から学習します。文書の他の内容は送信しません。削除した単語は自動追加されません。";
+"Added to dictionary:" = "辞書に追加しました：";
+"Could not learn words this time. Your dictation is unaffected." = "今回は単語を学習できませんでした。音声入力には影響しません。";

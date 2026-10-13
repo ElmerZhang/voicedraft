@@ -182,7 +182,10 @@ struct StudioView: View {
                         Spacer()
                         Button { state.copyResult() } label: { Label(L("Copy"), systemImage: "doc.on.doc") }.disabled(state.result.isEmpty)
                     }
-                    TextEditor(text: $state.result).font(.system(size: 14)).frame(minHeight: 150).scrollContentBackground(.hidden)
+                    TextEditor(text: Binding(get: { state.result }, set: { state.editResult($0) })).font(.system(size: 14)).frame(minHeight: 150).scrollContentBackground(.hidden)
+                    if !state.vocabularyLearningStatus.isEmpty {
+                        Text(state.vocabularyLearningStatus).font(.caption).foregroundStyle(.secondary)
+                    }
                     Text(state.mode == .translate ? L("Translation target: \(state.settings.targetLanguage)") : L("Your wording, with a little more clarity.")).font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -425,6 +428,8 @@ struct VocabularyView: View {
             PageHeading(title: L("Sounds like you."), detail: L("One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports."))
             Card {
                 Toggle(L("Enable app vocabulary"), isOn: $vocabulary.enabled).font(.headline)
+                Toggle(D("Learn from corrections"), isOn: $vocabulary.learnFromCorrections)
+                Toggle(D("Discover words from dictation"), isOn: $vocabulary.discoverFromDictation)
                 Text(L("Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models.")).font(.caption).foregroundStyle(.secondary)
                 HStack {
                     SingleLineField(L("Search vocabulary"), text: $query)
@@ -439,7 +444,7 @@ struct VocabularyView: View {
                                 if entry.priority { Image(systemName: "star.fill").foregroundStyle(.orange).help(L("Priority term")) }
                                 Text(L("Strength \(entry.boost)")).font(.caption).foregroundStyle(.secondary)
                                 Button(L("Edit")) { editing = entry }
-                                Button(role: .destructive) { vocabulary.entries.removeAll { $0.id == entry.id } } label: {
+                                Button(role: .destructive) { vocabulary.removeEntry(entry.id) } label: {
                                     Image(systemName: "trash")
                                 }.help(L("Delete term"))
                             }
@@ -504,6 +509,8 @@ struct VocabularyEntryEditor: View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: 16) {
             Text(L("Vocabulary term")).font(.title2)
+            Label(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"), systemImage: entry.origin == .automatic ? "sparkle" : "leaf.fill")
+                .font(.caption).foregroundStyle(.secondary)
             Form {
                 LabeledContent(L("Word or phrase")) { SingleLineField(L("Word or phrase"), text: $entry.text) }
                 Toggle(L("Enabled"), isOn: $entry.enabled)

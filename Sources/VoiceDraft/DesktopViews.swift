@@ -263,13 +263,15 @@ private struct DesktopDictionaryView: View {
     @ObservedObject var state: AppState
     @State private var query = ""
     @State private var filter = 0
+    @State private var statusFilter = 0
     @State private var editing: VocabularyEntry?
     @State private var bulkOpen = false
     @State private var words = ""
     private var entries: [VocabularyEntry] {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return state.settings.vocabulary.entries.filter {
-            (filter == 0 || (filter == 1 ? $0.enabled : !$0.enabled)) &&
+            (filter == 0 || (filter == 1 ? $0.origin == .automatic : $0.origin == .manual)) &&
+            (statusFilter == 0 || (statusFilter == 1 ? $0.enabled : !$0.enabled)) &&
             (term.isEmpty || $0.text.localizedCaseInsensitiveContains(term) || $0.aliases.contains { $0.localizedCaseInsensitiveContains(term) })
         }
     }
@@ -284,22 +286,29 @@ private struct DesktopDictionaryView: View {
                 }.buttonStyle(.plain)
             }
             HStack(spacing: 16) {
-                FilterPills(labels: [D("All"), L("Enabled"), D("Disabled")], selection: $filter)
+                FilterPills(labels: [D("All"), D("Auto-added"), D("Manually-added")], selection: $filter)
                 Spacer()
+                Picker(D("Word status"), selection: $statusFilter) {
+                    Text(D("All statuses")).tag(0)
+                    Text(L("Enabled")).tag(1)
+                    Text(D("Disabled")).tag(2)
+                }.labelsHidden().frame(width: 120)
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 SingleLineField(L("Search vocabulary"), text: $query).frame(width: 200)
             }
             if entries.isEmpty {
-                emptyState(icon: "book.closed", title: query.isEmpty && filter == 0 ? L("Add names, products, or phrases you often say.") : D("No matching words"))
+                emptyState(icon: "book.closed", title: query.isEmpty && filter == 0 && statusFilter == 0 ? L("Add names, products, or phrases you often say.") : D("No matching words"))
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 215), spacing: 12)], alignment: .leading, spacing: 12) {
                     ForEach(entries) { entry in
                         Button { editing = entry } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: entry.priority ? "star.fill" : "leaf.fill")
-                                    .foregroundStyle(entry.priority ? Color.orange : Color.gray.opacity(0.65)).font(.system(size: 13))
+                                Image(systemName: entry.origin == .automatic ? "sparkle" : "leaf.fill")
+                                    .foregroundStyle(entry.origin == .automatic ? Color.teal : Color.gray.opacity(0.65)).font(.system(size: 13))
+                                    .accessibilityLabel(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"))
                                 Text(entry.text).font(.system(size: 15)).lineLimit(1)
                                 Spacer(minLength: 0)
+                                if entry.priority { Image(systemName: "star.fill").foregroundStyle(.orange) }
                                 if !entry.enabled { Image(systemName: "pause.circle").foregroundStyle(.secondary) }
                             }.padding(.horizontal, 16).padding(.vertical, 16).contentShape(Rectangle())
                                 .background(.white, in: RoundedRectangle(cornerRadius: 12))
@@ -312,7 +321,7 @@ private struct DesktopDictionaryView: View {
                                         if let i = vocabulary.entries.firstIndex(where: { $0.id == entry.id }) { vocabulary.entries[i].enabled.toggle() }
                                     }
                                 }
-                                Button(L("Delete term"), role: .destructive) { update { $0.entries.removeAll { $0.id == entry.id } } }
+                                Button(L("Delete term"), role: .destructive) { update { $0.removeEntry(entry.id) } }
                             }
                     }
                 }
@@ -323,6 +332,18 @@ private struct DesktopDictionaryView: View {
                 Spacer()
                 Button(L("Add several terms")) { bulkOpen = true }.buttonStyle(.borderless)
             }.font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 8)
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(D("Learn from corrections"), isOn: Binding(get: { state.settings.vocabulary.learnFromCorrections }, set: { value in update { $0.learnFromCorrections = value } }))
+                Toggle(D("Discover words from dictation"), isOn: Binding(get: { state.settings.vocabulary.discoverFromDictation }, set: { value in update { $0.discoverFromDictation = value } }))
+                Text(D("Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open."))
+                    .font(.caption).foregroundStyle(.secondary)
+                Text(D("For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if !state.vocabularyLearningStatus.isEmpty {
+                    Text(state.vocabularyLearningStatus).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            }.toggleStyle(.switch).controlSize(.small).padding(18)
+                .background(DesktopTheme.surface, in: RoundedRectangle(cornerRadius: 16))
             DisclosureGroup(D("Model vocabulary details")) {
                 VStack(alignment: .leading, spacing: 16) {
                     if let speech = state.settings.speech { VocabularyProjectionView(vocabulary: state.settings.vocabulary, profile: speech) }

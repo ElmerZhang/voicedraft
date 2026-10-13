@@ -60,6 +60,7 @@ final class AppState: ObservableObject {
     }
 
     func key(for profile: ModelProfile) throws -> String { preview ? "" : try KeychainStore.read(profile.id.uuidString) }
+    func hasKey(for profile: ModelProfile) throws -> Bool { preview ? false : try KeychainStore.contains(profile.id.uuidString) }
     func syncToken() throws -> String { preview ? "" : try KeychainStore.read("sync-token") }
     func syncPassphrase() throws -> String { preview ? "" : try KeychainStore.read("sync-passphrase") }
     private func persistDevice() throws { try store?.write(device, name: "device") }

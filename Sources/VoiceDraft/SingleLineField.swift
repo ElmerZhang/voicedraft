@@ -7,11 +7,13 @@ struct SingleLineField: NSViewRepresentable {
     let title: String
     @Binding var text: String
     var secure = false
+    var placeholder: String?
 
-    init(_ title: String, text: Binding<String>, secure: Bool = false) {
+    init(_ title: String, text: Binding<String>, secure: Bool = false, placeholder: String? = nil) {
         self.title = title
         self._text = text
         self.secure = secure
+        self.placeholder = placeholder
     }
 
     func makeNSView(context: Context) -> NSTextField {
@@ -35,7 +37,7 @@ struct SingleLineField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.text = $text
-        field.placeholderString = title
+        field.placeholderString = placeholder ?? title
         field.setAccessibilityLabel(title)
         // Reassigning an unchanged value would disrupt selection and IME input.
         if field.stringValue != text { field.stringValue = text }

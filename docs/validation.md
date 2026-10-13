@@ -74,3 +74,9 @@ These have not been established by the automated tests:
 4. Select editable text, trigger Edit selection, and dictate an instruction. Ask a question and verify its answer appears in VoiceDraft without replacing the selection.
 5. Deny microphone/accessibility permission and verify useful recovery messages. Cancel during recording and processing; no later output should be inserted.
 6. Start a sync server, upload from Mac A, download on Mac B, and verify models, API keys, vocabulary, and style. Try a wrong passphrase. Make offline edits on both Macs and confirm an explicit conflict without lost local changes.
+
+## Saved API key presentation — 2026-10-13
+
+- Four additional credential draft tests passed: saved-key presentation, replacement, clearing a replacement without removing the stored key, explicit removal/cancellation, and read-error propagation. Thirteen standalone Swift tests passed; the two localhost integration tests remained skipped.
+- Opening a model editor now uses a Keychain metadata query and a fixed masked placeholder, without loading the secret into the editor.
+- Rebuilt, signed, and launched the release bundle. The existing ASR profile visibly showed twelve masked dots and the saved-key label. Cancelled without saving, changing credentials, recording, or sending a model request.

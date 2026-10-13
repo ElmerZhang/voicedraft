@@ -4,6 +4,19 @@ import VoiceDraftCore
 
 enum KeychainStore {
     static let service = "com.voicedraft.mac.credentials"
+    static func contains(_ account: String) throws -> Bool {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else {
+            throw VoiceDraftError.message("Could not check the saved API key (\(status)).")
+        }
+        return true
+    }
+
     static func read(_ account: String) throws -> String {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service, kSecAttrAccount as String: account,

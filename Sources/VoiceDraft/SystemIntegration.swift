@@ -28,16 +28,17 @@ enum TextInsertion {
         let element: AXUIElement? = focused.flatMap {
             CFGetTypeID($0) == AXUIElementGetTypeID() ? ($0 as! AXUIElement) : nil
         }
-        var range: CFRange?
-        if let element, let value = attribute(element, kAXSelectedTextRangeAttribute), CFGetTypeID(value) == AXValueGetTypeID() {
-            var r = CFRange()
-            if AXValueGetValue(value as! AXValue, .cfRange, &r) { range = r }
-        }
+        let range = element.flatMap(selectedRange)
         let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
         let secure = element.flatMap { attribute($0, kAXSubroleAttribute) as? String } == "AXSecureTextField"
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
                            element: element, range: range, selection: selection, secure: secure,
                            editable: element.map(isEditable) ?? false)
+    }
+    private static func selectedRange(_ element: AXUIElement) -> CFRange? {
+        guard let value = attribute(element, kAXSelectedTextRangeAttribute), CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        var range = CFRange()
+        return AXValueGetValue(value as! AXValue, .cfRange, &range) ? range : nil
     }
     private static func isEditable(_ element: AXUIElement) -> Bool {
         func isSettable(_ name: String) -> Bool {
@@ -58,6 +59,7 @@ enum TextInsertion {
         _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
     static func insert(_ text: String, into target: InputTarget) async throws {
+        try Task.checkCancellation()
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
         guard target.editable, let current = capture(), current.editable, current.pid == target.pid,
@@ -66,16 +68,17 @@ enum TextInsertion {
               rangesMatch(current.range, target.range) else {
             throw VoiceDraftError.message("The input focus or selection changed. Copy the result when ready.")
         }
-        var settable = DarwinBoolean(false)
-        if AXUIElementIsAttributeSettable(original, kAXSelectedTextAttribute as CFString, &settable) == .success,
-           settable.boolValue,
-           AXUIElementSetAttributeValue(original, kAXSelectedTextAttribute as CFString, text as CFString) == .success { return }
+        let receipt = TextInsertionReceipt(value: attribute(original, kAXValueAttribute) as? String,
+            range: current.range.map { NSRange(location: $0.location, length: $0.length) }, replacement: text)
 
+        // Chromium can acknowledge AXSelectedText writes without implementing
+        // the replacement action. Use the editor's normal paste path instead.
         let board = NSPasteboard.general
         let previous = board.pasteboardItems?.map { item -> [NSPasteboard.PasteboardType: Data] in
             Dictionary(uniqueKeysWithValues: item.types.compactMap { type in item.data(forType: type).map { (type, $0) } })
         } ?? []
-        board.clearContents(); board.setString(text, forType: .string)
+        board.clearContents()
+        let supplied = board.setString(text, forType: .string)
         let generation = board.changeCount
         defer {
             if board.changeCount == generation {
@@ -86,15 +89,24 @@ enum TextInsertion {
                 if !items.isEmpty { board.writeObjects(items) }
             }
         }
-        let source = CGEventSource(stateID: .hidSystemState)
+        guard supplied else { throw VoiceDraftError.message("Could not copy the result.") }
+        let source = CGEventSource(stateID: .privateState)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
             throw VoiceDraftError.message("Could not send the paste shortcut.")
         }
         down.flags = .maskCommand; up.flags = .maskCommand
         down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
-        // Some editors read the clipboard asynchronously. Never overwrite a later user copy.
-        try? await Task.sleep(nanoseconds: 800_000_000)
+        // AX/event success only acknowledges delivery. Wait for the actual
+        // field update before claiming success, without retrying and duplicating text.
+        // Keep the clipboard available during cancellation as the paste is already queued.
+        for _ in 0..<20 {
+            await Task.detached { try? await Task.sleep(nanoseconds: 75_000_000) }.value
+            let range = selectedRange(original).map { NSRange(location: $0.location, length: $0.length) }
+            if receipt.confirms(value: attribute(original, kAXValueAttribute) as? String, range: range) { return }
+        }
+        try Task.checkCancellation()
+        throw VoiceDraftError.message("The app did not confirm insertion. Check the input field before copying the result.")
     }
     private static func rangesMatch(_ a: CFRange?, _ b: CFRange?) -> Bool {
         switch (a, b) {

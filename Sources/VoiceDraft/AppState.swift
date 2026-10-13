@@ -395,7 +395,11 @@ final class AppState: ObservableObject {
         liveTranscript = ""; hudText = ""; hudKind = .compact; hideHUD?()
     }
     func dismissHUD() { if busy { cancel() } else { hideHUD?() } }
-    func copyHUDResult() { copyResult(hudText); hudCopied = true }
+    func copyHUDResult() {
+        guard !hudText.isEmpty, copyResult(hudText) else { return }
+        hudCopied = true
+        hideHUD?()
+    }
     private func fail(_ error: Error, id: UUID) {
         guard generation == id else { return }
         generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
@@ -421,9 +425,15 @@ final class AppState: ObservableObject {
         if let id { history.removeAll { $0.id == id } } else { history.removeAll() }
         do { try store?.write(history, name: "history") } catch { self.error = .init(error: error) }
     }
-    func copyResult(_ text: String? = nil) {
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text ?? result, forType: .string)
+    @discardableResult
+    func copyResult(_ text: String? = nil) -> Bool {
+        NSPasteboard.general.clearContents()
+        guard NSPasteboard.general.setString(text ?? result, forType: .string) else {
+            error = "Could not copy the result."
+            return false
+        }
         notice = "Copied"
+        return true
     }
     func processText() {
         guard !busy, !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }

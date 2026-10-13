@@ -291,3 +291,5 @@
 "⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ 空格  在任意 App 中開始或結束";
 "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  翻譯      ⌃ ⌥ E  修改選中文本      ⌃ ⌥ A  問答";
 "The connection is too slow for live transcription. Please try again." = "網路連線過慢，無法繼續即時辨識。請重試。";
+"Could not copy the result." = "無法複製結果。";
+"The app did not confirm insertion. Check the input field before copying the result." = "無法確認文字已輸入。請先檢查輸入框，再決定是否複製結果。";

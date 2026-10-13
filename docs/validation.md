@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-10-13 · Dismiss the HUD when paste is sent
+
+- The user confirmed that `aefbae6` inserts into Codex and dismisses the HUD without Copy, but reported a 1–2 second delay after the text arrived. The code still kept the HUD visible during the bounded 1.5-second receipt wait; confirmed/terminal outcomes also had a 1.2-second success-display delay.
+- Added a synchronous `onPasteSent` callback after both Command-V events are posted. AppState checks the run identity and hides the HUD immediately in that callback. Removed the delayed-success timer. Receipt polling and conditional clipboard restoration retain their existing timing with the run still busy; missing targets and errors before posting retain the Copy fallback. No ASR, focus eligibility, clipboard lifetime, or retry policy was changed.
+- `python3 scripts/test-all.py` passed all 72 Swift and 6 Python tests, including both localhost integrations; no real audio, selections, credentials or provider calls were used by automated tests. Both localization checks (301 shared / 65 desktop messages in eight languages), release packaging, signature/Info.plist validation and diff checks passed.
+- Relaunched the packaged build with the existing 31 history entries and model/microphone/vocabulary preferences preserved. Renewed the ad-hoc Accessibility entry under the user's prior authorization by selecting the exact current app bundle; the running app's permission indicator confirms access is available. No signing rule was changed.
+- The immediate-dismiss callback is placed before the first observation wait and is not invoked on pre-send errors. Native tool access to Codex remains blocked, so perceived timing in Codex still needs the user's observation; no measured end-to-end latency is claimed.
+
 ## 2026-10-13 · Do not prompt Copy after an unconfirmed paste
 
 - The user verified that `398fa01` now inserts into herdr in Warp and into Codex, but Codex still displayed Copy after the text arrived. The post-send path previously threw an error whenever the 1.5-second AX value/caret observation did not produce an exact receipt; that conflated missing confirmation with failed delivery.

@@ -1,5 +1,10 @@
 # Validation record
 
+## 2026-10-13 · Do not prompt Copy after an unconfirmed paste
+
+- Introduced a distinct sent-without-confirmation outcome. It closes the HUD immediately, without a success checkmark or a duplicate-copy prompt, and reports Paste sent · check the input field on Home. The output remains available on Home and in enabled History. Confirmed insertion, Warp feedback, missing-focus Copy, and pre-send failure handling keep their existing behavior. No receipt test was loosened, and no automatic paste retry was added.
+- All 72 Swift tests and 6 Python server tests passed through `python3 scripts/test-all.py`, including both isolated localhost integrations. Existing receipt tests still reject unchanged values and invalid/unknown ranges. Shared localization (301 messages) and desktop localization (65 messages) passed in eight languages, along with release packaging, signature/Info.plist validation and diff checks. No real audio, selection or provider credentials were used by automated tests.
+
 ## 2026-10-13 · Rich-editor focus and Warp keyboard delivery
 
 - Added nearest-editor ancestor resolution for focused paragraph/text children, so replacement of a child need not invalidate the input target. Empty editor values normalize a missing/zero caret only; nonempty/unknown values remain strict. Process, window, canonical input and selection checks still run before paste, with distinct errors. Non-input content, buttons, disabled and secure fields cannot borrow another editor's eligibility.

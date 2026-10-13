@@ -16,7 +16,7 @@ struct InputTarget {
     let keyboardSurface: Bool
 }
 
-enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal }
+enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWithoutConfirmation }
 
 @MainActor
 enum TextInsertion {
@@ -140,7 +140,10 @@ enum TextInsertion {
         // Terminal echo is not an AX value/selection replacement. Keep the
         // honest distinction between sending paste and observing inserted text.
         if target.keyboardSurface { return .sentToTerminal }
-        throw VoiceDraftError.message("The app did not confirm insertion. Check the input field before copying the result.")
+        // A rich editor can accept paste without exposing an exact AX receipt.
+        // Missing confirmation is not a failed send: prompting Copy here can
+        // duplicate text that already arrived. Keep it distinct from confirmed.
+        return .sentWithoutConfirmation
     }
     private static func nsRange(_ range: CFRange?) -> NSRange? {
         range.map { NSRange(location: $0.location, length: $0.length) }

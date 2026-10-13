@@ -369,24 +369,29 @@ final class AppState: ObservableObject {
         try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
         result = output
         saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
-        var inserted = false
+        var delivery: TextInsertionOutcome?
         if runExternal, runAutoPaste, mode != .ask, !insertionAuthorized {
             self.error = "Enable Accessibility to paste into other apps. The result is available here."
             status = "Result ready · open VoiceDraft to copy"
         } else if let destination, destination.editable, runAutoPaste, mode != .ask {
             status = "Inserting text…"
             do {
-                let delivery = try await TextInsertion.insert(output, into: destination)
+                let outcome = try await TextInsertion.insert(output, into: destination)
                 try Task.checkCancellation(); guard generation == id else { return }
-                inserted = true
-                status = delivery == .confirmed ? "Text inserted" : "Paste sent to terminal"
+                delivery = outcome
+                switch outcome {
+                case .confirmed: status = "Text inserted"
+                case .sentToTerminal: status = "Paste sent to terminal"
+                case .sentWithoutConfirmation: status = "Paste sent · check the input field"
+                }
             } catch {
                 try Task.checkCancellation(); guard generation == id else { return }
                 self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
             }
         } else { status = "Your text is ready" }
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
-        if inserted { hudKind = .compact; closeHUDAfterDelay(id: id) }
+        if delivery == .sentWithoutConfirmation { hideHUD?(); hudKind = .compact }
+        else if delivery != nil { hudKind = .compact; closeHUDAfterDelay(id: id) }
         else { hudText = output; hudKind = .result; showHUD?() }
     }
     func cancel() {

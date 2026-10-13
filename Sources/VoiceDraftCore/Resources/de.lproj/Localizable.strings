@@ -298,3 +298,4 @@
 "The active window changed. Copy the result when ready." = "Das aktive Fenster hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
 "The focused input changed. Copy the result when ready." = "Das fokussierte Eingabefeld hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
 "The text selection changed. Copy the result when ready." = "Die Textauswahl oder Cursorposition hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
+"Paste sent · check the input field" = "Einfügen gesendet · Eingabefeld prüfen";

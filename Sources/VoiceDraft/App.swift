@@ -15,6 +15,10 @@ private struct EditingCommands: Commands {
     @AppStorage("interfaceLanguage") private var language = AppLanguage.system.rawValue
     var body: some Commands {
         let _ = language
+        CommandGroup(replacing: .appSettings) {
+            Button(D("Settings")) { NotificationCenter.default.post(name: .voiceDraftOpenSettings, object: nil) }
+                .keyboardShortcut(",", modifiers: .command)
+        }
         CommandGroup(replacing: .undoRedo) {
             command("Undo", action: "undo:", key: "z")
             command("Redo", action: "redo:", key: "z", modifiers: [.command, .shift])
@@ -50,13 +54,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         let previewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_PREVIEWS"]
-        state = AppState(preview: previewDirectory != nil)
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 790),
+        let isolatedPreview = previewDirectory != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
+        state = AppState(preview: isolatedPreview)
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "VoiceDraft"
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: RootView(state: state))
+        window.contentView = NSHostingView(rootView: DesktopRootView(state: state))
         window.center()
         hud = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 516, height: 102), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         hud.level = .floating; hud.isOpaque = false; hud.backgroundColor = .clear; hud.hasShadow = true
@@ -79,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let modes: [WritingMode] = [.polish, .translate, .edit, .ask]
             self.state.toggle(mode: modes[min(Int(id), 3)], external: true)
         }
-        if previewDirectory == nil {
+        if !isolatedPreview {
             do { try shortcuts.install() } catch { state.error = .init(error: error) }
         }
         showWindow()
@@ -122,7 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for page in ["Studio", "Models", "Vocabulary", "Sync", "History"] {
+                for page in ["Studio", "Models", "Vocabulary", "Sync", "History", "Settings"] {
                     state.page = page
                     try await Task.sleep(nanoseconds: 600_000_000)
                     guard let view = window.contentView else { continue }
@@ -132,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(page.lowercased() + ".png"))
                 }
-                print("Rendered all five native screens without accessing persisted data or Keychain.")
+                print("Rendered all six native screens without accessing persisted data or Keychain.")
             } catch { fputs("Preview capture failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

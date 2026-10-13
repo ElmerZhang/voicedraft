@@ -1,5 +1,11 @@
 # Validation record
 
+## Desktop navigation and model entry — 2026-10-13
+
+- Added Home, History, Dictionary, and the settings modal with its eight-language desktop catalog. Models remain accessible through Settings; the sidebar card no longer has a Models button. Interactive/capture preview modes use synthetic in-memory data and avoid persisted settings, Keychain reads, and global shortcuts.
+- The combined working tree passed 40 Swift tests, with 2 existing localhost integration tests skipped and no failures. Both localization checks passed (292 shared messages and 59 desktop messages in each of eight languages). Release packaging, icon validation, signature verification, Info.plist validation, and `git diff --check` passed after the button removal.
+- The six Python service tests remain blocked during setup by the sandbox's localhost socket restriction. No app restart, joint native UI acceptance, microphone capture, or provider request was performed for this commit.
+
 ## Global vocabulary, interface languages, and audio inputs — 2026-10-13
 
 - Replaced model-owned vocabulary with one app-wide source: term, enablement, strength, priority, language, preferred spelling, aliases, and IPA pronunciation. Adapter projections keep the source intact while enforcing the supported Qwen formats and limits. Schema-v1/v2 migrations preserve profile/credential associations, merge legacy terms deterministically, preserve remote vocabulary references, and normalize legacy tab separators without dropping long terms.

@@ -69,6 +69,18 @@ final class AppState: ObservableObject {
         if preview {
             inputDevices = [.init(id: "preview-microphone", name: "MacBook Pro Microphone")]
             defaultInputID = "preview-microphone"
+            if ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW_FIXTURES"] == "1" {
+                settings.vocabulary = AppVocabulary(words: "VoiceDraft\nQwen\nSwiftUI\nBailian\nWebSocket\nmacOS\nAPI")
+                settings.vocabulary.entries[2].priority = true
+                settings.vocabulary.entries[6].enabled = false
+                history = [
+                    HistoryEntry(mode: .polish, original: "A sample voice note", result: "A sample voice note, ready to use.", application: "VoiceDraft Preview", duration: 12),
+                    HistoryEntry(mode: .translate, original: "这是用于界面检查的示例。", result: "This is a sample for checking the interface.", application: "VoiceDraft Preview", duration: 8),
+                    HistoryEntry(mode: .ask, original: "How can I organize my notes?", result: "Group related ideas and give each group a short heading.", application: "VoiceDraft Preview", duration: 5)
+                ]
+                history[1].date = Date().addingTimeInterval(-3600)
+                history[2].date = Date().addingTimeInterval(-86400)
+            }
             return
         }
         do {
@@ -114,6 +126,7 @@ final class AppState: ObservableObject {
                 if let (id, _) = credential, let previousKey { try? KeychainStore.write(previousKey, account: id.uuidString) }
                 throw error
             }
+            self.error = ""
             self.settings = settings; device.dirty = true; try persistDevice()
             notice = "Saved on this Mac"
             if device.autoSync { Task { await sync() } }

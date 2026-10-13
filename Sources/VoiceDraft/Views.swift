@@ -2,9 +2,9 @@ import SwiftUI
 import AppKit
 import VoiceDraftCore
 
-private let ink = Color(red: 0.14, green: 0.20, blue: 0.18)
-private let accent = Color(red: 0.20, green: 0.39, blue: 0.30)
-private let paper = Color(red: 0.97, green: 0.97, blue: 0.94)
+private let ink = Color(red: 0.10, green: 0.10, blue: 0.11)
+private let accent = Color(red: 0.15, green: 0.34, blue: 0.96)
+private let paper = Color.white
 
 struct RootView: View {
     @Environment(\.locale) private var interfaceLocale
@@ -89,7 +89,7 @@ private struct PageHeading: View {
     var body: some View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.text(title)).font(.system(size: 34, weight: .medium, design: .serif))
+            Text(L10n.text(title)).font(.system(size: 34, weight: .bold))
             Text(detail).font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(4)
         }.padding(.bottom, 24)
     }
@@ -107,12 +107,15 @@ private struct Card<Content: View>: View {
 }
 
 struct StudioView: View {
+    var showsHeading = true
     @Environment(\.locale) private var interfaceLocale
     @ObservedObject var state: AppState
     var body: some View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: 20) {
-            PageHeading(title: L("A little less typing."), detail: L("Speak naturally. Turn your thoughts into words, wherever you work."))
+            if showsHeading {
+                PageHeading(title: L("A little less typing."), detail: L("Speak naturally. Turn your thoughts into words, wherever you work."))
+            }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) { ForEach(WritingMode.allCases) { mode in modeButton(mode) } }.fixedSize()
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading, spacing: 8) {
@@ -366,7 +369,7 @@ struct ProfileEditor: View {
 
 }
 
-private struct VocabularyProjectionView: View {
+struct VocabularyProjectionView: View {
     @Environment(\.locale) private var interfaceLocale
     let vocabulary: AppVocabulary
     let profile: ModelProfile
@@ -487,10 +490,11 @@ struct VocabularyView: View {
     private func load() { vocabulary = state.settings.vocabulary; style = state.settings.stylePrompt; language = state.settings.targetLanguage }
 }
 
-private struct VocabularyEntryEditor: View {
+struct VocabularyEntryEditor: View {
     @Environment(\.locale) private var interfaceLocale
     @State var entry: VocabularyEntry
     var save: (VocabularyEntry) -> Void
+    var saveError: () -> String? = { nil }
     @State private var aliases = ""
     @State private var problem = ""
     @Environment(\.dismiss) private var dismiss
@@ -520,7 +524,10 @@ private struct VocabularyEntryEditor: View {
                 Button(L("Done")) {
                     entry.aliases = aliases.split(whereSeparator: \.isNewline).map(String.init)
                     let value = entry.normalized
-                    do { try value.validate(); save(value); dismiss() }
+                    do {
+                        try value.validate(); save(value)
+                        if let error = saveError() { problem = error } else { dismiss() }
+                    }
                     catch { problem = error.localizedDescription }
                 }.buttonStyle(.borderedProminent)
             }

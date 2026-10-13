@@ -376,9 +376,10 @@ final class AppState: ObservableObject {
         } else if let destination, destination.editable, runAutoPaste, mode != .ask {
             status = "Inserting text…"
             do {
-                try await TextInsertion.insert(output, into: destination)
+                let delivery = try await TextInsertion.insert(output, into: destination)
                 try Task.checkCancellation(); guard generation == id else { return }
-                inserted = true; status = "Text inserted"
+                inserted = true
+                status = delivery == .confirmed ? "Text inserted" : "Paste sent to terminal"
             } catch {
                 try Task.checkCancellation(); guard generation == id else { return }
                 self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"

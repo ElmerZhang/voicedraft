@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-13 · Rich-editor focus and Warp keyboard delivery
+
+- Added nearest-editor ancestor resolution for focused paragraph/text children, so replacement of a child need not invalidate the input target. Empty editor values normalize a missing/zero caret only; nonempty/unknown values remain strict. Process, window, canonical input and selection checks still run before paste, with distinct errors. Non-input content, buttons, disabled and secure fields cannot borrow another editor's eligibility.
+- Added a Warp-only, nonmodal keyboard-surface path for its noneditable AX output area/neutral container/missing focus element. Stable exposed surface/window checks remain, while collapsed output offsets may move. It sends one Command-V and reports Paste sent to terminal without pretending that terminal echo is an editor receipt. No Enter event or automatic retry was added. Limitations of absent focus/pane identity and terminal acceptance are documented in architecture.md.
+- Eight new synthetic focus/selection/terminal-policy tests passed. `python3 scripts/test-all.py` passed all 72 Swift tests and all 6 Python server tests, including both localhost integration cases, with no skips. Shared localization (300 messages), desktop localization (65 messages), all eight languages, release packaging, signature verification, Info.plist and diff checks passed. Automated tests used no real audio, selections, credentials or model services.
+
 ## 2026-10-13 · Confirm actual insertion and dismiss after copying
 
 - After the user reported another failure, the running app showed `Text inserted` while its Accessibility permission was valid. The old AXSelectedText fast path returned immediately on AX success. Inspection of the local Chromium source found that its Cocoa setter dispatches `kReplaceSelectedText`, while `BrowserAccessibility::AccessibilityPerformAction` has no implementation for that action. This supports a silent no-op failure path; the previous app had no per-attempt trace proving which insertion branch ran.

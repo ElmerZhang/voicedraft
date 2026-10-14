@@ -26,6 +26,7 @@ VoiceDraft keeps its own visual language instead of a stock macOS Settings look:
 | | `accentSoft` | accent 12% | accent 22% | selected mode pill |
 | | `recording` | #D63F38 | #F26157 | stop button, recording status |
 | | `success` / `warning` / `danger` | system | system | notices, permission status, errors |
+| | `onAccent` · `scrim` · `shadow` · `washStart`/`washEnd` | white · black 36% · black 18% · tints | white · black 55% · black 50% · dark tints | icons on accent fills, modal dimming, panel shadow, Home card wash |
 | | `hudPanel` | #161617 | same | HUD fill |
 | Radius | `control` 8 · `chip` 12 · `card` 16 · `panel` 22 | | | buttons/fields · chips, rows, notices · cards, sheets · sidebar, settings overlay, HUD cards |
 | Space | 4 · 8 · 12 · 16 · 24 · 32 | | | the only spacing values between elements |

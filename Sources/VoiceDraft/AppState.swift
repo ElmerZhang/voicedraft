@@ -10,6 +10,8 @@ final class AppState: ObservableObject {
     @Published private(set) var device = DeviceSettings()
     @Published private(set) var history: [HistoryEntry] = []
     @Published var page = "Studio"
+    /// Tab shown when `page` is "Settings". Models and Sync are settings tabs, not pages.
+    @Published var settingsTab = "Settings"
     @Published private(set) var interfaceLanguage = L10n.language
     var languageChanged: (() -> Void)?
     func setLanguage(_ value: AppLanguage) {
@@ -722,6 +724,10 @@ extension AppState {
         case .finish:
             if phase == "starting" { finishWhenReady = true } else { finish() }
         }
+    }
+    /// Opens the in-window settings overlay on a tab ("Settings", "Personalization", "Models", "Sync", "About", "Help").
+    func openSettings(_ tab: String = "Settings") {
+        settingsTab = tab; page = "Settings"
     }
     func shortcutLabel(_ action: ShortcutAction) -> String {
         device.features.shortcuts.first { $0.action == action }?.label ?? F("Disabled", "未启用")

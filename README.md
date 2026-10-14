@@ -37,10 +37,10 @@ The floating recording panel does not take keyboard focus. If the original field
 
 ## Pages
 
-- **Home**: shortcut guide, local usage counts, and the full recording/text-testing workspace. Transcribe, polish, translate, edit selection, and ask modes are preserved.
+- **Home**: enabled shortcuts as key caps, local usage counts, and the full recording/text-testing workspace. Transcribe, polish, translate, edit selection, and ask modes are preserved.
 - **History**: records grouped by day, search, dictation/question filters, original transcript details, copy, deletion, and the local-history toggle.
 - **Vocabulary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
-- **Settings** (sidebar or **Command-comma**): language, microphone, insertion and history preferences, plus Personalization, Models, Sync, About, and Help. Save writing style and translation target in Personalization.
+- **Settings** (sidebar or **Command-comma**): an overlay with shortcuts, recording, audio, language, general and update preferences, plus Personalization, Models, Sync, About, and Help tabs. Models and Sync are settings tabs, not pages. Save writing style and translation target in Personalization.
 
 ## Start configuration sync locally
 

@@ -123,13 +123,14 @@ final class AppState: ObservableObject {
     /// Synthetic UI fixtures only; this path cannot load keys, record, or call a model.
     func prepareHUDPreview(_ name: String) {
         guard preview else { return }
-        phase = "idle"; elapsed = 12; level = 0.45; hudCopied = false; error = ""
+        phase = "idle"; elapsed = 12; level = 0.45; hudCopied = false; error = ""; recordingLocked = false
         recordingDeviceName = "Preview microphone"
         liveTranscript = "周二下午三点开会。\n不对，把刚才的周二改成周四，时间不变。"
         hudText = "周四下午三点开会。"; result = hudText
         switch name {
         case "starting": phase = "starting"; hudKind = .compact
         case "recording": phase = "recording"; hudKind = .compact
+        case "locked": phase = "recording"; hudKind = .compact; recordingLocked = true; elapsed = 83
         case "live": phase = "recording"; hudKind = .live
         case "processing": phase = "processing"; hudKind = .live
         case "failure": hudKind = .failure; hudText = liveTranscript; error = "The speech connection ended before the final result."

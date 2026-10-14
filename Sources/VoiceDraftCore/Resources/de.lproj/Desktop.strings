@@ -1,4 +1,12 @@
 // Desktop pages and settings
+// Design refresh: HUD
+"Result ready" = "Ergebnis bereit";
+"Starting…" = "Wird gestartet …";
+"Processing…" = "Wird verarbeitet …";
+"Locked" = "Gesperrt";
+"Writing result" = "Schreibergebnis";
+"Streaming…" = "Wird erzeugt …";
+"Recording" = "Aufnahme";
 "Home" = "Startseite";
 "Vocabulary" = "Wortschatz";
 "Settings" = "Einstellungen";

@@ -5,8 +5,6 @@
 "A little less typing." = "Un poco menos de tecleo.";
 "A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them." = "Se conservó la referencia al vocabulario remoto anterior. Importa sus términos al vocabulario de la app.";
 "A server update is available. Leave the settings page to apply it automatically, or download the server copy explicitly." = "Hay nuevos ajustes en el servidor. Sal de los ajustes para aplicarlos automáticamente o descárgalos manualmente.";
-"A thought worth keeping." = "Una idea que merece guardarse.";
-"ACTIVE" = "ACTIVO";
 "API key saved on this Mac. Enter a new key to replace it." = "La clave API está guardada en este Mac. Introduce otra para reemplazarla.";
 "API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region." = "Las claves API se guardan en el Llavero de este Mac y se cifran antes de sincronizar. El endpoint debe coincidir con la región de la clave.";
 "About VoiceDraft" = "Acerca de VoiceDraft";
@@ -16,7 +14,6 @@
 "Add names, products, or phrases you often say." = "Añade nombres, productos o frases que uses con frecuencia.";
 "Add profile" = "Añadir perfil";
 "Add several terms" = "Añadir varios términos";
-"Add term" = "Añadir término";
 "Add to vocabulary" = "Añadir al vocabulario";
 "Add your Bailian API key in Models first." = "Primero añade tu clave API de Bailian en «Modelos».";
 "Advanced model parameters (JSON)" = "Parámetros avanzados del modelo (JSON)";
@@ -29,7 +26,6 @@
 "App vocabulary → {0}" = "Vocabulario de la app → {0}";
 "Ask" = "Preguntar";
 "Audio input was interrupted. Check the selected device and record again." = "Se interrumpió la entrada de audio. Revisa el dispositivo seleccionado y vuelve a grabar.";
-"Bailian API key" = "Clave API de Bailian";
 "Both this Mac and the server have changes. Download the server copy explicitly, then reapply local edits. Nothing was overwritten." = "Este Mac y el servidor tienen cambios. Descarga la copia del servidor y vuelve a aplicar tus cambios locales. No se ha sobrescrito nada.";
 "Bring All to Front" = "Traer todo al frente";
 "Cancel" = "Cancelar";
@@ -44,7 +40,6 @@
 "Choose a Message speech model." = "Elige un modelo de voz Message.";
 "Choose a speech recognition profile." = "Elige un perfil de reconocimiento de voz.";
 "Choose a supported model" = "Elegir modelo compatible";
-"Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and adapts the app vocabulary to its supported format. Recognition starts after you stop recording. Other model families require their own adapters." = "Elige primero un modelo compatible. VoiceDraft usa su protocolo HTTP o WebSocket y adapta el vocabulario al formato admitido. El reconocimiento comienza al detener la grabación. Otras familias de modelos requieren adaptadores propios.";
 "Choose a supported model for {0} in Models. This model has no matching adapter." = "Elige un modelo compatible para {0} en «Modelos». El modelo actual no tiene un adaptador adecuado.";
 "Choose a supported speech model in Models." = "Elige un modelo de voz compatible en «Modelos».";
 "Choose a sync passphrase with at least 12 characters." = "La frase de contraseña debe tener al menos 12 caracteres.";
@@ -69,7 +64,6 @@
 "Could not save history: {0}" = "No se pudo guardar el historial: {0}";
 "Could not save to Keychain ({0})." = "No se pudo guardar en el Llavero ({0}).";
 "Could not send the paste shortcut." = "No se pudo enviar el atajo de pegar.";
-"Current Qwen ASR adapters use the term and supported strength only. Other fields are kept for compatible adapters; spelling and aliases also guide the writing model." = "Los adaptadores de voz Qwen actuales solo usan el término y la intensidad admitida. Los demás campos se conservan para adaptadores compatibles; la grafía y los alias también orientan al modelo de escritura.";
 "Cut" = "Cortar";
 "Delete all local history?" = "¿Eliminar todo el historial local?";
 "Delete history" = "Eliminar historial";
@@ -100,8 +94,6 @@
 "Hide VoiceDraft" = "Ocultar VoiceDraft";
 "History" = "Historial";
 "IPA pronunciation" = "Pronunciación AFI";
-"In progress" = "En curso";
-"Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys." = "Modelos Qwen independientes para escuchar y escribir. Conéctalos con tus propias claves API de Alibaba Cloud Model Studio.";
 "Input device" = "Dispositivo de entrada";
 "Input: {0}" = "Entrada: {0}";
 "Insert into the original app after recording" = "Insertar en la app original tras grabar";
@@ -116,7 +108,6 @@
 "Language tags, aliases, preferred spelling, and pronunciation are retained in the app vocabulary. This ASR adapter sends only terms and supported weights." = "Las etiquetas de idioma, alias, grafías preferidas y pronunciaciones se conservan en el vocabulario. Este adaptador de voz solo envía términos y pesos admitidos.";
 "Listening · speak naturally" = "Escuchando · Habla con naturalidad";
 "Local history is kept. Current model settings are backed up on this Mac before replacement." = "Se conserva el historial local. Los ajustes actuales de los modelos se guardan en este Mac antes de reemplazarlos.";
-"MAC PREVIEW  ·  0.1.0" = "VISTA PREVIA MAC  ·  0.1.0";
 "Make room for your voice" = "Dale espacio a tu voz";
 "Manage all terms in Vocabulary. Changing the model only changes the format sent to it." = "Gestiona todos los términos en «Vocabulario». Cambiar de modelo solo cambia el formato enviado.";
 "Minimize" = "Minimizar";
@@ -128,8 +119,6 @@
 "No recording is available." = "No hay ninguna grabación disponible.";
 "No text was returned. Check microphone input or try again." = "No se recibió texto. Revisa el micrófono o vuelve a intentarlo.";
 "Not connected" = "Sin conexión";
-"On your terms" = "A tu manera";
-"One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports." = "Un vocabulario para todos los modelos. Guarda aquí todos los detalles; cada adaptador envía los campos que admite.";
 "One setup. Every device." = "Una configuración. Todos tus dispositivos.";
 "One word or phrase per line. Existing terms are kept." = "Una palabra o frase por línea. Se conservan los términos existentes.";
 "Open VoiceDraft" = "Abrir VoiceDraft";
@@ -143,19 +132,16 @@
 "Preferred spelling" = "Grafía preferida";
 "Preferred spelling (optional)" = "Grafía preferida (opcional)";
 "Preparing audio input…" = "Preparando entrada de audio…";
-"Previous remote vocabularies" = "Vocabularios remotos anteriores";
 "Priority term" = "Término prioritario";
 "Process text" = "Procesar texto";
 "Profile name" = "Nombre del perfil";
 "Pronunciation (IPA, optional)" = "Pronunciación (AFI, opcional)";
 "Quit VoiceDraft" = "Salir de VoiceDraft";
 "Qwen Audio returned an unexpected response. Check the model and endpoint." = "Qwen Audio devolvió una respuesta inesperada. Revisa el modelo y el endpoint.";
-"Qwen on Alibaba Cloud\nEncrypted configuration sync" = "Qwen en Alibaba Cloud\nSincronización cifrada de ajustes";
 "Rate limit or quota reached. Try again later." = "Se alcanzó el límite de solicitudes o la cuota. Inténtalo más tarde.";
 "Ready to use" = "Listo para usar";
 "Ready when you are" = "Cuando quieras";
 "Recognizing with Qwen…" = "Reconociendo con Qwen…";
-"Record your first thought in Studio, or use the shortcut in any app." = "Graba tu primera idea en el Estudio o usa el atajo en cualquier app.";
 "Redirects are blocked. Use the provider's direct endpoint." = "Las redirecciones están bloqueadas. Usa el endpoint directo del proveedor.";
 "Redo" = "Rehacer";
 "Refresh devices" = "Actualizar dispositivos";
@@ -181,7 +167,6 @@
 "Settings…" = "Ajustes…";
 "Show All" = "Mostrar todo";
 "Something needs attention" = "Algo necesita atención";
-"Sounds like you." = "Palabras que suenan a ti.";
 "Speak naturally. Turn your thoughts into words, wherever you work." = "Habla con naturalidad. Convierte tus ideas en palabras dondequiera que trabajes.";
 "Speech recognition" = "Reconocimiento de voz";
 "Speech recognition timed out. Try a shorter recording." = "Se agotó el tiempo de reconocimiento. Prueba con una grabación más corta.";
@@ -191,7 +176,6 @@
 "Start recording" = "Iniciar grabación";
 "Stop recording" = "Detener grabación";
 "Strength {0}" = "Intensidad {0}";
-"Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models." = "La intensidad, prioridad, idioma, alias, grafía y pronunciación pertenecen a la app. Los campos no admitidos se conservan al cambiar de modelo.";
 "Studio" = "Estudio";
 "Sync" = "Sincronización";
 "Sync access token was rejected." = "Se rechazó el token de acceso a la sincronización.";
@@ -205,7 +189,6 @@
 "Syncing…" = "Sincronizando…";
 "System default" = "Predeterminado del sistema";
 "System default — {0}" = "Predeterminado del sistema — {0}";
-"THINK OUT LOUD" = "PIENSA EN VOZ ALTA";
 "Test connection" = "Probar conexión";
 "Testing…" = "Probando…";
 "Text inserted" = "Texto insertado";
@@ -224,7 +207,6 @@
 "The selected audio input is unavailable. Reconnect it or choose another device." = "La entrada de audio seleccionada no está disponible. Conéctala de nuevo o elige otro dispositivo.";
 "The server is empty. Upload this Mac's settings first." = "El servidor está vacío. Primero sube los ajustes de este Mac.";
 "The server revision moved backwards. Check the server backup before downloading explicitly." = "La revisión del servidor retrocedió. Revisa la copia de seguridad antes de descargar manualmente.";
-"The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint." = "El servidor guarda una configuración cifrada. Las grabaciones y el historial permanecen en este Mac. Las llamadas a modelos van directamente a tu endpoint de Bailian.";
 "The speech connection closed without a final result." = "La conexión de voz se cerró sin un resultado final.";
 "The speech connection ended before the final result." = "La conexión de voz terminó antes del resultado final.";
 "The speech service did not start the task." = "El servicio de voz no inició la tarea.";
@@ -233,7 +215,6 @@
 "The speech service returned non-text data." = "El servicio de voz devolvió datos que no son texto.";
 "The speech service started the task twice." = "El servicio de voz inició la tarea dos veces.";
 "The speech task ended before it started." = "La tarea de voz terminó antes de empezar.";
-"These references are kept for recovery. Their contents are not sent until you import the terms here." = "Estas referencias se conservan para recuperación. Su contenido no se envía hasta que importes los términos aquí.";
 "This configuration needs a newer app." = "Esta configuración requiere una versión más reciente de la app.";
 "This model does not use the Message WebSocket adapter." = "Este modelo no usa el adaptador Message WebSocket.";
 "This model does not use the Qwen Audio HTTP adapter." = "Este modelo no usa el adaptador Qwen Audio HTTP.";
@@ -273,7 +254,6 @@
 "Writing model" = "Modelo de escritura";
 "Writing with Qwen…" = "Escribiendo con Qwen…";
 "Writing with {0}…" = "Escribiendo con {0}…";
-"Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read." = "Tus últimas 500 entradas, guardadas solo en este Mac. El audio se elimina después de leer cada grabación.";
 "Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase." = "Tus modelos, claves API, vocabulario y preferencias viajan juntos. Solo tú tienes la frase de contraseña para descifrar.";
 "Your models. Your words." = "Tus modelos. Tus palabras.";
 "Your text is ready" = "Tu texto está listo";
@@ -288,8 +268,6 @@
 "{0} terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged." = "{0} términos superan los límites de longitud o cantidad de este adaptador y se omitirán. El vocabulario de la app no cambia.";
 "{0} terms ready as context. This model does not support numeric weights or priority boosts." = "Se enviarán {0} términos como contexto. Este modelo no admite pesos numéricos ni refuerzos de prioridad.";
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "{0} términos listos. La intensidad 0–100 se convierte en pesos 1–5; los primeros 50 términos prioritarios reciben el peso 50.";
-"⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Espacio  Iniciar o terminar en cualquier app";
-"⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  Traducir      ⌃ ⌥ E  Editar selección      ⌃ ⌥ A  Preguntar";
 "The connection is too slow for live transcription. Please try again." = "La conexión es demasiado lenta para la transcripción en directo. Inténtalo de nuevo.";
 "Could not copy the result." = "No se pudo copiar el resultado.";
 "The app did not confirm insertion. Check the input field before copying the result." = "No se pudo confirmar la inserción. Revisa el campo antes de copiar el resultado.";

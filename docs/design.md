@@ -50,7 +50,7 @@ Secondary text uses `.secondary`; tertiary hints use `.tertiary`. Error text use
 | `VDInlineNotice(kind:)` | Transient feedback and warnings inside pages, sheets and the settings overlay. |
 | `.vdPill` / `.vdPillSecondary` | Page-level primary action (New word, Add profile). Sheet and dialog footers use `.borderedProminent` for the confirming action. |
 | `.vdEditorBox()` | Every `TextEditor`, so inputs look like inputs. |
-| `.vdSheet(width:)` | Every sheet: padding 24, fixed width, canvas background. |
+| `.vdSheet(width:)` | Every sheet: padding 24, fixed width, canvas background, accent tint. |
 
 Sheet layout: `sheetTitle`, optional detail, content, then a footer `HStack` ordered destructive action · `Spacer` · secondary actions · Cancel · confirming `.borderedProminent` action. Escape cancels.
 

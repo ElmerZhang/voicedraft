@@ -375,8 +375,8 @@ extension View {
             .overlay(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous).strokeBorder(VD.Palette.line))
     }
 
-    /// Standard sheet chrome: padding, width and background.
+    /// Standard sheet chrome: padding, width, background and accent tint (sheets do not always inherit the window tint).
     func vdSheet(width: CGFloat) -> some View {
-        self.padding(VD.Space.xl).frame(width: width).background(VD.Palette.canvas)
+        self.padding(VD.Space.xl).frame(width: width).background(VD.Palette.canvas).tint(VD.Palette.accent)
     }
 }

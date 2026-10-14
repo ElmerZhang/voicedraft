@@ -5,8 +5,6 @@
 "A little less typing." = "少打字，多表达。";
 "A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them." = "已保留旧的远程词表引用。请先将其中的词条导入 App 词库。";
 "A server update is available. Leave the settings page to apply it automatically, or download the server copy explicitly." = "服务器有新配置。离开设置页面后会自动应用，也可以手动下载服务器副本。";
-"A thought worth keeping." = "留住每一个想法。";
-"ACTIVE" = "使用中";
 "API key saved on this Mac. Enter a new key to replace it." = "API Key 已保存在本机。输入新 Key 可替换。";
 "API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region." = "API Key 保存在本机钥匙串中，同步前会加密。接口地址必须与 API Key 所属地域一致。";
 "About VoiceDraft" = "关于 VoiceDraft";
@@ -16,7 +14,6 @@
 "Add names, products, or phrases you often say." = "添加你经常提到的人名、产品或短语。";
 "Add profile" = "添加配置";
 "Add several terms" = "批量添加词条";
-"Add term" = "添加词条";
 "Add to vocabulary" = "添加到词库";
 "Add your Bailian API key in Models first." = "请先在“模型”中添加百炼 API Key。";
 "Advanced model parameters (JSON)" = "高级模型参数（JSON）";
@@ -29,7 +26,6 @@
 "App vocabulary → {0}" = "App 词库 → {0}";
 "Ask" = "问答";
 "Audio input was interrupted. Check the selected device and record again." = "音频输入中断。请检查所选设备后重新录音。";
-"Bailian API key" = "百炼 API Key";
 "Both this Mac and the server have changes. Download the server copy explicitly, then reapply local edits. Nothing was overwritten." = "本机和服务器都有修改。请手动下载服务器副本，再重新应用本地修改。目前没有覆盖任何配置。";
 "Bring All to Front" = "前置全部窗口";
 "Cancel" = "取消";
@@ -44,7 +40,6 @@
 "Choose a Message speech model." = "请选择 Message 语音模型。";
 "Choose a speech recognition profile." = "请选择语音识别配置。";
 "Choose a supported model" = "请选择支持的模型";
-"Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and adapts the app vocabulary to its supported format. Recognition starts after you stop recording. Other model families require their own adapters." = "先选择支持的模型。VoiceDraft 会使用对应的 HTTP 或 WebSocket 协议，并转换 App 词库格式。停止录音后开始识别。其他模型系列需要单独适配。";
 "Choose a supported model for {0} in Models. This model has no matching adapter." = "请在“模型”中为 {0} 选择支持的模型。当前模型没有匹配的适配器。";
 "Choose a supported speech model in Models." = "请在“模型”中选择支持的语音模型。";
 "Choose a sync passphrase with at least 12 characters." = "同步口令至少需要 12 个字符。";
@@ -69,7 +64,6 @@
 "Could not save history: {0}" = "无法保存历史记录：{0}";
 "Could not save to Keychain ({0})." = "无法保存到钥匙串（{0}）。";
 "Could not send the paste shortcut." = "无法发送粘贴快捷键。";
-"Current Qwen ASR adapters use the term and supported strength only. Other fields are kept for compatible adapters; spelling and aliases also guide the writing model." = "当前 Qwen 语音适配器仅使用词条和支持的强度设置。其他字段会保留供兼容的适配器使用；首选写法和别名也会提供给写作模型作为参考。";
 "Cut" = "剪切";
 "Delete all local history?" = "删除所有本地历史记录？";
 "Delete history" = "删除历史记录";
@@ -100,8 +94,6 @@
 "Hide VoiceDraft" = "隐藏 VoiceDraft";
 "History" = "历史记录";
 "IPA pronunciation" = "IPA 音标";
-"In progress" = "处理中";
-"Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys." = "为语音识别和写作分别选择 Qwen 模型，使用自己的阿里云百炼 API Key 连接。";
 "Input device" = "输入设备";
 "Input: {0}" = "输入：{0}";
 "Insert into the original app after recording" = "录音结束后插入到原 App";
@@ -116,7 +108,6 @@
 "Language tags, aliases, preferred spelling, and pronunciation are retained in the app vocabulary. This ASR adapter sends only terms and supported weights." = "语言标签、别名、首选写法和发音会保留在 App 词库中。当前语音适配器仅发送词条和支持的权重。";
 "Listening · speak naturally" = "正在聆听 · 自然表达即可";
 "Local history is kept. Current model settings are backed up on this Mac before replacement." = "本地历史记录会保留。替换前会在本机备份当前模型设置。";
-"MAC PREVIEW  ·  0.1.0" = "MAC 预览版  ·  0.1.0";
 "Make room for your voice" = "开始用语音表达";
 "Manage all terms in Vocabulary. Changing the model only changes the format sent to it." = "所有词条统一在“词库”中管理。切换模型只会改变发送给它的数据格式。";
 "Minimize" = "最小化";
@@ -128,8 +119,6 @@
 "No recording is available." = "没有可用的录音。";
 "No text was returned. Check microphone input or try again." = "没有返回文字。请检查麦克风输入或重试。";
 "Not connected" = "未连接";
-"On your terms" = "由你掌控";
-"One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports." = "所有模型共用一份 App 词库。在这里保存完整信息，由适配器选择支持的字段。";
 "One setup. Every device." = "配置一次，多端使用。";
 "One word or phrase per line. Existing terms are kept." = "每行一个词语或短语，已有词条会保留。";
 "Open VoiceDraft" = "打开 VoiceDraft";
@@ -143,19 +132,16 @@
 "Preferred spelling" = "首选写法";
 "Preferred spelling (optional)" = "首选写法（可选）";
 "Preparing audio input…" = "正在准备音频输入…";
-"Previous remote vocabularies" = "旧的远程词表";
 "Priority term" = "优先词条";
 "Process text" = "处理文本";
 "Profile name" = "配置名称";
 "Pronunciation (IPA, optional)" = "发音（IPA，可选）";
 "Quit VoiceDraft" = "退出 VoiceDraft";
 "Qwen Audio returned an unexpected response. Check the model and endpoint." = "Qwen Audio 返回了无法识别的响应。请检查模型和接口地址。";
-"Qwen on Alibaba Cloud\nEncrypted configuration sync" = "阿里云 Qwen\n配置加密同步";
 "Rate limit or quota reached. Try again later." = "已达到速率或配额限制，请稍后重试。";
 "Ready to use" = "可用结果";
 "Ready when you are" = "随时开始";
 "Recognizing with Qwen…" = "正在使用 Qwen 识别…";
-"Record your first thought in Studio, or use the shortcut in any app." = "在“工作台”录下第一个想法，或在任意 App 中使用快捷键。";
 "Redirects are blocked. Use the provider's direct endpoint." = "已阻止重定向，请使用服务商的直接接口地址。";
 "Redo" = "重做";
 "Refresh devices" = "刷新设备列表";
@@ -181,7 +167,6 @@
 "Settings…" = "设置…";
 "Show All" = "全部显示";
 "Something needs attention" = "有问题需要处理";
-"Sounds like you." = "让模型熟悉你的用词。";
 "Speak naturally. Turn your thoughts into words, wherever you work." = "自然表达，把想法变成文字，融入你的工作。";
 "Speech recognition" = "语音识别";
 "Speech recognition timed out. Try a shorter recording." = "语音识别超时，请缩短录音后重试。";
@@ -191,7 +176,6 @@
 "Start recording" = "开始录音";
 "Stop recording" = "停止录音";
 "Strength {0}" = "强度 {0}";
-"Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models." = "强度、优先级、语言、别名、写法和发音统一归 App 管理。切换模型后，不支持的字段仍会保留。";
 "Studio" = "工作台";
 "Sync" = "同步";
 "Sync access token was rejected." = "同步访问令牌被拒绝。";
@@ -205,7 +189,6 @@
 "Syncing…" = "正在同步…";
 "System default" = "系统默认";
 "System default — {0}" = "系统默认 — {0}";
-"THINK OUT LOUD" = "让想法说出来";
 "Test connection" = "测试连接";
 "Testing…" = "正在测试…";
 "Text inserted" = "文字已插入";
@@ -224,7 +207,6 @@
 "The selected audio input is unavailable. Reconnect it or choose another device." = "所选音频输入设备不可用。请重新连接或选择其他设备。";
 "The server is empty. Upload this Mac's settings first." = "服务器尚无配置，请先上传本机设置。";
 "The server revision moved backwards. Check the server backup before downloading explicitly." = "服务器版本号出现回退。请检查服务器备份，再决定是否手动下载。";
-"The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint." = "服务器仅保存加密配置。录音和听写历史保留在本机；模型调用直接发送到你配置的百炼接口。";
 "The speech connection closed without a final result." = "语音连接已关闭，但没有收到最终结果。";
 "The speech connection ended before the final result." = "最终结果返回前，语音连接已结束。";
 "The speech service did not start the task." = "语音服务未启动任务。";
@@ -233,7 +215,6 @@
 "The speech service returned non-text data." = "语音服务返回了非文本数据。";
 "The speech service started the task twice." = "语音服务重复启动了任务。";
 "The speech task ended before it started." = "语音任务尚未启动就已结束。";
-"These references are kept for recovery. Their contents are not sent until you import the terms here." = "这些引用仅用于恢复。将词条导入此处后，才会发送其中的内容。";
 "This configuration needs a newer app." = "此配置需要更新版本的 App。";
 "This model does not use the Message WebSocket adapter." = "此模型不使用 Message WebSocket 适配器。";
 "This model does not use the Qwen Audio HTTP adapter." = "此模型不使用 Qwen Audio HTTP 适配器。";
@@ -273,7 +254,6 @@
 "Writing model" = "写作模型";
 "Writing with Qwen…" = "正在使用 Qwen 写作…";
 "Writing with {0}…" = "正在使用 {0} 写作…";
-"Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read." = "最近 500 条记录，仅保存在本机。每次录音读取后即删除音频。";
 "Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase." = "模型、API Key、词库和写作偏好一起同步，只有你持有解密口令。";
 "Your models. Your words." = "你的模型，你的表达。";
 "Your text is ready" = "文字已就绪";
@@ -288,8 +268,6 @@
 "{0} terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged." = "有 {0} 个词条超出当前适配器的长度或数量限制，本次不会发送。App 词库保持完整。";
 "{0} terms ready as context. This model does not support numeric weights or priority boosts." = "将发送 {0} 个词条作为上下文。此模型不支持数值权重或优先级增强。";
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "将发送 {0} 个词条。强度 0–100 映射为权重 1–5；前 50 个优先词条使用权重 50。";
-"⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ 空格  在任意 App 中开始或结束";
-"⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  翻译      ⌃ ⌥ E  修改选中文本      ⌃ ⌥ A  问答";
 "The connection is too slow for live transcription. Please try again." = "网络连接过慢，无法继续实时识别。请重试。";
 "Could not copy the result." = "无法复制结果。";
 "The app did not confirm insertion. Check the input field before copying the result." = "未能确认文字已输入。请先检查输入框，再决定是否复制结果。";

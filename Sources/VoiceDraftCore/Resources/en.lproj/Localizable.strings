@@ -5,8 +5,6 @@
 "A little less typing." = "A little less typing.";
 "A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them." = "A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them.";
 "A server update is available. Leave the settings page to apply it automatically, or download the server copy explicitly." = "A server update is available. Leave the settings page to apply it automatically, or download the server copy explicitly.";
-"A thought worth keeping." = "A thought worth keeping.";
-"ACTIVE" = "ACTIVE";
 "API key saved on this Mac. Enter a new key to replace it." = "API key saved on this Mac. Enter a new key to replace it.";
 "API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region." = "API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region.";
 "About VoiceDraft" = "About VoiceDraft";
@@ -16,7 +14,6 @@
 "Add names, products, or phrases you often say." = "Add names, products, or phrases you often say.";
 "Add profile" = "Add profile";
 "Add several terms" = "Add several terms";
-"Add term" = "Add term";
 "Add to vocabulary" = "Add to vocabulary";
 "Add your Bailian API key in Models first." = "Add your Bailian API key in Models first.";
 "Advanced model parameters (JSON)" = "Advanced model parameters (JSON)";
@@ -29,7 +26,6 @@
 "App vocabulary → {0}" = "App vocabulary → {0}";
 "Ask" = "Ask";
 "Audio input was interrupted. Check the selected device and record again." = "Audio input was interrupted. Check the selected device and record again.";
-"Bailian API key" = "Bailian API key";
 "Both this Mac and the server have changes. Download the server copy explicitly, then reapply local edits. Nothing was overwritten." = "Both this Mac and the server have changes. Download the server copy explicitly, then reapply local edits. Nothing was overwritten.";
 "Bring All to Front" = "Bring All to Front";
 "Cancel" = "Cancel";
@@ -44,7 +40,6 @@
 "Choose a Message speech model." = "Choose a Message speech model.";
 "Choose a speech recognition profile." = "Choose a speech recognition profile.";
 "Choose a supported model" = "Choose a supported model";
-"Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and adapts the app vocabulary to its supported format. Recognition starts after you stop recording. Other model families require their own adapters." = "Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and adapts the app vocabulary to its supported format. Recognition starts after you stop recording. Other model families require their own adapters.";
 "Choose a supported model for {0} in Models. This model has no matching adapter." = "Choose a supported model for {0} in Models. This model has no matching adapter.";
 "Choose a supported speech model in Models." = "Choose a supported speech model in Models.";
 "Choose a sync passphrase with at least 12 characters." = "Choose a sync passphrase with at least 12 characters.";
@@ -69,7 +64,6 @@
 "Could not save history: {0}" = "Could not save history: {0}";
 "Could not save to Keychain ({0})." = "Could not save to Keychain ({0}).";
 "Could not send the paste shortcut." = "Could not send the paste shortcut.";
-"Current Qwen ASR adapters use the term and supported strength only. Other fields are kept for compatible adapters; spelling and aliases also guide the writing model." = "Current Qwen ASR adapters use the term and supported strength only. Other fields are kept for compatible adapters; spelling and aliases also guide the writing model.";
 "Cut" = "Cut";
 "Delete all local history?" = "Delete all local history?";
 "Delete history" = "Delete history";
@@ -100,8 +94,6 @@
 "Hide VoiceDraft" = "Hide VoiceDraft";
 "History" = "History";
 "IPA pronunciation" = "IPA pronunciation";
-"In progress" = "In progress";
-"Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys." = "Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys.";
 "Input device" = "Input device";
 "Input: {0}" = "Input: {0}";
 "Insert into the original app after recording" = "Insert into the original app after recording";
@@ -116,7 +108,6 @@
 "Language tags, aliases, preferred spelling, and pronunciation are retained in the app vocabulary. This ASR adapter sends only terms and supported weights." = "Language tags, aliases, preferred spelling, and pronunciation are retained in the app vocabulary. This ASR adapter sends only terms and supported weights.";
 "Listening · speak naturally" = "Listening · speak naturally";
 "Local history is kept. Current model settings are backed up on this Mac before replacement." = "Local history is kept. Current model settings are backed up on this Mac before replacement.";
-"MAC PREVIEW  ·  0.1.0" = "MAC PREVIEW  ·  0.1.0";
 "Make room for your voice" = "Make room for your voice";
 "Manage all terms in Vocabulary. Changing the model only changes the format sent to it." = "Manage all terms in Vocabulary. Changing the model only changes the format sent to it.";
 "Minimize" = "Minimize";
@@ -128,8 +119,6 @@
 "No recording is available." = "No recording is available.";
 "No text was returned. Check microphone input or try again." = "No text was returned. Check microphone input or try again.";
 "Not connected" = "Not connected";
-"On your terms" = "On your terms";
-"One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports." = "One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports.";
 "One setup. Every device." = "One setup. Every device.";
 "One word or phrase per line. Existing terms are kept." = "One word or phrase per line. Existing terms are kept.";
 "Open VoiceDraft" = "Open VoiceDraft";
@@ -143,19 +132,16 @@
 "Preferred spelling" = "Preferred spelling";
 "Preferred spelling (optional)" = "Preferred spelling (optional)";
 "Preparing audio input…" = "Preparing audio input…";
-"Previous remote vocabularies" = "Previous remote vocabularies";
 "Priority term" = "Priority term";
 "Process text" = "Process text";
 "Profile name" = "Profile name";
 "Pronunciation (IPA, optional)" = "Pronunciation (IPA, optional)";
 "Quit VoiceDraft" = "Quit VoiceDraft";
 "Qwen Audio returned an unexpected response. Check the model and endpoint." = "Qwen Audio returned an unexpected response. Check the model and endpoint.";
-"Qwen on Alibaba Cloud\nEncrypted configuration sync" = "Qwen on Alibaba Cloud\nEncrypted configuration sync";
 "Rate limit or quota reached. Try again later." = "Rate limit or quota reached. Try again later.";
 "Ready to use" = "Ready to use";
 "Ready when you are" = "Ready when you are";
 "Recognizing with Qwen…" = "Recognizing with Qwen…";
-"Record your first thought in Studio, or use the shortcut in any app." = "Record your first thought in Studio, or use the shortcut in any app.";
 "Redirects are blocked. Use the provider's direct endpoint." = "Redirects are blocked. Use the provider's direct endpoint.";
 "Redo" = "Redo";
 "Refresh devices" = "Refresh devices";
@@ -181,7 +167,6 @@
 "Settings…" = "Settings…";
 "Show All" = "Show All";
 "Something needs attention" = "Something needs attention";
-"Sounds like you." = "Sounds like you.";
 "Speak naturally. Turn your thoughts into words, wherever you work." = "Speak naturally. Turn your thoughts into words, wherever you work.";
 "Speech recognition" = "Speech recognition";
 "Speech recognition timed out. Try a shorter recording." = "Speech recognition timed out. Try a shorter recording.";
@@ -191,7 +176,6 @@
 "Start recording" = "Start recording";
 "Stop recording" = "Stop recording";
 "Strength {0}" = "Strength {0}";
-"Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models." = "Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models.";
 "Studio" = "Studio";
 "Sync" = "Sync";
 "Sync access token was rejected." = "Sync access token was rejected.";
@@ -205,7 +189,6 @@
 "Syncing…" = "Syncing…";
 "System default" = "System default";
 "System default — {0}" = "System default — {0}";
-"THINK OUT LOUD" = "THINK OUT LOUD";
 "Test connection" = "Test connection";
 "Testing…" = "Testing…";
 "Text inserted" = "Text inserted";
@@ -224,7 +207,6 @@
 "The selected audio input is unavailable. Reconnect it or choose another device." = "The selected audio input is unavailable. Reconnect it or choose another device.";
 "The server is empty. Upload this Mac's settings first." = "The server is empty. Upload this Mac's settings first.";
 "The server revision moved backwards. Check the server backup before downloading explicitly." = "The server revision moved backwards. Check the server backup before downloading explicitly.";
-"The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint." = "The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint.";
 "The speech connection closed without a final result." = "The speech connection closed without a final result.";
 "The speech connection ended before the final result." = "The speech connection ended before the final result.";
 "The speech service did not start the task." = "The speech service did not start the task.";
@@ -233,7 +215,6 @@
 "The speech service returned non-text data." = "The speech service returned non-text data.";
 "The speech service started the task twice." = "The speech service started the task twice.";
 "The speech task ended before it started." = "The speech task ended before it started.";
-"These references are kept for recovery. Their contents are not sent until you import the terms here." = "These references are kept for recovery. Their contents are not sent until you import the terms here.";
 "This configuration needs a newer app." = "This configuration needs a newer app.";
 "This model does not use the Message WebSocket adapter." = "This model does not use the Message WebSocket adapter.";
 "This model does not use the Qwen Audio HTTP adapter." = "This model does not use the Qwen Audio HTTP adapter.";
@@ -273,7 +254,6 @@
 "Writing model" = "Writing model";
 "Writing with Qwen…" = "Writing with Qwen…";
 "Writing with {0}…" = "Writing with {0}…";
-"Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read." = "Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read.";
 "Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase." = "Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase.";
 "Your models. Your words." = "Your models. Your words.";
 "Your text is ready" = "Your text is ready";
@@ -288,8 +268,6 @@
 "{0} terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged." = "{0} terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged.";
 "{0} terms ready as context. This model does not support numeric weights or priority boosts." = "{0} terms ready as context. This model does not support numeric weights or priority boosts.";
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50.";
-"⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  to start or finish in any app";
-"⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask";
 "The connection is too slow for live transcription. Please try again." = "The connection is too slow for live transcription. Please try again.";
 "Could not copy the result." = "Could not copy the result.";
 "The app did not confirm insertion. Check the input field before copying the result." = "The app did not confirm insertion. Check the input field before copying the result.";

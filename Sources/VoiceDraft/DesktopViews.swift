@@ -531,7 +531,7 @@ private struct DesktopSettingsView: View {
                     Group {
                         switch tab {
                         case "Models": ModelsView(state: state, showsHeading: false)
-                        case "Sync": SyncView(state: state)
+                        case "Sync": SyncView(state: state, showsHeading: false)
                         case "Personalization": DesktopPersonalizationView(state: state)
                         case "About": about
                         case "Help": help

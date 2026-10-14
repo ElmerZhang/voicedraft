@@ -5,8 +5,6 @@
 "A little less typing." = "入力を少し減らそう。";
 "A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them." = "以前のリモート語彙リストへの参照を保持しました。使用するには、用語をアプリの語彙に取り込んでください。";
 "A server update is available. Leave the settings page to apply it automatically, or download the server copy explicitly." = "サーバーに新しい設定があります。設定ページを離れると自動適用されます。手動でダウンロードすることもできます。";
-"A thought worth keeping." = "残しておきたい思い。";
-"ACTIVE" = "使用中";
 "API key saved on this Mac. Enter a new key to replace it." = "API キーはこの Mac に保存されています。置き換えるには新しいキーを入力してください。";
 "API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region." = "API キーはこの Mac のキーチェーンに保存され、同期前に暗号化されます。接続先とキーのリージョンを一致させてください。";
 "About VoiceDraft" = "VoiceDraft について";
@@ -16,7 +14,6 @@
 "Add names, products, or phrases you often say." = "よく話す名前、製品名、フレーズを追加します。";
 "Add profile" = "設定を追加";
 "Add several terms" = "用語をまとめて追加";
-"Add term" = "用語を追加";
 "Add to vocabulary" = "語彙に追加";
 "Add your Bailian API key in Models first." = "まず「モデル」で Bailian API キーを追加してください。";
 "Advanced model parameters (JSON)" = "詳細モデルパラメーター（JSON）";
@@ -29,7 +26,6 @@
 "App vocabulary → {0}" = "アプリの語彙 → {0}";
 "Ask" = "質問";
 "Audio input was interrupted. Check the selected device and record again." = "音声入力が中断されました。デバイスを確認して録音し直してください。";
-"Bailian API key" = "Bailian API キー";
 "Both this Mac and the server have changes. Download the server copy explicitly, then reapply local edits. Nothing was overwritten." = "この Mac とサーバーの両方に変更があります。サーバーの設定を手動でダウンロードし、ローカルの変更を再適用してください。上書きは行われていません。";
 "Bring All to Front" = "すべてを手前に移動";
 "Cancel" = "キャンセル";
@@ -44,7 +40,6 @@
 "Choose a Message speech model." = "Message 音声モデルを選択してください。";
 "Choose a speech recognition profile." = "音声認識設定を選択してください。";
 "Choose a supported model" = "対応モデルを選択";
-"Choose a supported model first. VoiceDraft uses its HTTP or WebSocket protocol and adapts the app vocabulary to its supported format. Recognition starts after you stop recording. Other model families require their own adapters." = "まず対応モデルを選択します。VoiceDraft は対応する HTTP または WebSocket プロトコルを使い、語彙を適切な形式に変換します。認識は録音停止後に開始します。他のモデルには専用アダプターが必要です。";
 "Choose a supported model for {0} in Models. This model has no matching adapter." = "「モデル」で {0} に対応モデルを選択してください。現在のモデルには対応アダプターがありません。";
 "Choose a supported speech model in Models." = "「モデル」で対応する音声モデルを選択してください。";
 "Choose a sync passphrase with at least 12 characters." = "同期パスフレーズは 12 文字以上にしてください。";
@@ -69,7 +64,6 @@
 "Could not save history: {0}" = "履歴を保存できません：{0}";
 "Could not save to Keychain ({0})." = "キーチェーンに保存できません（{0}）。";
 "Could not send the paste shortcut." = "貼り付けショートカットを送信できません。";
-"Current Qwen ASR adapters use the term and supported strength only. Other fields are kept for compatible adapters; spelling and aliases also guide the writing model." = "現在の Qwen 音声アダプターは用語と対応する強度のみを使用します。他の情報は対応アダプター向けに保持されます。表記と別名は文章作成モデルにも渡されます。";
 "Cut" = "カット";
 "Delete all local history?" = "ローカル履歴をすべて削除しますか？";
 "Delete history" = "履歴を削除";
@@ -100,8 +94,6 @@
 "Hide VoiceDraft" = "VoiceDraft を非表示";
 "History" = "履歴";
 "IPA pronunciation" = "IPA 発音記号";
-"In progress" = "処理中";
-"Independent Qwen models for listening and writing. Connect with your own Alibaba Cloud Model Studio API keys." = "音声認識と文章作成に別々の Qwen モデルを使用できます。ご自身の Alibaba Cloud Model Studio API キーで接続します。";
 "Input device" = "入力デバイス";
 "Input: {0}" = "入力：{0}";
 "Insert into the original app after recording" = "録音後に元のアプリへ挿入";
@@ -116,7 +108,6 @@
 "Language tags, aliases, preferred spelling, and pronunciation are retained in the app vocabulary. This ASR adapter sends only terms and supported weights." = "言語タグ、別名、優先表記、発音はアプリの語彙に保持されます。この音声アダプターは用語と対応する重みのみ送信します。";
 "Listening · speak naturally" = "録音中 · 自然にお話しください";
 "Local history is kept. Current model settings are backed up on this Mac before replacement." = "ローカル履歴は保持されます。置き換え前に現在のモデル設定をこの Mac にバックアップします。";
-"MAC PREVIEW  ·  0.1.0" = "MAC プレビュー版  ·  0.1.0";
 "Make room for your voice" = "声で表現しよう";
 "Manage all terms in Vocabulary. Changing the model only changes the format sent to it." = "すべての用語は「語彙」で管理します。モデルを変更しても、送信形式だけが変わります。";
 "Minimize" = "しまう";
@@ -128,8 +119,6 @@
 "No recording is available." = "録音がありません。";
 "No text was returned. Check microphone input or try again." = "テキストが返されませんでした。マイク入力を確認するか、再試行してください。";
 "Not connected" = "未接続";
-"On your terms" = "あなたのペースで";
-"One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports." = "すべてのモデルで 1 つの語彙を共有。詳細情報を保持し、各アダプターが対応する項目を送信します。";
 "One setup. Every device." = "一度の設定で、すべてのデバイスへ。";
 "One word or phrase per line. Existing terms are kept." = "1 行に 1 つの用語またはフレーズを入力します。既存の用語は保持されます。";
 "Open VoiceDraft" = "VoiceDraft を開く";
@@ -143,19 +132,16 @@
 "Preferred spelling" = "優先する表記";
 "Preferred spelling (optional)" = "優先する表記（任意）";
 "Preparing audio input…" = "音声入力を準備中…";
-"Previous remote vocabularies" = "以前のリモート語彙";
 "Priority term" = "優先用語";
 "Process text" = "テキストを処理";
 "Profile name" = "設定名";
 "Pronunciation (IPA, optional)" = "発音（IPA、任意）";
 "Quit VoiceDraft" = "VoiceDraft を終了";
 "Qwen Audio returned an unexpected response. Check the model and endpoint." = "Qwen Audio から予期しない応答が返されました。モデルと接続先を確認してください。";
-"Qwen on Alibaba Cloud\nEncrypted configuration sync" = "Alibaba Cloud の Qwen\n設定を暗号化して同期";
 "Rate limit or quota reached. Try again later." = "リクエスト頻度または利用枠の上限に達しました。後で再試行してください。";
 "Ready to use" = "使えるテキスト";
 "Ready when you are" = "いつでもどうぞ";
 "Recognizing with Qwen…" = "Qwen で認識中…";
-"Record your first thought in Studio, or use the shortcut in any app." = "「スタジオ」で最初の思いを録音するか、任意のアプリでショートカットを使ってください。";
 "Redirects are blocked. Use the provider's direct endpoint." = "リダイレクトはブロックされています。プロバイダーの直接の接続先を指定してください。";
 "Redo" = "やり直す";
 "Refresh devices" = "デバイス一覧を更新";
@@ -181,7 +167,6 @@
 "Settings…" = "設定…";
 "Show All" = "すべてを表示";
 "Something needs attention" = "確認が必要です";
-"Sounds like you." = "あなたらしい言葉を。";
 "Speak naturally. Turn your thoughts into words, wherever you work." = "自然に話して、思いを文字に。いつもの作業をそのままに。";
 "Speech recognition" = "音声認識";
 "Speech recognition timed out. Try a shorter recording." = "音声認識がタイムアウトしました。短く録音して再試行してください。";
@@ -191,7 +176,6 @@
 "Start recording" = "録音を開始";
 "Stop recording" = "録音を停止";
 "Strength {0}" = "強度 {0}";
-"Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models." = "強度、優先度、言語、別名、表記、発音はアプリ全体で管理します。モデルを変更しても、非対応の項目は保存されます。";
 "Studio" = "スタジオ";
 "Sync" = "同期";
 "Sync access token was rejected." = "同期アクセストークンが拒否されました。";
@@ -205,7 +189,6 @@
 "Syncing…" = "同期中…";
 "System default" = "システムのデフォルト";
 "System default — {0}" = "システムのデフォルト — {0}";
-"THINK OUT LOUD" = "思いを声に";
 "Test connection" = "接続テスト";
 "Testing…" = "テスト中…";
 "Text inserted" = "テキストを挿入しました";
@@ -224,7 +207,6 @@
 "The selected audio input is unavailable. Reconnect it or choose another device." = "選択した入力デバイスを使用できません。接続し直すか、別のデバイスを選んでください。";
 "The server is empty. Upload this Mac's settings first." = "サーバーに設定がありません。まずこの Mac の設定をアップロードしてください。";
 "The server revision moved backwards. Check the server backup before downloading explicitly." = "サーバーのリビジョンが古くなっています。サーバーのバックアップを確認してから、手動でダウンロードしてください。";
-"The server stores an encrypted configuration vault. Recordings and dictation history stay on this Mac. Model calls go directly to your configured Bailian endpoint." = "サーバーには暗号化した設定のみを保存します。録音と音声入力の履歴はこの Mac に残ります。モデルへのリクエストは設定した Bailian 接続先へ直接送信します。";
 "The speech connection closed without a final result." = "最終結果を受信せずに音声接続が閉じられました。";
 "The speech connection ended before the final result." = "最終結果が返る前に音声接続が終了しました。";
 "The speech service did not start the task." = "音声サービスがタスクを開始しませんでした。";
@@ -233,7 +215,6 @@
 "The speech service returned non-text data." = "音声サービスがテキスト以外のデータを返しました。";
 "The speech service started the task twice." = "音声サービスがタスクを二重に開始しました。";
 "The speech task ended before it started." = "音声タスクが開始前に終了しました。";
-"These references are kept for recovery. Their contents are not sent until you import the terms here." = "復元用に参照を保持しています。用語をここに取り込むまで、その内容は送信しません。";
 "This configuration needs a newer app." = "この設定には新しいバージョンのアプリが必要です。";
 "This model does not use the Message WebSocket adapter." = "このモデルは Message WebSocket アダプターを使用しません。";
 "This model does not use the Qwen Audio HTTP adapter." = "このモデルは Qwen Audio HTTP アダプターを使用しません。";
@@ -273,7 +254,6 @@
 "Writing model" = "文章作成モデル";
 "Writing with Qwen…" = "Qwen で文章作成中…";
 "Writing with {0}…" = "{0} で文章作成中…";
-"Your last 500 entries, saved only on this Mac. Audio is deleted after each recording is read." = "直近 500 件をこの Mac のみに保存します。音声は録音を読み取った後に削除します。";
 "Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase." = "モデル、API キー、語彙、文章の設定をまとめて同期します。復号パスフレーズを持つのはあなただけです。";
 "Your models. Your words." = "あなたのモデル、あなたの言葉。";
 "Your text is ready" = "テキストができました";
@@ -288,8 +268,6 @@
 "{0} terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged." = "{0} 個の用語は長さまたは件数の制限を超えるため送信しません。アプリの語彙は変更されません。";
 "{0} terms ready as context. This model does not support numeric weights or priority boosts." = "{0} 個の用語を文脈として送信します。このモデルは数値の重みや優先度の強化に対応していません。";
 "{0} terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50." = "{0} 個の用語を送信します。強度 0–100 は重み 1–5 に変換され、最初の優先用語 50 個には重み 50 を使用します。";
-"⌃ ⌥ Space  to start or finish in any app" = "⌃ ⌥ Space  どのアプリでも開始／終了";
-"⌃ ⌥ T  Translate      ⌃ ⌥ E  Edit selection      ⌃ ⌥ A  Ask" = "⌃ ⌥ T  翻訳      ⌃ ⌥ E  選択テキストを編集      ⌃ ⌥ A  質問";
 "The connection is too slow for live transcription. Please try again." = "接続が遅すぎるため、リアルタイム認識を続けられません。もう一度お試しください。";
 "Could not copy the result." = "結果をコピーできませんでした。";
 "The app did not confirm insertion. Check the input field before copying the result." = "入力を確認できませんでした。結果をコピーする前に入力欄を確認してください。";

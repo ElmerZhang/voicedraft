@@ -147,7 +147,9 @@ struct RecordingHUD: View {
                 }
                 if failure {
                     Button { state.page = "Studio"; state.showMain?(); state.dismissHUD() } label: {
+                        // Same height as the Copy pill; the padding is hittable but has no fill.
                         Text(L("Open VoiceDraft")).font(.system(size: 13)).foregroundStyle(.white.opacity(0.65))
+                            .padding(.horizontal, 12).padding(.vertical, 8).contentShape(Capsule())
                     }.buttonStyle(.plain)
                 }
                 Spacer()

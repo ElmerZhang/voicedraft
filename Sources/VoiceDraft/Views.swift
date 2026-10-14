@@ -68,7 +68,10 @@ struct StudioView: View {
                     Image(systemName: "arrow.right").foregroundStyle(.tertiary).accessibilityHidden(true)
                     Label(state.settings.writing?.model ?? L("Choose LLM"), systemImage: "sparkles").lineLimit(1)
                     Spacer(minLength: VD.Space.s)
-                    Button(L("Configure")) { state.openSettings("Models") }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent)
+                    // Text-only link: pad and shape it so the hit area is a comfortable target, not just the glyphs.
+                    Button { state.openSettings("Models") } label: {
+                        Text(L("Configure")).padding(.horizontal, 6).padding(.vertical, 5).contentShape(Rectangle())
+                    }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent).padding(.trailing, -6)
                 }.font(VD.Font.detail).foregroundStyle(.secondary)
             }
             if state.mode == .edit || state.mode == .ask {
@@ -361,7 +364,7 @@ struct ProfileEditor: View {
                         state.save(copy, credential: keyDraft.credentialUpdate.map { (profile.id, $0) })
                         if state.error.isEmpty { dismiss() } else { problem = L(state.error) }
                     } catch { problem = error.localizedDescription }
-                }.buttonStyle(.borderedProminent).disabled(testing)
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(testing)
             }
         }.vdSheet(width: 680).onAppear {
             profile = profile.normalizedInput
@@ -472,7 +475,7 @@ struct VocabularyEntryEditor: View {
                         if let error = saveError() { problem = error } else { dismiss() }
                     }
                     catch { problem = error.localizedDescription }
-                }.buttonStyle(.borderedProminent)
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }.vdSheet(width: 620).onAppear { aliases = entry.aliases.joined(separator: "\n") }
     }

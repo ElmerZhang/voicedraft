@@ -112,3 +112,20 @@
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning.";
 "Added to vocabulary:" = "Added to vocabulary:";
 "Could not learn words this time. Your dictation is unaffected." = "Could not learn words this time. Your dictation is unaffected.";
+
+// Design refresh: onboarding and sheets
+"Active" = "Active";
+"No profiles yet" = "No profiles yet";
+"Add a profile to connect your own provider." = "Add a profile to connect your own provider.";
+"Sync passphrase" = "Sync passphrase";
+"Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model." = "Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model.";
+"Writing style" = "Writing style";
+"Style name" = "Style name";
+"Style instructions" = "Style instructions";
+"Your fields" = "Your fields";
+"Microphone" = "Microphone";
+"Records your voice only while you dictate." = "Records your voice only while you dictate.";
+"Runs shortcuts in any app and inserts text where you type." = "Runs shortcuts in any app and inserts text where you type.";
+"Allowed" = "Allowed";
+"Not allowed" = "Not allowed";
+"Allow" = "Allow";

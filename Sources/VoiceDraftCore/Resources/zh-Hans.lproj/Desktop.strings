@@ -112,3 +112,20 @@
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "输入后的 45 秒内，可从受支持编辑器中对口述文字的修改学习。不会发送文档中的其他内容。删除的词不会自动加回。";
 "Added to vocabulary:" = "已加入词库：";
 "Could not learn words this time. Your dictation is unaffected." = "本次未能学习新词，不影响语音输入。";
+
+// Design refresh: onboarding and sheets
+"Active" = "使用中";
+"No profiles yet" = "还没有配置";
+"Add a profile to connect your own provider." = "添加配置以连接你自己的服务商。";
+"Sync passphrase" = "同步口令";
+"Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model." = "语音模型会使用词条本身，并在支持时使用其强度。其他字段会保留给支持它们的模型；拼写和别名也会引导写作模型。";
+"Writing style" = "写作风格";
+"Style name" = "风格名称";
+"Style instructions" = "风格说明";
+"Your fields" = "你的领域";
+"Microphone" = "麦克风";
+"Records your voice only while you dictate." = "仅在你听写时录制声音。";
+"Runs shortcuts in any app and inserts text where you type." = "在任意应用中使用快捷键，并在你输入的位置插入文字。";
+"Allowed" = "已允许";
+"Not allowed" = "未允许";
+"Allow" = "允许";

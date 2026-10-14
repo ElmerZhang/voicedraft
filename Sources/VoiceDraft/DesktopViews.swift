@@ -2,133 +2,128 @@ import SwiftUI
 import AppKit
 import VoiceDraftCore
 
-private enum DesktopTheme {
-    static let ink = Color(red: 0.09, green: 0.09, blue: 0.10)
-    static let muted = Color(red: 0.48, green: 0.48, blue: 0.50)
-    static let surface = Color(red: 0.967, green: 0.967, blue: 0.970)
-    static let line = Color.black.opacity(0.065)
-    static let blue = Color(red: 0.15, green: 0.34, blue: 0.96)
-}
-
+/// Main window shell: floating sidebar, the three main pages and the in-window settings overlay.
+/// Only Home ("Studio"), History and Vocabulary are pages. `AppState.page == "Settings"` opens the overlay on
+/// `AppState.settingsTab`; the legacy page names "Models" and "Sync" are normalized to that overlay.
 struct DesktopRootView: View {
     @ObservedObject var state: AppState
     @State private var returnPage = "Studio"
-    @State private var settingsTab = "Settings"
-    private var settingsOpen: Bool { state.page == "Settings" }
+    private static let mainPages: Set<String> = ["Studio", "History", "Vocabulary"]
+    private static let settingsPages: Set<String> = ["Settings", "Models", "Sync"]
+    private var settingsOpen: Bool { Self.settingsPages.contains(state.page) }
+    private var visiblePage: String {
+        if settingsOpen { return returnPage }
+        return Self.mainPages.contains(state.page) ? state.page : "Studio"
+    }
+    private var settingsTab: Binding<String> {
+        Binding(get: { state.page == "Models" || state.page == "Sync" ? state.page : state.settingsTab },
+                set: { tab in state.openSettings(tab) })
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 HStack(spacing: 0) {
-                    sidebar
+                    sidebar.ignoresSafeArea(edges: .top)
                     VStack(spacing: 0) {
-                        if !state.error.isEmpty { feedback() }
+                        if !state.error.isEmpty && !settingsOpen {
+                            VDInlineNotice(kind: .error, text: L(state.error), dismissLabel: D("Dismiss")) { state.error = "" }
+                                .padding(.horizontal, 30).padding(.top, VD.Space.xl)
+                        }
                         ScrollView {
                             Group {
-                                switch settingsOpen ? returnPage : state.page {
+                                switch visiblePage {
                                 case "History": DesktopHistoryView(state: state)
                                 case "Vocabulary": DesktopVocabularyView(state: state)
-                                case "Models": ModelsView(state: state)
-                                case "Sync": SyncView(state: state)
                                 default: DesktopHomeView(state: state)
                                 }
                             }
                             .frame(maxWidth: 1260, alignment: .leading)
-                            .padding(.horizontal, 30).padding(.top, 30).padding(.bottom, 36)
+                            .padding(.horizontal, 30).padding(.top, VD.Space.l).padding(.bottom, 36)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
-                        if !state.notice.isEmpty {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(DesktopTheme.blue)
-                                Text(L(state.notice)).foregroundStyle(.secondary)
-                                Spacer()
-                                Button { state.notice = "" } label: { Image(systemName: "xmark") }
-                                    .buttonStyle(.plain).help(D("Dismiss"))
-                            }.font(.caption).padding(.horizontal, 30).padding(.vertical, 10)
+                        if !state.notice.isEmpty && !settingsOpen {
+                            VDInlineNotice(kind: .success, text: L(state.notice), dismissLabel: D("Dismiss")) { state.notice = "" }
+                                .padding(.horizontal, 30).padding(.vertical, VD.Space.m)
                         }
-                    }.background(.white)
+                    }.background(VD.Palette.canvas.ignoresSafeArea())
                 }.disabled(settingsOpen).allowsHitTesting(!settingsOpen).accessibilityHidden(settingsOpen)
                 if settingsOpen {
-                    Color.black.opacity(0.36).ignoresSafeArea()
-                    DesktopSettingsView(state: state, tab: $settingsTab, close: closeSettings)
+                    VD.Palette.scrim.ignoresSafeArea()
+                    DesktopSettingsView(state: state, tab: settingsTab, close: closeSettings)
                         .frame(width: min(1040, geometry.size.width - 80), height: geometry.size.height - 64)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 18))
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        .shadow(color: .black.opacity(0.18), radius: 28, y: 12)
+                        .background(VD.Palette.canvas, in: RoundedRectangle(cornerRadius: VD.Radius.panel, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: VD.Radius.panel, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: VD.Radius.panel, style: .continuous).strokeBorder(VD.Palette.line))
+                        .shadow(color: VD.Palette.shadow, radius: 28, y: 12)
                         .onExitCommand(perform: closeSettings)
                 }
             }
         }
         .frame(minWidth: 1080, minHeight: 740)
-        .background(.white).foregroundStyle(DesktopTheme.ink).tint(DesktopTheme.blue)
-        .preferredColorScheme(.light).environment(\.locale, L10n.locale)
+        .background(VD.Palette.canvas.ignoresSafeArea()).foregroundStyle(VD.Palette.ink).tint(VD.Palette.accent)
+        .environment(\.locale, L10n.locale)
         .sheet(isPresented: $state.showingOnboarding) { OnboardingView(state: state) }
-        .onReceive(NotificationCenter.default.publisher(for: .voiceDraftOpenSettings)) { _ in openSettings() }
+        .onReceive(NotificationCenter.default.publisher(for: .voiceDraftOpenSettings)) { _ in state.openSettings() }
+        .onAppear { pageChanged(state.page) }
+        .onChange(of: state.page) { pageChanged($0) }
+    }
+
+    private func pageChanged(_ page: String) {
+        if Self.mainPages.contains(page) { returnPage = page; return }
+        if page == "Models" || page == "Sync" { state.settingsTab = page; state.page = "Settings" }
+        // Commit or drop any in-progress page edit before the overlay disables the page.
+        if settingsOpen { NSApp.keyWindow?.makeFirstResponder(nil) }
     }
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 28) {
             HStack(spacing: 9) {
                 Image(systemName: "waveform").font(.system(size: 25, weight: .bold))
-                Text("VoiceDraft").font(.system(size: 23, weight: .bold, design: .rounded))
+                Text("VoiceDraft").font(VD.Font.brand)
                 Spacer(minLength: 0)
-            }.padding(.horizontal, 10).padding(.top, 25)
-            VStack(spacing: 5) {
+            }.padding(.horizontal, 10).padding(.top, 34).accessibilityElement(children: .combine)
+            VStack(spacing: VD.Space.xs) {
                 navigation("Studio", title: D("Home"), icon: "house")
                 navigation("History", title: L("History"), icon: "clock.arrow.circlepath")
                 navigation("Vocabulary", title: D("Vocabulary"), icon: "book.closed")
             }
             Spacer(minLength: 20)
-            VStack(alignment: .leading, spacing: 13) {
-                Label(D("Made for your words"), systemImage: "waveform").font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: VD.Space.m) {
+                Label(D("Made for your words"), systemImage: "waveform").font(VD.Font.body.weight(.semibold))
                 Text(D("Your models. Your vocabulary. A little less typing."))
-                    .font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
-            }.padding(17).background(.white, in: RoundedRectangle(cornerRadius: 20))
+                    .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+            }.padding(VD.Space.l).frame(maxWidth: .infinity, alignment: .leading)
+                .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
             HStack {
-                footerButton("slider.horizontal.3", title: D("Settings")) { openSettings() }
+                VDIconButton(systemName: "slider.horizontal.3", label: D("Settings"), size: 17) { state.openSettings() }
                 Spacer()
-                footerButton("arrow.triangle.2.circlepath", title: L("Sync")) { openSettings(tab: "Sync") }
+                VDIconButton(systemName: "arrow.triangle.2.circlepath", label: L("Sync"), size: 17) { state.openSettings("Sync") }
                 Spacer()
-                footerButton("info.circle", title: D("About")) { openSettings(tab: "About") }
+                VDIconButton(systemName: "info.circle", label: D("About"), size: 17) { state.openSettings("About") }
                 Spacer()
-                footerButton("questionmark.circle", title: D("Help")) { openSettings(tab: "Help") }
-            }.padding(.horizontal, 9).padding(.top, 16).overlay(alignment: .top) { Rectangle().fill(DesktopTheme.line).frame(height: 1) }
+                VDIconButton(systemName: "questionmark.circle", label: D("Help"), size: 17) { state.openSettings("Help") }
+            }.padding(.horizontal, VD.Space.s).padding(.top, VD.Space.l)
+                .overlay(alignment: .top) { Rectangle().fill(VD.Palette.line).frame(height: 1) }
         }
-        .padding(16).frame(width: 222).frame(maxHeight: .infinity)
-        .background(DesktopTheme.surface, in: RoundedRectangle(cornerRadius: 26)).padding(10)
+        .padding(VD.Space.l).frame(width: 222).frame(maxHeight: .infinity)
+        .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.panel, style: .continuous))
+        .padding(10)
     }
 
     private func navigation(_ page: String, title: String, icon: String) -> some View {
-        Button { state.page = page } label: {
+        let selected = visiblePage == page
+        return Button { state.page = page } label: {
             HStack(spacing: 13) {
                 Image(systemName: icon).font(.system(size: 18)).frame(width: 24)
-                Text(title).font(.system(size: 16, weight: .medium))
+                Text(title).font(VD.Font.navigation)
                 Spacer()
             }.padding(.horizontal, 13).padding(.vertical, 13)
-                .background((settingsOpen ? returnPage : state.page) == page ? Color.black.opacity(0.07) : .clear,
-                            in: RoundedRectangle(cornerRadius: 11))
-        }.buttonStyle(.plain)
+                .background(selected ? VD.Palette.selection : .clear, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+        }.buttonStyle(.plain).accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    private func footerButton(_ icon: String, title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: icon).font(.system(size: 18)).frame(width: 28, height: 28) }
-            .buttonStyle(.plain).foregroundStyle(.secondary).help(title).accessibilityLabel(title)
-    }
-
-    private func feedback() -> some View {
-        HStack(alignment: .top) {
-            Image(systemName: "exclamationmark.circle")
-            Text(L(state.error)).textSelection(.enabled)
-            Spacer()
-            Button { state.error = "" } label: { Image(systemName: "xmark") }.buttonStyle(.plain).help(D("Dismiss"))
-        }.font(.callout).foregroundStyle(.red).padding(14).background(Color.red.opacity(0.05))
-    }
-
-    private func openSettings(tab: String = "Settings") {
-        if !settingsOpen { returnPage = state.page }
-        NSApp.keyWindow?.makeFirstResponder(nil)
-        settingsTab = tab; state.page = "Settings"
-    }
     private func closeSettings() { state.page = returnPage }
 }
 
@@ -136,128 +131,104 @@ extension Notification.Name {
     static let voiceDraftOpenSettings = Notification.Name("VoiceDraft.openSettings")
 }
 
-private struct DesktopTitle: View {
-    let title: String
-    var body: some View { Text(title).font(.system(size: 40, weight: .bold)).tracking(-1.2) }
-}
-
-private struct DesktopSurface<Content: View>: View {
-    var shaded = false
-    @ViewBuilder var content: Content
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) { content }
-            .padding(22).frame(maxWidth: .infinity, alignment: .leading)
-            .background(shaded ? DesktopTheme.surface : .white, in: RoundedRectangle(cornerRadius: 22))
-            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(DesktopTheme.line))
+/// Informational list of the enabled dictate / translate / edit / ask shortcuts, shown as key caps.
+private struct ShortcutSummaryList: View {
+    @ObservedObject var state: AppState
+    var rowPadding: CGFloat = 20
+    private var bindings: [ShortcutBinding] {
+        [ShortcutAction.dictate, .translate, .edit, .ask].compactMap { action in
+            state.device.features.shortcuts.first { $0.action == action && $0.enabled }
+        }
     }
-}
-
-private struct KeyCaps: View {
-    let keys: [String]
     var body: some View {
-        HStack(spacing: 5) {
-            ForEach(keys, id: \.self) { key in
-                Text(key).font(.system(size: 15, weight: .semibold)).frame(minWidth: 22)
-                    .padding(.horizontal, 7).padding(.vertical, 7)
-                    .background(LinearGradient(colors: [.white, Color(white: 0.965)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 7))
-                    .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color.black.opacity(0.19)))
+        VStack(spacing: 0) {
+            if bindings.isEmpty {
+                VStack(alignment: .leading, spacing: VD.Space.s) {
+                    Text(D("No shortcuts are on")).font(VD.Font.cardTitle)
+                    Text(D("Turn on a shortcut in Settings to dictate from any app.")).font(VD.Font.detail).foregroundStyle(.secondary)
+                    Button(D("Settings")) { state.openSettings() }
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(rowPadding)
             }
-        }.fixedSize()
+            ForEach(Array(bindings.enumerated()), id: \.element.id) { index, binding in
+                if index > 0 { Divider().padding(.horizontal, rowPadding) }
+                HStack(spacing: VD.Space.l) {
+                    VStack(alignment: .leading, spacing: VD.Space.xs) {
+                        Text(title(binding.action)).font(VD.Font.cardTitle)
+                        Text(detail(binding.action)).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: VD.Space.s)
+                    VDKeyCaps(label: binding.label, size: 13)
+                }.padding(.horizontal, rowPadding).padding(.vertical, VD.Space.l)
+                    .accessibilityElement(children: .combine)
+            }
+        }
+    }
+    private func title(_ action: ShortcutAction) -> String {
+        switch action {
+        case .dictate: return D("Dictate")
+        case .ask: return D("Ask anything")
+        default: return action.title
+        }
+    }
+    private func detail(_ action: ShortcutAction) -> String {
+        switch action {
+        case .translate: return D("Your voice, in another language")
+        case .edit: return D("Speak an instruction for selected text.")
+        case .ask: return D("Speak a question. Make room for an idea.")
+        default: return D("Messy thoughts → clear writing")
+        }
     }
 }
 
 private struct DesktopHomeView: View {
     @ObservedObject var state: AppState
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            Text(D("Speak, don't type.")).font(.system(size: 48, weight: .bold)).tracking(-1.8)
-                .minimumScaleFactor(0.8).lineLimit(1)
+        VStack(alignment: .leading, spacing: VD.Space.xl) {
+            Text(D("Speak, don't type.")).font(VD.Font.hero).tracking(-1.2)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             FnShortcutStatus(state: state)
-            HStack(alignment: .top, spacing: 22) {
-                VStack(spacing: 0) {
-                    shortcut(.polish, title: D("Dictate"), detail: D("Messy thoughts → clear writing"), key: "Space")
-                    Divider().padding(.horizontal, 20)
-                    shortcut(.translate, title: L("Translate"), detail: D("Your voice, in another language"), key: "T")
-                    Divider().padding(.horizontal, 20)
-                    shortcut(.ask, title: D("Ask anything"), detail: D("Speak a question. Make room for an idea."), key: "A")
-                }.background(.white, in: RoundedRectangle(cornerRadius: 24))
-                    .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(DesktopTheme.line))
-                    .padding(10).background {
-                        ZStack {
-                            LinearGradient(colors: [Color(red: 0.94, green: 0.97, blue: 0.98), Color(red: 0.96, green: 0.95, blue: 0.99)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            Canvas { context, size in
-                                for x in stride(from: 6.0, to: size.width, by: 10) {
-                                    for y in stride(from: 6.0, to: size.height, by: 10) {
-                                        context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)), with: .color(.black.opacity(0.10)))
-                                    }
-                                }
-                            }
-                        }.clipShape(RoundedRectangle(cornerRadius: 30))
-                    }
-                DesktopSurface(shaded: true) {
+            HStack(alignment: .top, spacing: VD.Space.xl) {
+                ShortcutSummaryList(state: state)
+                    .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous).strokeBorder(VD.Palette.line))
+                    .padding(10).background { wash }
+                VDSurface(style: .shaded) {
                     stat("clock", value: "\(Int(state.history.reduce(0) { $0 + $1.duration }) / 60)", label: D("minutes recorded"))
                     stat("text.bubble", value: "\(state.history.count)", label: D("saved entries"))
                     stat("book.closed", value: "\(state.settings.vocabulary.entries.filter(\.enabled).count)", label: D("active terms"))
-                    Text(D("Based on history on this Mac.")).font(.system(size: 10)).foregroundStyle(.secondary)
-                }.frame(width: 190).padding(.top, 10)
+                    Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }.frame(width: 200).padding(.top, 10)
             }
             HStack(alignment: .firstTextBaseline) {
-                Text(D("Try it here")).font(.system(size: 23, weight: .bold))
+                Text(D("Try it here")).font(VD.Font.sectionTitle)
                 Spacer()
-                Label(D("Your testing workspace"), systemImage: "slider.horizontal.3").font(.system(size: 12)).foregroundStyle(.secondary)
-            }
+                Label(D("Your testing workspace"), systemImage: "slider.horizontal.3").font(VD.Font.detail).foregroundStyle(.secondary)
+            }.padding(.top, VD.Space.s)
             StudioView(showsHeading: false, state: state)
-            Text(D("Make it part of your day")).font(.system(size: 23, weight: .bold)).padding(.top, 8)
-            HStack(alignment: .top, spacing: 14) {
-                useCase("envelope", title: D("Emails & messages"), detail: D("Turn a quick thought into a clear message."), tint: .blue)
-                useCase("doc.text", title: D("Notes & documents"), detail: D("Capture ideas while they are still fresh."), tint: .green)
-                useCase("sparkles", title: D("Ideas & answers"), detail: D("Ask, explore, and refine with your writing model."), tint: .orange)
-            }
         }
     }
-    private func shortcut(_ mode: WritingMode, title: String, detail: String, key: String) -> some View {
-        Button { state.mode = mode } label: {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title).font(.system(size: 17, weight: .semibold))
-                    Text(detail).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    /// Decorative tinted dot grid behind the shortcut card; adapts to the appearance.
+    private var wash: some View {
+        ZStack {
+            LinearGradient(colors: [VD.Palette.washStart, VD.Palette.washEnd], startPoint: .topLeading, endPoint: .bottomTrailing)
+            Canvas { context, size in
+                for x in stride(from: 6.0, to: size.width, by: 10) {
+                    for y in stride(from: 6.0, to: size.height, by: 10) {
+                        context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)), with: .color(.primary.opacity(0.10)))
+                    }
                 }
-                Spacer(minLength: 8)
-                Text(state.shortcutLabel(mode == .translate ? .translate : mode == .ask ? .ask : .dictate)).font(.system(.caption, design: .monospaced))
-            }.padding(.horizontal, 20).padding(.vertical, 18).contentShape(Rectangle())
-        }.buttonStyle(.plain).disabled(state.busy).help(D("Choose a mode in the testing workspace"))
+            }
+        }.clipShape(RoundedRectangle(cornerRadius: VD.Radius.card + 10, style: .continuous)).accessibilityHidden(true)
     }
     private func stat(_ icon: String, value: String, label: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 18)).frame(width: 22)
+        HStack(spacing: VD.Space.m) {
+            Image(systemName: icon).font(.system(size: 18)).frame(width: 22).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(.system(size: 22, weight: .bold))
-                Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(value).font(VD.Font.statValue)
+                Text(label).font(VD.Font.footnote).foregroundStyle(.secondary)
             }
-        }
-    }
-    private func useCase(_ icon: String, title: String, detail: String, tint: Color) -> some View {
-        DesktopSurface {
-            Image(systemName: icon).font(.system(size: 27)).foregroundStyle(tint).frame(height: 32)
-            Text(title).font(.system(size: 15, weight: .semibold))
-            Text(detail).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(3).frame(minHeight: 50, alignment: .top)
-        }
-    }
-}
-
-private struct FilterPills: View {
-    let labels: [String]
-    @Binding var selection: Int
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(labels.indices, id: \.self) { index in
-                Button { selection = index } label: {
-                    Text(labels[index]).font(.system(size: 13, weight: selection == index ? .medium : .regular))
-                        .padding(.horizontal, 15).padding(.vertical, 10)
-                        .background(selection == index ? .white : .clear, in: Capsule())
-                }.buttonStyle(.plain).accessibilityAddTraits(selection == index ? [.isSelected] : [])
-            }
-        }.padding(5).background(Color(white: 0.945), in: Capsule())
+        }.accessibilityElement(children: .combine)
     }
 }
 
@@ -281,89 +252,72 @@ private struct DesktopVocabularyView: View {
             return $0.text.localizedStandardCompare($1.text) == .orderedAscending
         }
     }
+    private var vocabularyEnabled: Binding<Bool> {
+        Binding(get: { state.settings.vocabulary.enabled }, set: { enabled in update { $0.enabled = enabled } })
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack {
-                DesktopTitle(title: D("Vocabulary"))
-                Spacer()
-                Button { editing = VocabularyEntry() } label: {
-                    Text(D("New word")).font(.system(size: 14, weight: .medium)).padding(.horizontal, 20).padding(.vertical, 12)
-                        .foregroundStyle(.white).background(DesktopTheme.ink, in: Capsule())
-                }.buttonStyle(.plain)
-            }
-            VocabularyFileControls(state: state)
-            HStack(spacing: 16) {
-                FilterPills(labels: [D("All"), D("Auto-added"), D("Manually-added")], selection: $filter)
-                Spacer()
-                Picker(D("Word status"), selection: $statusFilter) {
-                    Text(D("All statuses")).tag(0)
-                    Text(L("Enabled")).tag(1)
-                    Text(D("Disabled")).tag(2)
-                }.labelsHidden().frame(width: 120)
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                SingleLineField(L("Search vocabulary"), text: $query).frame(width: 200)
-            }
-            if entries.isEmpty {
-                emptyState(icon: "book.closed", title: query.isEmpty && filter == 0 && statusFilter == 0 ? L("Add names, products, or phrases you often say.") : D("No matching words"))
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 215), spacing: 12)], alignment: .leading, spacing: 12) {
-                    ForEach(entries) { entry in
-                        Button { editing = entry } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: entry.origin == .automatic ? "sparkle" : "leaf.fill")
-                                    .foregroundStyle(entry.origin == .automatic ? Color.teal : Color.gray.opacity(0.65)).font(.system(size: 13))
-                                    .accessibilityLabel(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"))
-                                Text("\(entry.useCount)").font(.caption).foregroundStyle(.secondary).help(F("Uses", "使用次数"))
-                                Text(entry.text).font(.system(size: 15)).lineLimit(1)
-                                Spacer(minLength: 0)
-                                if entry.priority { Image(systemName: "star.fill").foregroundStyle(.orange) }
-                                if !entry.enabled { Image(systemName: "pause.circle").foregroundStyle(.secondary) }
-                            }.padding(.horizontal, 16).padding(.vertical, 16).contentShape(Rectangle())
-                                .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(DesktopTheme.line))
-                        }.buttonStyle(.plain).help(entry.text)
-                            .contextMenu {
-                                Button(L("Edit")) { editing = entry }
-                                Button(entry.enabled ? D("Disable word") : D("Enable word")) {
-                                    update { vocabulary in
-                                        if let i = vocabulary.entries.firstIndex(where: { $0.id == entry.id }) { vocabulary.entries[i].enabled.toggle() }
-                                    }
-                                }
-                                Button(L("Delete term"), role: .destructive) { update { $0.removeEntry(entry.id) } }
-                            }
+        VStack(alignment: .leading, spacing: VD.Space.xl) {
+            VDPageHeader(D("Vocabulary")) {
+                HStack(spacing: VD.Space.s) {
+                    Button(D("New word")) { editing = VocabularyEntry() }.buttonStyle(.vdPill)
+                    VDOverflowMenu(label: D("More actions")) {
+                        Button(L("Add several terms")) { bulkOpen = true }
                     }
                 }
             }
-            HStack {
-                Toggle(L("Enable app vocabulary"), isOn: Binding(get: { state.settings.vocabulary.enabled }, set: { enabled in update { $0.enabled = enabled } }))
-                    .toggleStyle(.switch).controlSize(.small)
-                Spacer()
-                Button(L("Add several terms")) { bulkOpen = true }.buttonStyle(.borderless)
-            }.font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 8)
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle(D("Learn from corrections"), isOn: Binding(get: { state.settings.vocabulary.learnFromCorrections }, set: { value in update { $0.learnFromCorrections = value } }))
-                Toggle(D("Discover words from dictation"), isOn: Binding(get: { state.settings.vocabulary.discoverFromDictation }, set: { value in update { $0.discoverFromDictation = value } }))
-                Text(D("Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open."))
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(F("Manual spellings take priority. Automatic terms stay enabled with lower priority; edit and save a term to confirm it.", "手动拼写优先。自动词条保持启用，但优先级较低；编辑并保存即可确认该拼写。"))
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(D("For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning."))
-                    .font(.caption).foregroundStyle(.secondary)
-                if !state.vocabularyLearningStatus.isEmpty {
-                    Text(state.vocabularyLearningStatus).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: VD.Space.m) {
+                    pills
+                    Spacer(minLength: VD.Space.s)
+                    statusPicker
+                    masterToggle
+                    VDSearchField(title: L("Search vocabulary"), text: $query, width: 180)
                 }
-            }.toggleStyle(.switch).controlSize(.small).padding(18)
-                .background(DesktopTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                VStack(alignment: .leading, spacing: VD.Space.m) {
+                    HStack(spacing: VD.Space.m) { pills; Spacer(minLength: VD.Space.s); masterToggle }
+                    HStack(spacing: VD.Space.m) { statusPicker; Spacer(minLength: VD.Space.s); VDSearchField(title: L("Search vocabulary"), text: $query, width: 220) }
+                }
+            }
+            if !state.settings.vocabulary.enabled {
+                VDInlineNotice(kind: .info, text: D("App vocabulary is off. Your words are kept but not sent to your models."))
+            }
+            if entries.isEmpty {
+                VDEmptyState(icon: "book.closed", title: query.isEmpty && filter == 0 && statusFilter == 0 ? L("Add names, products, or phrases you often say.") : D("No matching words"))
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 215), spacing: VD.Space.m)], alignment: .leading, spacing: VD.Space.m) {
+                    ForEach(entries) { entry in chip(entry) }
+                }.opacity(state.settings.vocabulary.enabled ? 1 : 0.6)
+            }
+            VDSurface(style: .shaded, spacing: VD.Space.s) {
+                Label(D("Automatic learning"), systemImage: "sparkles").font(VD.Font.cardTitle)
+                VDSettingRow(title: D("Learn from corrections"), detail: D("For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning.")) {
+                    VDSwitch(D("Learn from corrections"), isOn: Binding(get: { state.settings.vocabulary.learnFromCorrections }, set: { value in update { $0.learnFromCorrections = value } }))
+                }
+                Divider()
+                VDSettingRow(title: D("Discover words from dictation"), detail: D("Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open.")) {
+                    VDSwitch(D("Discover words from dictation"), isOn: Binding(get: { state.settings.vocabulary.discoverFromDictation }, set: { value in update { $0.discoverFromDictation = value } }))
+                }
+                Text(F("Manual spellings take priority. Automatic terms stay enabled with lower priority; edit and save a term to confirm it.", "手动拼写优先。自动词条保持启用，但优先级较低；编辑并保存即可确认该拼写。"))
+                    .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if !state.vocabularyLearningStatus.isEmpty {
+                    Text(state.vocabularyLearningStatus).font(VD.Font.footnote).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            }
             DisclosureGroup(D("Model vocabulary details")) {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: VD.Space.l) {
                     if let speech = state.settings.speech { VocabularyProjectionView(vocabulary: state.settings.vocabulary, profile: speech) }
                     ForEach(state.settings.vocabulary.legacyReferences.indices, id: \.self) { i in
                         let reference = state.settings.vocabulary.legacyReferences[i]
-                        Text("\(reference.model) · \(reference.resourceID)").font(.caption).textSelection(.enabled)
+                        Text("\(reference.model) · \(reference.resourceID)").font(VD.Font.detail).textSelection(.enabled)
                     }
-                }.padding(.top, 12)
-            }.font(.system(size: 12)).foregroundStyle(.secondary)
-            Text(L("Vocabulary and preferences are included in encrypted sync.")).font(.caption).foregroundStyle(.secondary)
+                }.padding(.top, VD.Space.m)
+            }.font(VD.Font.detail).foregroundStyle(.secondary)
+            // The import/export/extraction buttons own their review sheet, so they stay as buttons instead of menu items.
+            VStack(alignment: .leading, spacing: VD.Space.m) {
+                VDSectionHeader(icon: "square.and.arrow.down.on.square", title: D("Import and export"))
+                VocabularyFileControls(state: state)
+            }
+            Text(L("Vocabulary and preferences are included in encrypted sync.")).font(VD.Font.footnote).foregroundStyle(.secondary)
         }
         .sheet(item: $editing) { entry in
             VocabularyEntryEditor(entry: entry, save: { value in
@@ -373,33 +327,71 @@ private struct DesktopVocabularyView: View {
                 }
             }, saveError: { state.error.isEmpty ? nil : L(state.error) })
         }
-        .sheet(isPresented: $bulkOpen) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(L("Add several terms")).font(.title2.bold())
-                Text(L("One word or phrase per line. Existing terms are kept.")).foregroundStyle(.secondary)
-                TextEditor(text: $words).frame(height: 190).border(DesktopTheme.line)
-                HStack {
-                    Spacer()
-                    Button(L("Cancel")) { bulkOpen = false }
-                    Button(L("Add to vocabulary")) {
-                        update { $0.appendLines(words) }
-                        if state.error.isEmpty { words = ""; bulkOpen = false }
-                    }.buttonStyle(.borderedProminent).disabled(words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .sheet(isPresented: $bulkOpen) { bulkSheet }
+    }
+    private var pills: some View {
+        VDFilterPills(labels: [D("All"), D("Auto-added"), D("Manually-added")], selection: $filter).fixedSize()
+    }
+    private var statusPicker: some View {
+        Picker(D("Word status"), selection: $statusFilter) {
+            Text(D("All statuses")).tag(0)
+            Text(L("Enabled")).tag(1)
+            Text(D("Disabled")).tag(2)
+        }.labelsHidden().fixedSize()
+    }
+    private var masterToggle: some View {
+        Toggle(L("Enable app vocabulary"), isOn: vocabularyEnabled).toggleStyle(.switch).font(VD.Font.detail).fixedSize()
+    }
+    private func chip(_ entry: VocabularyEntry) -> some View {
+        Button { editing = entry } label: {
+            HStack(spacing: 10) {
+                Image(systemName: entry.origin == .automatic ? "sparkle" : "leaf.fill")
+                    .foregroundStyle(entry.origin == .automatic ? AnyShapeStyle(VD.Palette.accent) : AnyShapeStyle(.tertiary)).font(.system(size: 13))
+                    .accessibilityLabel(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"))
+                Text("\(entry.useCount)").font(VD.Font.footnote).foregroundStyle(.secondary).monospacedDigit().help(F("Uses", "使用次数"))
+                Text(entry.text).font(.system(size: 15)).lineLimit(1)
+                Spacer(minLength: 0)
+                if entry.priority { Image(systemName: "star.fill").foregroundStyle(VD.Palette.warning) }
+                if !entry.enabled { Image(systemName: "pause.circle").foregroundStyle(.secondary).accessibilityLabel(D("Disabled")) }
+            }.padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.l).contentShape(Rectangle())
+                .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous).strokeBorder(VD.Palette.line))
+                .opacity(entry.enabled ? 1 : 0.65)
+        }.buttonStyle(.plain).help(entry.text)
+            .contextMenu {
+                Button(L("Edit")) { editing = entry }
+                Button(entry.enabled ? D("Disable word") : D("Enable word")) {
+                    update { vocabulary in
+                        if let i = vocabulary.entries.firstIndex(where: { $0.id == entry.id }) { vocabulary.entries[i].enabled.toggle() }
+                    }
                 }
-                if !state.error.isEmpty { Text(L(state.error)).foregroundStyle(.red) }
-            }.padding(28).frame(width: 520)
-        }
+                Button(L("Delete term"), role: .destructive) { update { $0.removeEntry(entry.id) } }
+            }
+    }
+    private var bulkSheet: some View {
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            VStack(alignment: .leading, spacing: VD.Space.xs) {
+                Text(L("Add several terms")).font(VD.Font.sheetTitle)
+                Text(L("One word or phrase per line. Existing terms are kept.")).font(VD.Font.detail).foregroundStyle(.secondary)
+            }
+            TextEditor(text: $words).font(VD.Font.body).vdEditorBox(minHeight: 190, maxHeight: 190)
+            if !state.error.isEmpty {
+                VDInlineNotice(kind: .error, text: L(state.error), dismissLabel: D("Dismiss")) { state.error = "" }
+            }
+            HStack {
+                Spacer()
+                Button(L("Cancel")) { bulkOpen = false }.keyboardShortcut(.cancelAction)
+                Button(L("Add to vocabulary")) {
+                    update { $0.appendLines(words) }
+                    if state.error.isEmpty { words = ""; bulkOpen = false }
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    .disabled(words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }.vdSheet(width: 520)
     }
     private func update(_ change: (inout AppVocabulary) -> Void) {
         var copy = state.settings; change(&copy.vocabulary); state.save(copy)
     }
-}
-
-private func emptyState(icon: String, title: String) -> some View {
-    VStack(spacing: 15) {
-        Image(systemName: icon).font(.system(size: 32, weight: .light)).foregroundStyle(.tertiary)
-        Text(title).font(.system(size: 15)).foregroundStyle(.secondary)
-    }.frame(maxWidth: .infinity).padding(.vertical, 65)
 }
 
 private struct DesktopHistoryView: View {
@@ -416,88 +408,86 @@ private struct DesktopHistoryView: View {
         }.sorted { $0.date > $1.date }
     }
     private var days: [Date] { Set(entries.map { Calendar.current.startOfDay(for: $0.date) }).sorted(by: >) }
+    private var keepHistory: Binding<Bool> {
+        Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) })
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack {
-                DesktopTitle(title: L("History"))
-                Spacer()
-                Label(D("Only on this Mac"), systemImage: "internaldrive").font(.system(size: 13)).foregroundStyle(.secondary)
-                Menu {
-                    Button(L("Clear history…"), role: .destructive) { confirmClear = true }.disabled(state.history.isEmpty)
-                } label: { Image(systemName: "ellipsis").font(.title3).frame(width: 28) }.menuStyle(.borderlessButton).fixedSize().help(L("Clear history…"))
-            }
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Label(D("Keep history"), systemImage: "internaldrive").font(.system(size: 15, weight: .semibold))
-                        Text(F("Keep history for your chosen retention period.", "按设置的期限保留历史。")).font(.system(size: 13)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: VD.Space.xl) {
+            VDPageHeader(L("History")) {
+                HStack(spacing: VD.Space.m) {
+                    Label(D("Only on this Mac"), systemImage: "internaldrive").font(VD.Font.detail).foregroundStyle(.secondary)
+                    VDOverflowMenu(label: D("More actions")) {
+                        Toggle(D("Keep history"), isOn: keepHistory)
+                        Divider()
+                        Button(L("Clear history…"), role: .destructive) { confirmClear = true }.disabled(state.history.isEmpty)
                     }
-                    Spacer()
-                    Toggle(L("Save future transcripts on this Mac"), isOn: Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) }))
-                        .labelsHidden().toggleStyle(.switch).help(L("Save future transcripts on this Mac"))
                 }
-                Divider()
-                Label(D("Your history stays on your device"), systemImage: "lock").font(.system(size: 15, weight: .semibold))
-                Text(F("History and retained recordings stay on this Mac. Manage audio retention in Settings.", "历史与保留的录音只存储在本机。可在设置中管理录音保存和保留期限。"))
-                    .font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(4)
-            }.padding(22).background(DesktopTheme.surface, in: RoundedRectangle(cornerRadius: 16))
-            HStack {
-                FilterPills(labels: [D("All"), D("Dictations"), D("Ask anything")], selection: $filter)
-                Spacer()
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                SingleLineField(L("Search your words"), text: $query).frame(width: 190)
+            }
+            if !state.device.keepHistory {
+                VDInlineNotice(kind: .info, text: D("History is off. New transcripts are not saved on this Mac."))
+            }
+            HStack(spacing: VD.Space.m) {
+                VDFilterPills(labels: [D("All"), D("Dictations"), D("Ask anything")], selection: $filter).fixedSize()
+                Spacer(minLength: VD.Space.s)
+                VDSearchField(title: L("Search your words"), text: $query, width: 200)
             }
             if entries.isEmpty {
-                emptyState(icon: "clock.arrow.circlepath", title: state.history.isEmpty ? L("Your words will find a home here.") : D("No matching entries"))
+                VDEmptyState(icon: "clock.arrow.circlepath", title: state.history.isEmpty ? L("Your words will find a home here.") : D("No matching entries"))
             }
             ForEach(days, id: \.self) { day in
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(dayTitle(day)).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
-                    LazyVStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: VD.Space.s) {
+                    Text(dayTitle(day)).font(VD.Font.detail.weight(.medium)).foregroundStyle(.secondary).padding(.leading, VD.Space.xs)
+                    VDSurface(padding: 0, spacing: 0) {
                         let group = entries.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
                         ForEach(Array(group.enumerated()), id: \.element.id) { index, entry in
-                            if index > 0 { Divider() }
+                            if index > 0 { Divider().padding(.horizontal, VD.Space.l) }
                             historyRow(entry)
                         }
-                    }.background(.white, in: RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(DesktopTheme.line))
+                    }
                 }
             }
+            Label(F("History and retained recordings stay on this Mac. Manage audio retention in Settings.", "历史与保留的录音只存储在本机。可在设置中管理录音保存和保留期限。"), systemImage: "lock")
+                .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.confirmationDialog(L("Delete all local history?"), isPresented: $confirmClear, titleVisibility: .visible) {
             Button(L("Delete history"), role: .destructive) { state.deleteHistory() }
         }
     }
     private func historyRow(_ entry: HistoryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 16) {
-                Text(entry.date.formatted(.dateTime.hour().minute().locale(L10n.locale))).font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 70, alignment: .leading)
-                Text(entry.result).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 12) {
-                    Button { if expanded.contains(entry.id) { expanded.remove(entry.id) } else { expanded.insert(entry.id) } } label: {
-                        Image(systemName: expanded.contains(entry.id) ? "chevron.up" : "chevron.down")
-                    }.help(D("Show details"))
-                    Button { state.copyResult(entry.result) } label: { Image(systemName: "doc.on.doc") }.help(L("Copy"))
-                    Button(role: .destructive) { state.deleteHistory(entry.id) } label: { Image(systemName: "trash") }.help(L("Delete history entry"))
-                }.font(.system(size: 11)).foregroundStyle(.secondary).buttonStyle(.plain)
+        let isExpanded = expanded.contains(entry.id)
+        return VStack(alignment: .leading, spacing: VD.Space.m) {
+            HStack(alignment: .top, spacing: VD.Space.l) {
+                Text(entry.date.formatted(.dateTime.hour().minute().locale(L10n.locale))).font(VD.Font.detail).foregroundStyle(.secondary)
+                    .monospacedDigit().frame(width: 70, alignment: .leading).padding(.top, 6)
+                Text(entry.result).font(VD.Font.body).lineSpacing(5).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+                HStack(spacing: 2) {
+                    VDIconButton(systemName: isExpanded ? "chevron.up" : "chevron.down", label: isExpanded ? D("Hide details") : D("Show details")) {
+                        if isExpanded { expanded.remove(entry.id) } else { expanded.insert(entry.id) }
+                    }
+                    VDIconButton(systemName: "doc.on.doc", label: L("Copy")) { state.copyResult(entry.result) }
+                    VDIconButton(systemName: "trash", label: L("Delete history entry")) { state.deleteHistory(entry.id) }
+                }
             }
-            if expanded.contains(entry.id) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
+            if isExpanded {
+                VStack(alignment: .leading, spacing: VD.Space.m) {
+                    Label("\(entry.mode.title) · \(entry.application)", systemImage: entry.mode.icon).font(VD.Font.detail).foregroundStyle(.secondary)
+                    if entry.original != entry.result {
+                        VDSurface(style: .shaded, padding: VD.Space.m, spacing: VD.Space.xs) {
+                            Text(L("Original transcript")).font(VD.Font.detail.weight(.semibold)).foregroundStyle(.secondary)
+                            Text(entry.original).font(VD.Font.body).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    HStack(spacing: VD.Space.s) {
                         if entry.audioID != nil {
                             Button(state.playingAudioID == entry.audioID ? F("Stop audio", "停止播放") : F("Play audio", "播放录音")) { state.play(entry) }
                             Button(F("Transcribe again", "重新识别")) { state.reprocess(entry, transcribeAgain: true) }
                         }
                         Button(F("Rewrite transcript", "重新处理文字")) { state.reprocess(entry, transcribeAgain: false) }
-                        Text(F("Uses current models and style", "使用当前模型和风格")).font(.caption).foregroundStyle(.secondary)
+                        Text(F("Uses current models and style", "使用当前模型和风格")).font(VD.Font.footnote).foregroundStyle(.secondary)
                     }.disabled(state.busy)
-                    Label("\(entry.mode.title) · \(entry.application)", systemImage: entry.mode.icon).font(.caption).foregroundStyle(.secondary)
-                    if entry.original != entry.result {
-                        Text(L("Original transcript")).font(.caption.weight(.semibold))
-                        Text(entry.original).font(.system(size: 13)).textSelection(.enabled)
-                    }
-                }.padding(.leading, 86)
+                }.padding(.leading, 86).padding(.trailing, 92)
             }
-        }.padding(17)
+        }.padding(VD.Space.l)
     }
     private func dayTitle(_ day: Date) -> String {
         if Calendar.current.isDateInToday(day) { return D("Today") }
@@ -510,37 +500,37 @@ private struct DesktopSettingsView: View {
     @ObservedObject var state: AppState
     @Binding var tab: String
     let close: () -> Void
+    @State private var accessibilityAllowed: Bool?
     private let tabs = [("Settings", "gearshape"), ("Personalization", "pencil.and.outline"), ("Models", "cpu"),
                         ("Sync", "arrow.triangle.2.circlepath"), ("About", "info.circle"), ("Help", "questionmark.circle")]
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: VD.Space.xs) {
                 ForEach(tabs, id: \.0) { name, icon in
                     Button { tab = name } label: {
                         HStack(spacing: 11) {
                             Image(systemName: icon).frame(width: 20)
-                            Text(title(name)).font(.system(size: 14))
+                            Text(title(name)).font(VD.Font.body)
                             Spacer(minLength: 0)
-                        }.padding(.horizontal, 12).padding(.vertical, 12)
-                            .background(tab == name ? Color.black.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: 10))
-                    }.buttonStyle(.plain)
+                        }.padding(.horizontal, VD.Space.m).padding(.vertical, VD.Space.m)
+                            .background(tab == name ? VD.Palette.selection : .clear, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+                    }.buttonStyle(.plain).accessibilityAddTraits(tab == name ? [.isSelected] : [])
                 }
                 Spacer()
-            }.padding(14).padding(.top, 20).frame(width: 195).background(DesktopTheme.surface)
+            }.padding(14).padding(.top, 20).frame(width: 195).background(VD.Palette.surface)
             VStack(spacing: 0) {
-                HStack {
-                    Text(title(tab)).font(.system(size: 26, weight: .bold))
-                    Spacer()
-                    Button(action: close) { Image(systemName: "xmark").font(.system(size: 14)).frame(width: 28, height: 28) }
-                        .keyboardShortcut(.cancelAction).buttonStyle(.plain).foregroundStyle(.secondary).help(D("Close settings")).accessibilityLabel(D("Close settings"))
+                VDPageHeader(title(tab)) {
+                    VDIconButton(systemName: "xmark", label: D("Close settings"), size: 14, action: close).keyboardShortcut(.cancelAction)
                 }.padding(.horizontal, 30).padding(.top, 28).padding(.bottom, 20)
                 if !state.error.isEmpty {
-                    Text(L(state.error)).font(.caption).foregroundStyle(.red).textSelection(.enabled).padding(.horizontal, 30).padding(.bottom, 12)
+                    VDInlineNotice(kind: .error, text: L(state.error), dismissLabel: D("Dismiss")) { state.error = "" }
+                        .padding(.horizontal, 30).padding(.bottom, VD.Space.m)
                 }
                 ScrollView {
                     Group {
                         switch tab {
-                        case "Models": ModelsView(state: state)
+                        case "Models": ModelsView(state: state, showsHeading: false)
                         case "Sync": SyncView(state: state)
                         case "Personalization": DesktopPersonalizationView(state: state)
                         case "About": about
@@ -550,9 +540,17 @@ private struct DesktopSettingsView: View {
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 30).padding(.bottom, 30)
                 }
                 if !state.notice.isEmpty {
-                    Text(L(state.notice)).font(.caption).foregroundStyle(DesktopTheme.blue).padding(12)
+                    VDInlineNotice(kind: .success, text: L(state.notice), dismissLabel: D("Dismiss")) { state.notice = "" }
+                        .padding(.horizontal, 30).padding(.vertical, VD.Space.m)
                 }
             }
+        }
+        .task {
+            // Accessibility can be granted in System Settings while the overlay is open.
+            repeat {
+                accessibilityAllowed = state.insertionAuthorized
+                do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
+            } while !Task.isCancelled
         }
     }
     private func title(_ name: String) -> String {
@@ -561,25 +559,19 @@ private struct DesktopSettingsView: View {
         default: return D(name)
         }
     }
+    private func section<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            VDSectionHeader(icon: icon, title: title)
+            content()
+        }
+    }
     private var general: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            settingsSection(D("Shortcuts"), icon: "keyboard") { ShortcutPreferences(state: state) }
+        VStack(alignment: .leading, spacing: VD.Space.xxl) {
+            section(D("Shortcuts"), icon: "keyboard") { ShortcutPreferences(state: state) }
             RecordingPreferences(state: state)
-            UpdatePreferences(state: state)
-            settingsSection(D("Language"), icon: "globe") {
-                settingsRow(L("Interface language"), detail: D("Choose the language used in VoiceDraft.")) {
-                    Picker(L("Interface language"), selection: Binding(get: { state.interfaceLanguage }, set: { state.setLanguage($0) })) {
-                        ForEach(AppLanguage.allCases) { language in Text(language.title).tag(language) }
-                    }.labelsHidden().frame(width: 190).disabled(state.busy)
-                }
-                settingsRow(L("Translation target language"), detail: state.settings.targetLanguage) {
-                    Button(L("Edit")) { tab = "Personalization" }
-                }
-            }
-            settingsSection(D("Audio"), icon: "mic") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(L("Input device")).font(.system(size: 14, weight: .medium))
-                    HStack {
+            section(D("Audio"), icon: "mic") {
+                VDSettingRow(title: L("Input device"), detail: D("Used when you record with a shortcut or on Home.")) {
+                    HStack(spacing: VD.Space.xs) {
                         Picker(L("Input device"), selection: Binding(get: { state.device.inputDeviceID ?? "" }, set: { state.selectInputDevice($0) })) {
                             let defaultName = state.inputDevices.first { $0.id == state.defaultInputID }?.name
                             Text(defaultName.map { L("System default — \($0)") } ?? L("System default")).tag("")
@@ -587,74 +579,83 @@ private struct DesktopSettingsView: View {
                             if let saved = state.device.inputDeviceID, !state.inputDevices.contains(where: { $0.id == saved }) {
                                 Text(L("Unavailable: \(state.device.inputDeviceName ?? saved)")).tag(saved)
                             }
-                        }.labelsHidden()
-                        Button { state.refreshInputDevices() } label: { Image(systemName: "arrow.clockwise") }.help(L("Refresh devices"))
+                        }.labelsHidden().frame(maxWidth: 300)
+                        VDIconButton(systemName: "arrow.clockwise", label: L("Refresh devices")) { state.refreshInputDevices() }
                     }.disabled(state.busy)
                 }
             }
-            settingsSection(D("General"), icon: "laptopcomputer") {
-                settingsRow(D("Automatic insertion"), detail: L("Insert into the original app after recording")) {
-                    Toggle(L("Insert into the original app after recording"), isOn: Binding(get: { state.device.autoPaste }, set: { state.saveDevice(autoPaste: $0, history: state.device.keepHistory) })).labelsHidden().toggleStyle(.switch)
+            section(D("Language"), icon: "globe") {
+                VDSettingRow(title: L("Interface language"), detail: D("Choose the language used in VoiceDraft.")) {
+                    Picker(L("Interface language"), selection: Binding(get: { state.interfaceLanguage }, set: { state.setLanguage($0) })) {
+                        ForEach(AppLanguage.allCases) { language in Text(language.title).tag(language) }
+                    }.labelsHidden().frame(width: 190).disabled(state.busy)
                 }
-                settingsRow(D("Keep history"), detail: L("Save future transcripts on this Mac")) {
-                    Toggle(L("Save future transcripts on this Mac"), isOn: Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) })).labelsHidden().toggleStyle(.switch)
-                }
-                settingsRow(D("Accessibility"), detail: L("Allow Accessibility for insertion. Microphone permission is requested when you record.")) {
-                    Button(L("Allow Accessibility")) { TextInsertion.requestAccess() }
+                VDSettingRow(title: L("Translation target language"), detail: state.settings.targetLanguage) {
+                    Button(L("Edit")) { tab = "Personalization" }
                 }
             }
-        }
-    }
-    private func shortcutRow(_ title: String, detail: String, key: String) -> some View {
-        settingsRow(title, detail: detail) { KeyCaps(keys: ["⌃", "⌥", key]) }
-    }
-    private func settingsSection<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Label(title, systemImage: icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
-            Divider()
-            content()
-        }
-    }
-    private func settingsRow<Control: View>(_ title: String, detail: String, @ViewBuilder control: () -> Control) -> some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text(title).font(.system(size: 14, weight: .medium))
-                Text(detail).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+            section(D("General"), icon: "laptopcomputer") {
+                VDSettingRow(title: D("Automatic insertion"), detail: L("Insert into the original app after recording")) {
+                    VDSwitch(L("Insert into the original app after recording"), isOn: Binding(get: { state.device.autoPaste }, set: { state.saveDevice(autoPaste: $0, history: state.device.keepHistory) }))
+                }
+                VDSettingRow(title: D("Keep history"), detail: L("Save future transcripts on this Mac")) {
+                    VDSwitch(L("Save future transcripts on this Mac"), isOn: Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) }))
+                }
+                VDSettingRow(title: D("Accessibility"), detail: L("Allow Accessibility for insertion. Microphone permission is requested when you record.")) {
+                    if accessibilityAllowed ?? state.insertionAuthorized {
+                        VDBadge(text: D("Allowed"), tint: VD.Palette.success)
+                    } else {
+                        Button(L("Allow Accessibility")) { TextInsertion.requestAccess() }
+                    }
+                }
+                LaunchPreferences(state: state)
             }
-            Spacer(minLength: 0)
-            control().controlSize(.large)
-        }.padding(.bottom, 6)
+            UpdatePreferences(state: state)
+        }
     }
     private var about: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Image(systemName: "waveform").font(.system(size: 42, weight: .bold)).foregroundStyle(DesktopTheme.blue)
-            Text("VoiceDraft").font(.system(size: 30, weight: .bold, design: .rounded))
-            Text(F("Version ", "版本 ") + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0")).font(.caption).foregroundStyle(.secondary)
-            Text(D("Your models. Your vocabulary. A little less typing.")).font(.title3)
-            DesktopSurface(shaded: true) {
-                Label(L("Your models. Your words."), systemImage: "lock.shield").font(.headline)
-                Text(F("The sync server stores encrypted settings. Model calls go directly to your configured providers; history and retained audio stay on this Mac.", "同步服务器只保存加密配置。模型调用直接发送到你配置的服务商；历史和保留的录音留在本机。"))
-                    .font(.callout).foregroundStyle(.secondary).lineSpacing(5)
+        VStack(alignment: .leading, spacing: VD.Space.xl) {
+            HStack(spacing: VD.Space.l) {
+                Image(systemName: "waveform").font(.system(size: 42, weight: .bold)).foregroundStyle(VD.Palette.accent)
+                VStack(alignment: .leading, spacing: VD.Space.xs) {
+                    Text("VoiceDraft").font(VD.Font.brand)
+                    Text(F("Version ", "版本 ") + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"))
+                        .font(VD.Font.detail).foregroundStyle(.secondary).textSelection(.enabled)
+                }
             }
-        }.padding(.top, 14)
+            Text(D("Your models. Your vocabulary. A little less typing.")).font(VD.Font.sectionTitle.weight(.regular))
+            VDSurface(style: .shaded, spacing: VD.Space.s) {
+                Label(L("Your models. Your words."), systemImage: "lock.shield").font(VD.Font.cardTitle)
+                Text(F("The sync server stores encrypted settings. Model calls go directly to your configured providers; history and retained audio stay on this Mac.", "同步服务器只保存加密配置。模型调用直接发送到你配置的服务商；历史和保留的录音留在本机。"))
+                    .font(VD.Font.body).foregroundStyle(.secondary).lineSpacing(5).fixedSize(horizontal: false, vertical: true)
+            }
+        }.padding(.top, VD.Space.xs)
     }
     private var help: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            DesktopSurface(shaded: true) {
-                Text(D("Start with your models")).font(.headline)
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            VDSurface(style: .shaded, spacing: VD.Space.s) {
+                Text(D("Start with your models")).font(VD.Font.cardTitle)
                 Text(F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
-                    .font(.callout).foregroundStyle(.secondary)
-                Button(L("Models")) { tab = "Models" }
+                    .font(VD.Font.body).foregroundStyle(.secondary)
+                Button(L("Models")) { tab = "Models" }.padding(.top, VD.Space.xs)
             }
-            DesktopSurface {
-                Text(D("Try it here")).font(.headline)
-                Text(L("Or type here to test your writing model.")).font(.callout).foregroundStyle(.secondary)
-                Button(D("Home")) { close(); state.page = "Studio" }
+            VDSurface(padding: 0, spacing: 0) {
+                Text(D("Shortcuts")).font(VD.Font.cardTitle).padding([.horizontal, .top], 20).padding(.bottom, VD.Space.xs)
+                ShortcutSummaryList(state: state)
             }
-            DesktopSurface {
-                Text(L("Make room for your voice")).font(.headline)
-                Text(L("Allow Accessibility for insertion. Microphone permission is requested when you record.")).font(.callout).foregroundStyle(.secondary)
-                Button(L("Allow Accessibility")) { TextInsertion.requestAccess() }
+            VDSurface(spacing: VD.Space.s) {
+                Text(D("Try it here")).font(VD.Font.cardTitle)
+                Text(L("Or type here to test your writing model.")).font(VD.Font.body).foregroundStyle(.secondary)
+                Button(D("Home")) { close(); state.page = "Studio" }.padding(.top, VD.Space.xs)
+            }
+            VDSurface(spacing: VD.Space.s) {
+                Text(L("Make room for your voice")).font(VD.Font.cardTitle)
+                Text(L("Allow Accessibility for insertion. Microphone permission is requested when you record.")).font(VD.Font.body).foregroundStyle(.secondary)
+                if accessibilityAllowed ?? state.insertionAuthorized {
+                    Label(D("Accessibility is allowed"), systemImage: "checkmark.circle.fill").font(VD.Font.detail).foregroundStyle(VD.Palette.success)
+                } else {
+                    Button(L("Allow Accessibility")) { TextInsertion.requestAccess() }.padding(.top, VD.Space.xs)
+                }
             }
         }
     }
@@ -665,21 +666,25 @@ private struct DesktopPersonalizationView: View {
     @State private var style = ""
     @State private var language = ""
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: VD.Space.xxl) {
             StyleLibraryView(state: state)
-            Divider()
-            Text(L("Your writing style")).font(.system(size: 16, weight: .semibold))
-            TextEditor(text: $style).font(.body).frame(height: 180).padding(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(DesktopTheme.line))
-            Text(L("Translation target language")).font(.system(size: 16, weight: .semibold))
-            SingleLineField(L("Translation target language"), text: $language)
-            Text(L("Vocabulary and preferences are included in encrypted sync.")).font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                Button(L("Save preferences")) {
-                    var copy = state.settings; copy.stylePrompt = style; copy.targetLanguage = language; state.save(copy)
-                }.buttonStyle(.borderedProminent)
+            VStack(alignment: .leading, spacing: VD.Space.m) {
+                VDSectionHeader(icon: "text.quote", title: L("Your writing style"))
+                Text(D("Used when no named style applies.")).font(VD.Font.detail).foregroundStyle(.secondary)
+                TextEditor(text: $style).font(VD.Font.body).vdEditorBox(minHeight: 180, maxHeight: 180)
             }
+            VStack(alignment: .leading, spacing: VD.Space.m) {
+                VDSectionHeader(icon: "globe", title: L("Translation target language"))
+                SingleLineField(L("Translation target language"), text: $language).frame(maxWidth: 360)
+                HStack(spacing: VD.Space.m) {
+                    Button(L("Save preferences")) {
+                        var copy = state.settings; copy.stylePrompt = style; copy.targetLanguage = language; state.save(copy)
+                    }.buttonStyle(.borderedProminent)
+                        .disabled(style == state.settings.stylePrompt && language == state.settings.targetLanguage)
+                    Text(D("Saves the writing style and translation target.")).font(VD.Font.detail).foregroundStyle(.secondary)
+                }.padding(.top, VD.Space.xs)
+            }
+            Text(L("Vocabulary and preferences are included in encrypted sync.")).font(VD.Font.footnote).foregroundStyle(.secondary)
         }.onAppear { style = state.settings.stylePrompt; language = state.settings.targetLanguage }
     }
 }

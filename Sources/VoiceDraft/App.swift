@@ -65,9 +65,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hudPreviewOnly = hudPreview != nil
         let isolatedPreview = (Bundle.main.object(forInfoDictionaryKey: "VoiceDraftPreviewMode") as? Bool == true) || previewDirectory != nil || onboardingPreviewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
         state = AppState(preview: isolatedPreview)
+        if isolatedPreview, let appearance = ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW_APPEARANCE"] {
+            // Preview-only override so captures can be rendered in either appearance.
+            NSApp.appearance = appearance == "dark" ? NSAppearance(named: .darkAqua) : appearance == "light" ? NSAppearance(named: .aqua) : nil
+        }
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 860),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "VoiceDraft"
+        window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: DesktopRootView(state: state))
@@ -184,17 +189,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for page in ["Studio", "Models", "Vocabulary", "Sync", "History", "Settings"] {
-                    state.page = page
+                // AppKit's view caching draws scroll views in a full-size content view blank, so captures
+                // use a standard title bar; the page layout is otherwise identical.
+                window.styleMask.remove(.fullSizeContentView)
+                // Main pages, then the settings overlay on each tab (over Home).
+                let captures: [(name: String, page: String, tab: String?)] = [
+                    ("studio", "Studio", nil), ("history", "History", nil), ("vocabulary", "Vocabulary", nil),
+                    ("settings", "Settings", "Settings"), ("personalization", "Settings", "Personalization"),
+                    ("models", "Settings", "Models"), ("sync", "Settings", "Sync"), ("about", "Settings", "About"), ("help", "Settings", "Help")
+                ]
+                for (name, page, tab) in captures {
+                    if let tab {
+                        if state.page != "Settings" { state.page = "Studio"; try await Task.sleep(nanoseconds: 200_000_000) }
+                        state.openSettings(tab)
+                    } else { state.page = page }
                     try await Task.sleep(nanoseconds: 600_000_000)
                     guard let view = window.contentView else { continue }
                     view.layoutSubtreeIfNeeded()
                     guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
                     view.cacheDisplay(in: view.bounds, to: bitmap)
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
-                    try data.write(to: directory.appendingPathComponent(page.lowercased() + ".png"))
+                    try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
-                print("Rendered all six native screens without accessing persisted data or Keychain.")
+                print("Rendered three pages and six settings tabs without accessing persisted data or Keychain.")
             } catch { fputs("Preview capture failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

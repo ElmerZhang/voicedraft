@@ -28,6 +28,15 @@ enum VD {
         static let success = Color(nsColor: .systemGreen)
         static let warning = Color(nsColor: .systemOrange)
         static let danger = Color(nsColor: .systemRed)
+        /// Icons and text drawn on `accent` or `recording` fills.
+        static let onAccent = Color.white
+        /// Dimming layer behind in-window modals such as the settings overlay.
+        static let scrim = adaptive(light: NSColor(white: 0, alpha: 0.36), dark: NSColor(white: 0, alpha: 0.55))
+        /// Drop shadow of floating panels.
+        static let shadow = adaptive(light: NSColor(white: 0, alpha: 0.18), dark: NSColor(white: 0, alpha: 0.5))
+        /// Decorative wash behind the Home shortcut card (gradient start and end).
+        static let washStart = adaptive(light: NSColor(red: 0.94, green: 0.97, blue: 0.98, alpha: 1), dark: NSColor(red: 0.14, green: 0.16, blue: 0.20, alpha: 1))
+        static let washEnd = adaptive(light: NSColor(red: 0.96, green: 0.95, blue: 0.99, alpha: 1), dark: NSColor(red: 0.17, green: 0.15, blue: 0.21, alpha: 1))
         /// Floating HUD panel fill (always dark).
         static let hudPanel = Color(red: 0.085, green: 0.085, blue: 0.09)
 
@@ -65,6 +74,10 @@ enum VD {
         static let footnote = SwiftUI.Font.system(size: 11)
         static let mono = SwiftUI.Font.system(size: 12, design: .monospaced)
         static let statValue = SwiftUI.Font.system(size: 22, weight: .bold)
+        /// Brand word mark in the sidebar.
+        static let brand = SwiftUI.Font.system(size: 23, weight: .bold, design: .rounded)
+        /// Sidebar navigation rows.
+        static let navigation = SwiftUI.Font.system(size: 16, weight: .medium)
     }
 }
 
@@ -226,12 +239,71 @@ struct VDEmptyState: View {
     let icon: String
     let title: String
     var detail: String? = nil
+    var verticalPadding: CGFloat = 56
     var body: some View {
         VStack(spacing: VD.Space.m) {
             Image(systemName: icon).font(.system(size: 30, weight: .light)).foregroundStyle(.tertiary)
             Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(.secondary)
             if let detail { Text(detail).font(VD.Font.detail).foregroundStyle(.tertiary).multilineTextAlignment(.center) }
-        }.frame(maxWidth: .infinity).padding(.vertical, 56)
+        }.frame(maxWidth: .infinity).padding(.vertical, verticalPadding)
+    }
+}
+
+/// Switch-style toggle whose title is used for accessibility only; pair it with a `VDSettingRow` title.
+struct VDSwitch: View {
+    let title: String
+    @Binding var isOn: Bool
+    init(_ title: String, isOn: Binding<Bool>) { self.title = title; self._isOn = isOn }
+    var body: some View { Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch) }
+}
+
+/// Setting row whose control is a switch labelled by the row title.
+struct VDSwitchRow: View {
+    let title: String
+    var detail: String? = nil
+    @Binding var isOn: Bool
+    var body: some View {
+        VDSettingRow(title: title, detail: detail) { VDSwitch(title, isOn: $isOn) }
+    }
+}
+
+/// Search field with a leading magnifying glass.
+struct VDSearchField: View {
+    let title: String
+    @Binding var text: String
+    var width: CGFloat = 200
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            SingleLineField(title, text: $text).frame(width: width)
+        }
+    }
+}
+
+/// Visible field label above a text input.
+struct VDLabeledField<Content: View>: View {
+    let title: String
+    var detail: String? = nil
+    @ViewBuilder var content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(VD.Font.body.weight(.medium))
+            if let detail { Text(detail).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            content
+        }
+    }
+}
+
+/// Borderless "more" menu for page-level secondary actions.
+struct VDOverflowMenu<Content: View>: View {
+    let label: String
+    @ViewBuilder var content: Content
+    var body: some View {
+        Menu { content } label: {
+            Image(systemName: "ellipsis.circle").font(.system(size: 17)).frame(width: 28, height: 28)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().tint(.secondary)
+        .help(label).accessibilityLabel(label)
     }
 }
 

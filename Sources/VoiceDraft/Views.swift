@@ -110,37 +110,52 @@ struct StudioView: View {
     var showsHeading = true
     @Environment(\.locale) private var interfaceLocale
     @ObservedObject var state: AppState
+    @State private var accessibilityAllowed: Bool?
+    private var dictateBinding: ShortcutBinding? { state.device.features.shortcuts.first { $0.action == .dictate && $0.enabled } }
     var body: some View {
         let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: VD.Space.l) {
             if showsHeading {
-                PageHeading(title: L("A little less typing."), detail: L("Speak naturally. Turn your thoughts into words, wherever you work."))
+                VDPageHeader(L("A little less typing."), subtitle: L("Speak naturally. Turn your thoughts into words, wherever you work."))
             }
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { ForEach(WritingMode.allCases) { mode in modeButton(mode) } }.fixedSize()
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading, spacing: 8) {
+                HStack(spacing: VD.Space.s) { ForEach(WritingMode.allCases) { mode in modeButton(mode) } }.fixedSize()
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading, spacing: VD.Space.s) {
                     ForEach(WritingMode.allCases) { mode in modeButton(mode) }
                 }
             }
-            Card {
-                HStack(alignment: .center, spacing: 24) {
+            VDSurface {
+                HStack(alignment: .center, spacing: VD.Space.xl) {
                     Button { state.toggle() } label: {
                         Image(systemName: state.recording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 27)).foregroundStyle(.white).frame(width: 76, height: 76)
-                            .background(state.recording ? Color(red: 0.72, green: 0.26, blue: 0.20) : accent, in: Circle())
+                            .font(.system(size: 24, weight: .medium)).foregroundStyle(VD.Palette.onAccent).frame(width: 64, height: 64)
+                            .background(state.recording ? VD.Palette.recording : VD.Palette.accent, in: Circle())
+                            .contentShape(Circle())
                     }.buttonStyle(.plain).disabled(state.busy && !state.recording)
                         .accessibilityLabel(state.recording ? L("Stop recording") : L("Start recording"))
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(L(state.status)).font(.system(size: 18, weight: .medium))
-                        Text(state.recording ? String(format: L("%02d:%02d · tap to finish"), Int(state.elapsed) / 60, Int(state.elapsed) % 60) : state.shortcutLabel(.dictate) + " · " + F("Hold to talk / tap to lock", "按住说话 / 轻按锁定"))
-                            .font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary)
-                        if state.recording { ProgressView(value: state.level).frame(width: 190) }
+                    VStack(alignment: .leading, spacing: VD.Space.s) {
+                        Text(L(state.status)).font(VD.Font.sectionTitle.weight(.medium))
+                            .foregroundStyle(state.recording ? VD.Palette.recording : VD.Palette.ink)
+                        if state.recording {
+                            HStack(spacing: VD.Space.m) {
+                                Text(String(format: L("%02d:%02d · tap to finish"), Int(state.elapsed) / 60, Int(state.elapsed) % 60))
+                                    .font(VD.Font.detail).monospacedDigit().foregroundStyle(.secondary)
+                                ProgressView(value: state.level).tint(VD.Palette.recording).frame(width: 160)
+                                    .accessibilityLabel(D("Input level"))
+                            }
+                        } else if let dictateBinding {
+                            HStack(spacing: VD.Space.s) {
+                                VDKeyCaps(label: dictateBinding.label, size: 11)
+                                Text(F("Hold to talk / tap to lock", "按住说话 / 轻按锁定")).font(VD.Font.detail).foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    Spacer()
-                    if state.busy { Button(L("Cancel")) { state.cancel() }.buttonStyle(.bordered) }
+                    Spacer(minLength: VD.Space.s)
+                    if state.busy { Button(L("Cancel")) { state.cancel() }.buttonStyle(.vdPillSecondary) }
                 }
                 Divider()
-                HStack {
+                HStack(spacing: VD.Space.s) {
+                    Label(L("Input device"), systemImage: "mic").font(VD.Font.detail).foregroundStyle(.secondary).fixedSize()
                     Picker(L("Input device"), selection: Binding(get: { state.device.inputDeviceID ?? "" }, set: { state.selectInputDevice($0) })) {
                         let defaultName = state.inputDevices.first { $0.id == state.defaultInputID }?.name
                         Text(defaultName.map { L("System default — \($0)") } ?? L("System default")).tag("")
@@ -148,72 +163,91 @@ struct StudioView: View {
                         if let saved = state.device.inputDeviceID, !state.inputDevices.contains(where: { $0.id == saved }) {
                             Text(L("Unavailable: \(state.device.inputDeviceName ?? saved)")).tag(saved)
                         }
-                    }
-                    Button { state.refreshInputDevices() } label: { Image(systemName: "arrow.clockwise") }.help(L("Refresh devices"))
+                    }.labelsHidden().frame(maxWidth: 340)
+                    VDIconButton(systemName: "arrow.clockwise", label: L("Refresh devices")) { state.refreshInputDevices() }
+                    Spacer(minLength: 0)
                 }.disabled(state.busy)
-                HStack {
-                    Label(state.settings.speech?.model ?? L("Choose ASR"), systemImage: "waveform")
-                    Image(systemName: "arrow.right").foregroundStyle(.tertiary)
-                    Label(state.settings.writing?.model ?? L("Choose LLM"), systemImage: "sparkles")
-                    Spacer()
-                    Button(L("Configure")) { state.page = "Models" }.buttonStyle(.plain).foregroundStyle(accent)
-                }.font(.system(size: 11))
+                HStack(spacing: VD.Space.s) {
+                    Label(state.settings.speech?.model ?? L("Choose ASR"), systemImage: "waveform").lineLimit(1)
+                    Image(systemName: "arrow.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+                    Label(state.settings.writing?.model ?? L("Choose LLM"), systemImage: "sparkles").lineLimit(1)
+                    Spacer(minLength: VD.Space.s)
+                    Button(L("Configure")) { state.openSettings("Models") }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent)
+                }.font(VD.Font.detail).foregroundStyle(.secondary)
             }
             if state.mode == .edit || state.mode == .ask {
-                Card {
-                    Text(L("Selection")).font(.headline)
-                    Text(L("Global shortcuts read selected text from the active app. For a test here, paste text below.")).font(.caption).foregroundStyle(.secondary)
-                    TextEditor(text: $state.selection).font(.body).frame(minHeight: 70).scrollContentBackground(.hidden)
+                VDSurface(spacing: VD.Space.s) {
+                    Text(L("Selection")).font(VD.Font.cardTitle)
+                    Text(L("Global shortcuts read selected text from the active app. For a test here, paste text below.")).font(VD.Font.detail).foregroundStyle(.secondary)
+                    TextEditor(text: $state.selection).font(VD.Font.body).vdEditorBox(minHeight: 80).padding(.top, VD.Space.xs)
+                        .accessibilityLabel(L("Selection"))
                 }
             }
-            HStack(alignment: .top, spacing: 16) {
-                Card {
+            HStack(alignment: .top, spacing: VD.Space.l) {
+                VDSurface(spacing: VD.Space.m) {
                     HStack {
-                        Text(L("Transcript")).font(.headline)
+                        Text(L("Transcript")).font(VD.Font.cardTitle)
                         Spacer()
                         Button(L("Process text")) { state.processText() }.disabled(state.busy || state.transcript.isEmpty)
                     }
-                    TextEditor(text: $state.transcript).font(.system(size: 14)).frame(minHeight: 150).scrollContentBackground(.hidden)
-                    Text(L("Or type here to test your writing model.")).font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $state.transcript).font(VD.Font.body).vdEditorBox(minHeight: 150)
+                        .accessibilityLabel(L("Transcript"))
+                    Text(L("Or type here to test your writing model.")).font(VD.Font.footnote).foregroundStyle(.secondary)
                 }
-                Card {
+                VDSurface(spacing: VD.Space.m) {
                     HStack {
-                        Text(L("Ready to use")).font(.headline)
+                        Text(L("Ready to use")).font(VD.Font.cardTitle)
                         Spacer()
                         Button { state.copyResult() } label: { Label(L("Copy"), systemImage: "doc.on.doc") }.disabled(state.result.isEmpty)
                     }
-                    TextEditor(text: Binding(get: { state.result }, set: { state.editResult($0) })).font(.system(size: 14)).frame(minHeight: 150).scrollContentBackground(.hidden)
+                    TextEditor(text: Binding(get: { state.result }, set: { state.editResult($0) })).font(VD.Font.body).vdEditorBox(minHeight: 150)
+                        .accessibilityLabel(L("Ready to use"))
                     if !state.vocabularyLearningStatus.isEmpty {
-                        Text(state.vocabularyLearningStatus).font(.caption).foregroundStyle(.secondary)
+                        Text(state.vocabularyLearningStatus).font(VD.Font.footnote).foregroundStyle(.secondary)
                     }
-                    Text(state.mode == .translate ? L("Translation target: \(state.settings.targetLanguage)") : L("Your wording, with a little more clarity.")).font(.caption).foregroundStyle(.secondary)
+                    Text(state.mode == .translate ? L("Translation target: \(state.settings.targetLanguage)") : L("Your wording, with a little more clarity.")).font(VD.Font.footnote).foregroundStyle(.secondary)
                 }
             }
-            Card {
-                HStack {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(L("Make room for your voice")).font(.headline)
-                        Text(state.insertionAuthorized
-                             ? L("Allow Accessibility for insertion. Microphone permission is requested when you record.")
+            VDSurface(spacing: VD.Space.m) {
+                let allowed = accessibilityAllowed ?? state.insertionAuthorized
+                HStack(alignment: .center, spacing: VD.Space.m) {
+                    Image(systemName: allowed ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 18)).foregroundStyle(allowed ? VD.Palette.success : VD.Palette.warning)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(allowed ? D("Accessibility is allowed") : D("Accessibility is not allowed")).font(VD.Font.cardTitle)
+                        Text(allowed
+                             ? D("Results can be inserted into the app you were using. Microphone permission is requested when you record.")
                              : L("Enable Accessibility to paste into other apps. The result is available here."))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer()
-                    Button(L("Allow Accessibility")) { TextInsertion.requestAccess() }
+                    Spacer(minLength: VD.Space.s)
+                    if !allowed { Button(L("Allow Accessibility")) { TextInsertion.requestAccess() } }
                 }
-                Toggle(L("Insert into the original app after recording"), isOn: Binding(get: { state.device.autoPaste }, set: { state.saveDevice(autoPaste: $0, history: state.device.keepHistory) }))
-                Text(state.shortcutLabel(.translate) + "  " + L("Translate") + "    " + state.shortcutLabel(.edit) + "  " + L("Edit selection") + "    " + state.shortcutLabel(.ask) + "  " + L("Ask")).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                Divider()
+                VDSettingRow(title: D("Automatic insertion"), detail: L("Insert into the original app after recording")) {
+                    VDSwitch(L("Insert into the original app after recording"), isOn: Binding(get: { state.device.autoPaste }, set: { state.saveDevice(autoPaste: $0, history: state.device.keepHistory) }))
+                }
             }
+        }
+        .task {
+            // Accessibility can be granted in System Settings while Home is visible.
+            repeat {
+                accessibilityAllowed = state.insertionAuthorized
+                do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
+            } while !Task.isCancelled
         }
     }
     private func modeButton(_ mode: WritingMode) -> some View {
-        Button { state.mode = mode } label: {
-            Label(mode.title, systemImage: mode.icon).font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(state.mode == mode ? accent.opacity(0.12) : Color.white.opacity(0.65), in: Capsule())
-        }.buttonStyle(.plain).disabled(state.busy)
+        let selected = state.mode == mode
+        return Button { state.mode = mode } label: {
+            Label(mode.title, systemImage: mode.icon).font(VD.Font.detail.weight(.medium))
+                .foregroundStyle(selected ? VD.Palette.accent : VD.Palette.ink)
+                .padding(.horizontal, VD.Space.m).padding(.vertical, 9)
+                .background(selected ? VD.Palette.accentSoft : VD.Palette.surface, in: Capsule())
+                .contentShape(Capsule())
+        }.buttonStyle(.plain).disabled(state.busy).accessibilityAddTraits(selected ? [.isSelected] : [])
     }
-
 }
 
 struct ModelsView: View {

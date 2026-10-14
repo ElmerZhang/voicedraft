@@ -157,22 +157,28 @@ struct UpdatePreferences: View {
     @State private var publicKey = ""
     @State private var automatic = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(F("Software updates", "软件更新")).font(.headline)
-            TextField(F("HTTPS update manifest URL", "HTTPS 更新清单地址"), text: $feed)
-            TextField(F("Ed25519 public key (Base64)", "Ed25519 公钥（Base64）"), text: $publicKey)
-            Toggle(F("Check automatically every day", "每天自动检查更新"), isOn: $automatic)
+        VStack(alignment: .leading, spacing: VD.Space.m) {
+            VDSectionHeader(icon: "arrow.down.circle", title: F("Software updates", "软件更新"))
+            VDLabeledField(title: D("Update manifest URL")) {
+                SingleLineField(F("HTTPS update manifest URL", "HTTPS 更新清单地址"), text: $feed)
+            }
+            VDLabeledField(title: D("Release public key")) {
+                SingleLineField(F("Ed25519 public key (Base64)", "Ed25519 公钥（Base64）"), text: $publicKey)
+            }
+            VDSwitchRow(title: F("Check automatically every day", "每天自动检查更新"), isOn: $automatic)
             HStack {
                 Button(F("Save update source", "保存更新源")) {
                     var options = state.device.features; options.updateFeed = feed.trimmingCharacters(in: .whitespacesAndNewlines)
                     options.updatePublicKey = publicKey.trimmingCharacters(in: .whitespacesAndNewlines); options.automaticUpdates = automatic
                     state.saveFeatures(options)
                 }
-                UpdateActions(updater: state.updater, canInstall: !state.busy && !state.preview)
+                Spacer()
             }
+            Divider().padding(.vertical, VD.Space.xs)
+            UpdateActions(updater: state.updater, canInstall: !state.busy && !state.preview)
             Text(F("Updates are verified with your release public key. After downloading, choose Install and restart. Release notes come from the signed manifest.", "使用发布公钥校验更新。点击“安装并重启”会下载、验证并安装；版本说明也经过签名验证。"))
-                .font(.caption).foregroundStyle(.secondary)
-        }.textFieldStyle(.roundedBorder).onAppear {
+                .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }.onAppear {
             feed = state.device.features.updateFeed; publicKey = state.device.features.updatePublicKey; automatic = state.device.features.automaticUpdates
         }
     }
@@ -181,13 +187,18 @@ private struct UpdateActions: View {
     @ObservedObject var updater: UpdateController
     let canInstall: Bool
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Button(F("Check now", "检查更新")) { updater.check() }.disabled(updater.busy || !canInstall)
-                if updater.release != nil { Button(F("Install and restart", "安装并重启")) { updater.install() }.disabled(updater.busy || !canInstall) }
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            VDSettingRow(title: D("Check for updates"), detail: updater.status.isEmpty ? nil : updater.status) {
+                HStack(spacing: VD.Space.s) {
+                    if updater.release != nil { Button(F("Install and restart", "安装并重启")) { updater.install() }.disabled(updater.busy || !canInstall) }
+                    Button(F("Check now", "检查更新")) { updater.check() }.disabled(updater.busy || !canInstall)
+                }
             }
-            Text(updater.status).font(.caption).textSelection(.enabled)
-            if let release = updater.release { Text(release.notes).font(.caption).textSelection(.enabled) }
+            if let release = updater.release {
+                Text(release.notes).font(VD.Font.detail).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    .padding(VD.Space.m).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+            }
         }
     }
 }

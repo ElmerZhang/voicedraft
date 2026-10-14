@@ -34,22 +34,26 @@ struct FnShortcutStatus: View {
         // A task on an empty Group has no rendered child on which to start.
         VStack(alignment: .leading, spacing: 0) {
             if usesFn, let systemActionDisabled, showReady || !systemActionDisabled {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(systemActionDisabled
-                          ? F("Fn system action is off", "Fn 系统动作已关闭")
-                          : F("Check the macOS Fn action", "检查 macOS 的 Fn 系统动作"),
-                          systemImage: systemActionDisabled ? "checkmark.circle" : "exclamationmark.triangle")
-                        .font(.callout.weight(.semibold))
-                    if !systemActionDisabled {
-                        Text(F("In System Settings → Keyboard, set ‘Press Fn (🌐) key to’ to ‘Do Nothing’ so recording does not also switch input sources, open emoji or start Dictation. This is a system-wide setting and stays in effect after VoiceDraft quits.", "在系统设置 → 键盘中，将“按 Fn（🌐）键”设为“不执行任何操作”，避免录音时同时切换输入法、打开表情或启动系统听写。这是系统级设置，退出 VoiceDraft 后也会保留。"))
-                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                let tint = systemActionDisabled ? VD.Palette.success : VD.Palette.warning
+                HStack(alignment: .firstTextBaseline, spacing: VD.Space.m) {
+                    Image(systemName: systemActionDisabled ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(tint)
+                    VStack(alignment: .leading, spacing: VD.Space.s) {
+                        Text(systemActionDisabled
+                             ? F("Fn system action is off", "Fn 系统动作已关闭")
+                             : F("Check the macOS Fn action", "检查 macOS 的 Fn 系统动作"))
+                            .font(VD.Font.body.weight(.semibold))
+                        if !systemActionDisabled {
+                            Text(F("In System Settings → Keyboard, set ‘Press Fn (🌐) key to’ to ‘Do Nothing’ so recording does not also switch input sources, open emoji or start Dictation. This is a system-wide setting and stays in effect after VoiceDraft quits.", "在系统设置 → 键盘中，将“按 Fn（🌐）键”设为“不执行任何操作”，避免录音时同时切换输入法、打开表情或启动系统听写。这是系统级设置，退出 VoiceDraft 后也会保留。"))
+                                .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Button(F("Open Keyboard Settings", "打开键盘设置")) {
+                            guard !state.preview, let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") else { return }
+                            NSWorkspace.shared.open(url)
+                        }
                     }
-                    Button(F("Open Keyboard Settings", "打开键盘设置")) {
-                        guard !state.preview, let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") else { return }
-                        NSWorkspace.shared.open(url)
-                    }
-                }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                    Spacer(minLength: 0)
+                }.padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.m).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
             }
         }
         .task(id: usesFn) {
@@ -69,20 +73,29 @@ struct ShortcutPreferences: View {
     @State private var capturing: ShortcutAction?
     @State private var monitor: Any?
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: VD.Space.s) {
             Text(F("Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish.", "按住说话，松开结束；轻按后锁定录音，再按一次结束。启动麦克风时松开也会保留你的操作。"))
-                .font(.callout).foregroundStyle(.secondary)
+                .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach(state.device.features.shortcuts) { binding in
-                HStack {
-                    Toggle(binding.action.title, isOn: Binding(get: { binding.enabled }, set: { value in change(binding) { $0.enabled = value } }))
-                    Spacer()
-                    Button(capturing == binding.action ? F("Press shortcut… (Esc cancels)", "按下快捷键…（Esc 取消）") : binding.label) { begin(binding.action) }
-                        .frame(minWidth: 180)
-                    Button("Fn") { change(binding) { $0.keyCode = 63; $0.modifiers = 0 } }.help(F("Fn requires Accessibility", "单独使用 Fn 需要辅助功能权限"))
+                VDSettingRow(title: binding.action.title) {
+                    HStack(spacing: VD.Space.s) {
+                        if capturing == binding.action {
+                            Text(F("Press shortcut… (Esc cancels)", "按下快捷键…（Esc 取消）")).font(VD.Font.detail.weight(.medium)).foregroundStyle(VD.Palette.accent)
+                        } else {
+                            VDKeyCaps(label: binding.label, size: 12).opacity(binding.enabled ? 1 : 0.4)
+                        }
+                        Button(D("Change")) { begin(binding.action) }.help(D("Record a new shortcut"))
+                        Button("Fn") { change(binding) { $0.keyCode = 63; $0.modifiers = 0 } }.help(F("Fn requires Accessibility", "单独使用 Fn 需要辅助功能权限"))
+                        VDSwitch(binding.action.title, isOn: Binding(get: { binding.enabled }, set: { value in change(binding) { $0.enabled = value } }))
+                            .padding(.leading, VD.Space.s)
+                    }
                 }
             }
-            Button(F("Restore default shortcuts", "恢复默认快捷键")) {
-                end(); var options = state.device.features; options.shortcuts = ShortcutBinding.defaults; state.saveFeatures(options)
+            HStack {
+                Spacer()
+                Button(F("Restore default shortcuts", "恢复默认快捷键")) {
+                    end(); var options = state.device.features; options.shortcuts = ShortcutBinding.defaults; state.saveFeatures(options)
+                }
             }
             FnShortcutStatus(state: state, showReady: true)
         }.disabled(state.busy).onDisappear { end() }
@@ -117,9 +130,9 @@ struct ShortcutPreferences: View {
     }
 }
 
+/// The Recording section of the General settings tab.
 struct RecordingPreferences: View {
     @ObservedObject var state: AppState
-    @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var confirmRetention = false
     @State private var proposedDays = 0
     private func option(_ key: WritableKeyPath<DesktopOptions, Bool>) -> Binding<Bool> {
@@ -128,36 +141,24 @@ struct RecordingPreferences: View {
         })
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(F("Recording · up to 10 minutes", "录音 · 最长 10 分钟")).font(.headline)
-            Toggle(F("Play recording sounds", "播放录音提示音"), isOn: option(\.sounds))
-            Toggle(F("Mute system output while recording", "录音时静音系统声音"), isOn: option(\.muteOutput))
-            Divider()
-            Toggle(F("Keep recordings with history", "在历史中保留录音"), isOn: option(\.retainAudio)).disabled(!state.device.keepHistory)
-            Text(F("Audio stays on this Mac and is excluded from configuration sync. Turning this off affects future recordings; deleting history also deletes its audio.", "录音只保存在本机，不参与配置同步。关闭只影响之后的录音；删除历史时也会删除相应音频。"))
-                .font(.caption).foregroundStyle(.secondary)
-            Picker(F("History retention", "历史保留期限"), selection: Binding(get: { state.device.features.retentionDays }, set: { days in
-                proposedDays = days
-                if days == 0 { setRetention(days) } else { confirmRetention = true }
-            })) {
-                Text(F("Forever", "永久")).tag(0)
-                ForEach([1,7,30,90], id: \.self) { days in Text("\(days) " + F("days", "天")).tag(days) }
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            VDSectionHeader(icon: "record.circle", title: F("Recording · up to 10 minutes", "录音 · 最长 10 分钟"))
+            VDSwitchRow(title: F("Play recording sounds", "播放录音提示音"), isOn: option(\.sounds))
+            VDSwitchRow(title: F("Mute system output while recording", "录音时静音系统声音"), isOn: option(\.muteOutput))
+            VDSwitchRow(title: F("Keep recordings with history", "在历史中保留录音"), detail: F("Audio stays on this Mac and is excluded from configuration sync. Turning this off affects future recordings; deleting history also deletes its audio.", "录音只保存在本机，不参与配置同步。关闭只影响之后的录音；删除历史时也会删除相应音频。"), isOn: option(\.retainAudio)).disabled(!state.device.keepHistory)
+            VDSettingRow(title: F("History retention", "历史保留期限")) {
+                Picker(F("History retention", "历史保留期限"), selection: Binding(get: { state.device.features.retentionDays }, set: { days in
+                    proposedDays = days
+                    if days == 0 { setRetention(days) } else { confirmRetention = true }
+                })) {
+                    Text(F("Forever", "永久")).tag(0)
+                    ForEach([1,7,30,90], id: \.self) { days in Text("\(days) " + F("days", "天")).tag(days) }
+                }.labelsHidden().fixedSize()
             }
-            Divider()
-            Toggle(F("Use recent inputs as writing context", "用近期输入辅助写作"), isOn: option(\.recentContext))
-            Text(F("Uses up to three recent VoiceDraft outputs from the same app, for 30 minutes. This context is sent to your writing model and cleared when VoiceDraft quits.", "使用同一应用最近 30 分钟的最多三条 VoiceDraft 输出作为上下文，发送给写作模型。退出后清空，不读取周围文档。"))
-                .font(.caption).foregroundStyle(.secondary)
-            Button(F("Clear recent context", "清空近期上下文")) { state.clearRecentContext() }
-            Divider()
-            Toggle(F("Launch at login", "登录 Mac 后启动"), isOn: Binding(get: { loginEnabled }, set: { enabled in
-                guard !state.preview else { return }
-                do {
-                    if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                    loginEnabled = SMAppService.mainApp.status == .enabled
-                    if SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
-                } catch { state.error = .init(error: error) }
-            }))
-            Button(F("Open first-use guide", "打开首次使用引导")) { state.showingOnboarding = true }
+            VDSwitchRow(title: F("Use recent inputs as writing context", "用近期输入辅助写作"), detail: F("Uses up to three recent VoiceDraft outputs from the same app, for 30 minutes. This context is sent to your writing model and cleared when VoiceDraft quits.", "使用同一应用最近 30 分钟的最多三条 VoiceDraft 输出作为上下文，发送给写作模型。退出后清空，不读取周围文档。"), isOn: option(\.recentContext))
+            VDSettingRow(title: F("Clear recent context", "清空近期上下文")) {
+                Button(D("Clear")) { state.clearRecentContext() }
+            }
         }.disabled(state.busy)
         .confirmationDialog(F("Delete history and audio older than this period?", "删除超过此期限的历史和录音？"), isPresented: $confirmRetention) {
             Button(F("Apply retention period", "应用保留期限"), role: .destructive) { setRetention(proposedDays) }
@@ -166,69 +167,118 @@ struct RecordingPreferences: View {
     private func setRetention(_ days: Int) { var options = state.device.features; options.retentionDays = days; state.saveFeatures(options) }
 }
 
+/// Launch-at-login and first-use guide rows for the General section of the settings tab.
+struct LaunchPreferences: View {
+    @ObservedObject var state: AppState
+    @State private var loginEnabled = SMAppService.mainApp.status == .enabled
+    var body: some View {
+        VDSwitchRow(title: F("Launch at login", "登录 Mac 后启动"), isOn: Binding(get: { loginEnabled }, set: { enabled in
+            guard !state.preview else { return }
+            do {
+                if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                loginEnabled = SMAppService.mainApp.status == .enabled
+                if SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+            } catch { state.error = .init(error: error) }
+        })).disabled(state.busy)
+        VDSettingRow(title: F("Open first-use guide", "打开首次使用引导")) {
+            Button(D("Open")) { state.showingOnboarding = true }
+        }.disabled(state.busy)
+    }
+}
+
 struct StyleLibraryView: View {
     @ObservedObject var state: AppState
     @State private var editing: WritingStyle?
     @State private var appID = ""
     @State private var assignedStyle = ""
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(F("Writing styles", "写作风格库")).font(.headline)
-            Picker(F("Default style", "默认使用风格"), selection: Binding(get: { state.settings.selectedStyleID?.uuidString ?? "" }, set: { id in
-                var copy = state.settings; copy.selectedStyleID = UUID(uuidString: id); state.save(copy)
-            })) {
-                Text(F("General writing preferences", "下方通用写作偏好")).tag("")
-                ForEach(state.settings.styles) { style in Text(style.name).tag(style.id.uuidString) }
-            }
-            ForEach(state.settings.styles) { style in
-                HStack {
-                    Text(style.name); Spacer()
-                    Button(L("Edit")) { editing = style }
-                    Button(L("Delete"), role: .destructive) {
-                        var copy = state.settings; copy.styles.removeAll { $0.id == style.id }
-                        copy.applicationStyles = copy.applicationStyles.filter { $0.value != style.id }
-                        if copy.selectedStyleID == style.id { copy.selectedStyleID = nil }; state.save(copy)
+        VStack(alignment: .leading, spacing: VD.Space.xxl) {
+            VStack(alignment: .leading, spacing: VD.Space.m) {
+                VDSectionHeader(icon: "paintbrush", title: F("Writing styles", "写作风格库"))
+                let defaultStyleTitle = F("Default style", "默认使用风格")
+                VDSettingRow(title: defaultStyleTitle) {
+                    Picker(defaultStyleTitle, selection: Binding(get: { state.settings.selectedStyleID?.uuidString ?? "" }, set: { id in
+                        var copy = state.settings; copy.selectedStyleID = UUID(uuidString: id); state.save(copy)
+                    })) {
+                        Text(F("General writing preferences", "下方通用写作偏好")).tag("")
+                        ForEach(state.settings.styles) { style in Text(style.name).tag(style.id.uuidString) }
+                    }.labelsHidden().fixedSize()
+                }
+                if state.settings.styles.isEmpty {
+                    VDEmptyState(icon: "paintbrush", title: D("No writing styles yet"), detail: D("Create a style or start from a preset."), verticalPadding: VD.Space.xl)
+                        .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
+                } else {
+                    VDSurface(padding: 0, spacing: 0) {
+                        ForEach(Array(state.settings.styles.enumerated()), id: \.element.id) { index, style in
+                            if index > 0 { Divider().padding(.horizontal, VD.Space.l) }
+                            HStack(spacing: VD.Space.s) {
+                                Text(style.name).font(VD.Font.body).lineLimit(1)
+                                if state.settings.selectedStyleID == style.id { VDBadge(text: D("Default")) }
+                                Spacer()
+                                VDIconButton(systemName: "pencil", label: L("Edit")) { editing = style }
+                                VDIconButton(systemName: "trash", label: L("Delete")) {
+                                    var copy = state.settings; copy.styles.removeAll { $0.id == style.id }
+                                    copy.applicationStyles = copy.applicationStyles.filter { $0.value != style.id }
+                                    if copy.selectedStyleID == style.id { copy.selectedStyleID = nil }; state.save(copy)
+                                }
+                            }.padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.s)
+                        }
                     }
                 }
-            }
-            HStack {
-                Button(F("New style", "新建风格")) { editing = WritingStyle(name: F("New style", "新风格"), prompt: "") }
-                Menu(F("Add a preset", "添加预设")) {
-                    Button(F("Casual", "日常自然")) { editing = WritingStyle(name: F("Casual", "日常自然"), prompt: "Use natural, conversational language. Preserve my voice and avoid formal phrasing.") }
-                    Button(F("Professional", "工作沟通")) { editing = WritingStyle(name: F("Professional", "工作沟通"), prompt: "Use clear professional language. Keep sentences concise, polite and actionable. Preserve all facts.") }
-                    Button(F("Bullet notes", "条目笔记")) { editing = WritingStyle(name: F("Bullet notes", "条目笔记"), prompt: "Organize the text into short bullet points. Preserve facts, conditions and action items without adding any information.") }
-                }
-            }
-            Divider()
-            Text(F("Choose a style automatically by app", "按应用自动切换风格")).font(.headline)
-            ForEach(state.settings.applicationStyles.keys.sorted(), id: \.self) { bundle in
-                HStack {
-                    Text(bundle).font(.caption)
+                HStack(spacing: VD.Space.s) {
+                    Button(F("New style", "新建风格")) { editing = WritingStyle(name: F("New style", "新风格"), prompt: "") }
+                    Menu(F("Add a preset", "添加预设")) {
+                        Button(F("Casual", "日常自然")) { editing = WritingStyle(name: F("Casual", "日常自然"), prompt: "Use natural, conversational language. Preserve my voice and avoid formal phrasing.") }
+                        Button(F("Professional", "工作沟通")) { editing = WritingStyle(name: F("Professional", "工作沟通"), prompt: "Use clear professional language. Keep sentences concise, polite and actionable. Preserve all facts.") }
+                        Button(F("Bullet notes", "条目笔记")) { editing = WritingStyle(name: F("Bullet notes", "条目笔记"), prompt: "Organize the text into short bullet points. Preserve facts, conditions and action items without adding any information.") }
+                    }.fixedSize()
                     Spacer()
-                    Text(state.settings.styles.first { $0.id == state.settings.applicationStyles[bundle] }?.name ?? "")
-                    Button(L("Delete")) { var copy = state.settings; copy.applicationStyles.removeValue(forKey: bundle); state.save(copy) }
                 }
-            }
-            HStack {
-                TextField(F("App bundle ID", "应用标识，例如 com.apple.mail"), text: $appID)
-                Menu(F("Running apps", "正在运行的应用")) {
-                    ForEach(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil }, id: \.processIdentifier) { app in
-                        Button(app.localizedName ?? app.bundleIdentifier!) { appID = app.bundleIdentifier! }
+                HStack(alignment: .firstTextBaseline, spacing: VD.Space.s) {
+                    Text(F("Select text in another app and press the style shortcut to choose a style and replace the selection.", "在其他应用中选中文字，按风格快捷键，选择风格后直接替换选区。"))
+                        .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if let binding = state.device.features.shortcuts.first(where: { $0.action == .styleSelection && $0.enabled }) {
+                        VDKeyCaps(label: binding.label, size: 11)
                     }
                 }
             }
-            HStack {
-                Picker(F("Style", "风格"), selection: $assignedStyle) {
-                    Text(F("Select style", "选择风格")).tag("")
-                    ForEach(state.settings.styles) { style in Text(style.name).tag(style.id.uuidString) }
+            VStack(alignment: .leading, spacing: VD.Space.m) {
+                VDSectionHeader(icon: "app.badge", title: F("Choose a style automatically by app", "按应用自动切换风格"))
+                if state.settings.applicationStyles.isEmpty {
+                    VDEmptyState(icon: "square.stack", title: D("No app rules yet"), detail: D("Pick an app and a style below to switch styles automatically."), verticalPadding: VD.Space.xl)
+                        .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
+                } else {
+                    VDSurface(padding: 0, spacing: 0) {
+                        ForEach(Array(state.settings.applicationStyles.keys.sorted().enumerated()), id: \.element) { index, bundle in
+                            if index > 0 { Divider().padding(.horizontal, VD.Space.l) }
+                            HStack(spacing: VD.Space.s) {
+                                Text(bundle).font(VD.Font.mono).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                                Spacer()
+                                Text(state.settings.styles.first { $0.id == state.settings.applicationStyles[bundle] }?.name ?? "").font(VD.Font.body).foregroundStyle(.secondary)
+                                VDIconButton(systemName: "trash", label: L("Delete")) { var copy = state.settings; copy.applicationStyles.removeValue(forKey: bundle); state.save(copy) }
+                            }.padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.s)
+                        }
+                    }
                 }
-                Button(F("Assign", "绑定")) {
-                    guard let id = UUID(uuidString: assignedStyle) else { return }
-                    var copy = state.settings; copy.applicationStyles[appID.trimmingCharacters(in: .whitespaces)] = id; state.save(copy)
-                }.disabled(appID.trimmingCharacters(in: .whitespaces).isEmpty || assignedStyle.isEmpty)
+                VDLabeledField(title: D("Add a rule")) {
+                    HStack(spacing: VD.Space.s) {
+                        SingleLineField(F("App bundle ID", "应用标识，例如 com.apple.mail"), text: $appID).frame(minWidth: 200)
+                        Menu(F("Running apps", "正在运行的应用")) {
+                            ForEach(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil }, id: \.processIdentifier) { app in
+                                Button(app.localizedName ?? app.bundleIdentifier!) { appID = app.bundleIdentifier! }
+                            }
+                        }.fixedSize()
+                        Picker(F("Style", "风格"), selection: $assignedStyle) {
+                            Text(F("Select style", "选择风格")).tag("")
+                            ForEach(state.settings.styles) { style in Text(style.name).tag(style.id.uuidString) }
+                        }.labelsHidden().fixedSize()
+                        Button(F("Assign", "绑定")) {
+                            guard let id = UUID(uuidString: assignedStyle) else { return }
+                            var copy = state.settings; copy.applicationStyles[appID.trimmingCharacters(in: .whitespaces)] = id; state.save(copy)
+                        }.disabled(appID.trimmingCharacters(in: .whitespaces).isEmpty || assignedStyle.isEmpty)
+                    }
+                }
             }
-            Text(F("Select text in another app and press the style shortcut to choose a style and replace the selection.", "在其他应用中选中文字，按风格快捷键，选择风格后直接替换选区。") + " " + state.shortcutLabel(.styleSelection))
-                .font(.caption).foregroundStyle(.secondary)
         }.sheet(item: $editing) { value in StyleEditor(style: value) { style in
             var copy = state.settings
             if let i = copy.styles.firstIndex(where: { $0.id == style.id }) { copy.styles[i] = style } else { copy.styles.append(style) }

@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-14 · Manual vocabulary precedence and weaker automatic hints
+
+- Read-only diagnosis of the reported take found the same spelling error in original ASR and final writing output, alongside a manually entered canonical term and an automatically learned competing spelling with equal stored strength. This establishes where the error first appears and the risk of reinforcing it, not that automatic learning caused the first misrecognition. No historical outgoing request trace or real-audio replay was available.
+- Message ASR now supplies supported whole manual terms as bounded domain context in addition to weighted vocabulary, following the [official client-event API](https://help.aliyun.com/zh/model-studio/qwen-asr-message-client-events). Writing hints include origin and explicitly prefer matching manual spellings over low-confidence learned forms, preserving uncertain matches and raw transcript data. No extra inference request is added.
+- `./scripts/test-all.sh` passed all **119 Swift tests with zero skips/failures**, Go vet/build/race checks, eight-language localization checks and local Go sync/provider/SSE integrations. Six new synthetic tests cover manual precedence under high automatic frequency, automatic weight caps and explicit promotion, continued discovery enablement, alias conflict isolation, bounded whole-term Message context/global disablement, and writing source metadata/raw-transcript preservation. Updated the old automatic-weight assertion from 3 to 2 to reflect the selected policy. The sandbox initially blocked localhost binding; the authorized complete rerun passed. Real provider calls/audio were not used; these tests prove request and state behavior, not end-to-end recognition accuracy.
+
 ## 2026-10-14 · Onboarding layout, permission refresh and silent takes
 
 - Fixed the first onboarding step by removing the nested Models page heading and placing step content in a scroll view, with a separate fixed heading/footer. The mounted sheet polls microphone/Accessibility authorization every 500 ms and renders granted buttons as disabled “allowed” states.

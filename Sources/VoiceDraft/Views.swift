@@ -447,6 +447,8 @@ struct VocabularyProjectionView: View {
                 switch profile.vocabularyCapability {
                 case .weighted:
                     Text(L("\(projection.terms.count) terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50."))
+                    Text(F("Manual terms take priority. Automatically learned terms are capped at weight 2 and do not use the priority boost.", "手动词条优先。自动学习词条的权重最高为 2，不使用优先词加权。"))
+                        .font(.caption).foregroundStyle(.secondary)
                 case .context:
                     Text(L("\(projection.terms.count) terms ready as context. This model does not support numeric weights or priority boosts."))
                 case .none:
@@ -454,6 +456,10 @@ struct VocabularyProjectionView: View {
                 }
                 if projection.omitted > 0 {
                     Text(L("\(projection.omitted) terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged.")).foregroundStyle(.orange)
+                }
+                if projection.shadowedAutomatic > 0 {
+                    Text(F("\(projection.shadowedAutomatic) automatic terms are superseded by your manual spellings.", "\(projection.shadowedAutomatic) 个自动词条已由你的手动拼写覆盖。"))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if projection.downgradedPriority > 0 {
                     Text(L("\(projection.downgradedPriority) priority terms will use regular weight 5 because this model's priority limit is 50.")).foregroundStyle(.orange)
@@ -568,6 +574,10 @@ struct VocabularyEntryEditor: View {
             Text(L("Vocabulary term")).font(.title2)
             Label(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"), systemImage: entry.origin == .automatic ? "sparkle" : "leaf.fill")
                 .font(.caption).foregroundStyle(.secondary)
+            if entry.origin == .automatic {
+                Text(F("Automatic terms have lower priority than manual spellings. Saving here confirms this spelling as a manual term.", "自动词条的优先级低于手动拼写。在此保存后，此拼写将确认为手动词条。"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Form {
                 LabeledContent(L("Word or phrase")) { SingleLineField(L("Word or phrase"), text: $entry.text) }
                 Toggle(L("Enabled"), isOn: $entry.enabled)
@@ -589,6 +599,7 @@ struct VocabularyEntryEditor: View {
                 Button(L("Cancel")) { dismiss() }
                 Button(L("Done")) {
                     entry.aliases = aliases.split(whereSeparator: \.isNewline).map(String.init)
+                    entry.origin = .manual
                     let value = entry.normalized
                     do {
                         try value.validate(); save(value)

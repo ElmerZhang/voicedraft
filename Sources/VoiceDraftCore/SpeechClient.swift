@@ -110,13 +110,26 @@ public enum MessageASRRequests {
             parameters["disfluency_removal_enabled"] = false
         }
         try vocabulary.validate()
-        let words = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability).weighted
-        if !words.isEmpty { parameters["vocabulary"] = words }
+        let projection = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability)
+        if !projection.weighted.isEmpty { parameters["vocabulary"] = projection.weighted }
+        // Message ASR accepts a user domain word list as context (400 characters
+        // per turn). Reinforce manual spellings here; automatic terms still
+        // participate as lower-weight hints, without unweighted reinforcement.
+        var contextTerms: [String] = [], contextSize = 0
+        let manualTerms = Set(vocabulary.entries.filter { $0.enabled && $0.origin == .manual }.map { $0.normalized.text })
+        for term in projection.terms where manualTerms.contains(term) {
+            let added = term.unicodeScalars.count + (contextTerms.isEmpty ? 0 : 2)
+            guard contextSize + added <= 400 else { continue }
+            contextTerms.append(term); contextSize += added
+        }
+        let input: [String: Any] = contextTerms.isEmpty ? [:] : ["context": [
+            ["role": "user", "content": [["type": "input_text", "text": contextTerms.joined(separator: ", ")]]]
+        ]]
         return try json([
             "header": ["action": "run-task", "task_id": taskID, "streaming": "duplex"],
             "payload": ["task_group": "audio", "task": "asr", "function": "recognition",
                         "model": profile.model.trimmingCharacters(in: .whitespacesAndNewlines),
-                        "parameters": parameters, "input": [:]]
+                        "parameters": parameters, "input": input]
         ])
     }
     public static func finish(taskID: String) throws -> String {

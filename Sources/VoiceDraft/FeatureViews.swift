@@ -293,11 +293,25 @@ private struct StyleEditor: View {
     let save: (WritingStyle) -> Bool
     @Environment(\.dismiss) private var dismiss
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            TextField(F("Style name", "风格名称"), text: $style.name)
-            TextEditor(text: $style.prompt).frame(height: 220).border(.gray.opacity(0.3))
-            HStack { Button(L("Cancel")) { dismiss() }; Spacer(); Button(L("Save")) { if save(style) { dismiss() } }.disabled(style.name.trimmingCharacters(in: .whitespaces).isEmpty || style.prompt.utf8.count > 20_000) }
-        }.padding(24).frame(width: 560)
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            Text(D("Writing style")).font(VD.Font.sheetTitle)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(D("Style name")).font(.system(size: 13, weight: .medium))
+                SingleLineField(D("Style name"), text: $style.name)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(D("Style instructions")).font(.system(size: 13, weight: .medium))
+                TextEditor(text: $style.prompt).font(VD.Font.body).vdEditorBox(minHeight: 220)
+                    .accessibilityLabel(D("Style instructions"))
+            }
+            HStack {
+                Spacer()
+                Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L("Save")) { if save(style) { dismiss() } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(style.name.trimmingCharacters(in: .whitespaces).isEmpty || style.prompt.utf8.count > 20_000)
+            }
+        }.vdSheet(width: 560)
     }
 }
 
@@ -326,23 +340,29 @@ struct VocabularyFileControls: View {
                 candidates = []; selected = []; sources = [:]; showPreview = true
             }
         }.sheet(isPresented: $showPreview) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(F("Review words to import", "选择要导入的词条")).font(.title2)
-                Text(contextMode
-                     ? F("Finds local Codex and Claude context automatically, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing.", "自动查找本机 Codex 和 Claude 上下文，再将候选词交给你的写作模型筛除通用词。只发送候选词列表，最后由你勾选导入。")
-                     : F("Review the vocabulary before importing. Only selected terms are added.", "检查词库内容，只添加勾选的词条。"))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                if scanning {
-                    HStack { ProgressView().controlSize(.small); Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…") : F("Finding local context…", "正在查找本机上下文…")) }
-                } else if let scan {
-                    Text(F("Context files read", "已读取上下文文件") + ": \(scan.filesRead) · " + (scan.sources.isEmpty ? "Codex / Claude" : scan.sources.map(\.rawValue).joined(separator: " / ")))
-                        .font(.caption).foregroundStyle(.secondary)
-                    if scan.limited { Text(F("Recent context was prioritized to keep the scan quick.", "已优先提取近期上下文，避免扫描时间过长。")).font(.caption).foregroundStyle(.secondary) }
-                    if scan.unreadableFiles > 0 { Text(F("Some context files could not be read", "部分上下文文件无法读取") + ": \(scan.unreadableFiles)").font(.caption).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: VD.Space.l) {
+                VStack(alignment: .leading, spacing: VD.Space.s) {
+                    Text(F("Review words to import", "选择要导入的词条")).font(VD.Font.sheetTitle)
+                    Text(contextMode
+                         ? F("Finds local Codex and Claude context automatically, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing.", "自动查找本机 Codex 和 Claude 上下文，再将候选词交给你的写作模型筛除通用词。只发送候选词列表，最后由你勾选导入。")
+                         : F("Review the vocabulary before importing. Only selected terms are added.", "检查词库内容，只添加勾选的词条。"))
+                        .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
                 }
-                if !filterSummary.isEmpty { Text(filterSummary).font(.caption).foregroundStyle(.secondary) }
+                if scanning {
+                    HStack(spacing: VD.Space.s) {
+                        ProgressView().controlSize(.small)
+                        Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…") : F("Finding local context…", "正在查找本机上下文…")).font(VD.Font.detail)
+                    }
+                } else if let scan {
+                    VStack(alignment: .leading, spacing: VD.Space.xs) {
+                        Text(F("Context files read", "已读取上下文文件") + ": \(scan.filesRead) · " + (scan.sources.isEmpty ? "Codex / Claude" : scan.sources.map(\.rawValue).joined(separator: " / ")))
+                        if scan.limited { Text(F("Recent context was prioritized to keep the scan quick.", "已优先提取近期上下文，避免扫描时间过长。")) }
+                        if scan.unreadableFiles > 0 { Text(F("Some context files could not be read", "部分上下文文件无法读取") + ": \(scan.unreadableFiles)") }
+                    }.font(VD.Font.detail).foregroundStyle(.secondary)
+                }
+                if !filterSummary.isEmpty { Text(filterSummary).font(VD.Font.detail).foregroundStyle(.secondary) }
                 if !scanError.isEmpty {
-                    Text(scanError).font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                    VDInlineNotice(kind: .error, text: scanError)
                     HStack {
                         Button(F("Retry filtering", "重新筛选")) { scanning = true; scanError = ""; filterSummary = ""; candidates = []; selected = []; scanAttempt = UUID() }
                         if !rawCandidates.isEmpty {
@@ -353,39 +373,46 @@ struct VocabularyFileControls: View {
                         }
                     }
                 }
-                HStack {
+                HStack(spacing: VD.Space.s) {
                     Button(F("Select all", "全选")) { selected = Set(candidates.map(\.id)) }
                     Button(F("Clear selection", "清空选择")) { selected.removeAll() }
-                    Text("\(selected.count) / \(candidates.count)")
-                }.disabled(scanning || candidates.isEmpty)
+                    Spacer()
+                    Text("\(selected.count) / \(candidates.count)").font(VD.Font.detail).foregroundStyle(.secondary).monospacedDigit()
+                }.buttonStyle(.bordered).disabled(scanning || candidates.isEmpty)
                 if candidates.isEmpty {
-                    Text(scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…") : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
+                    VDEmptyState(icon: scanning ? "hourglass" : !scanError.isEmpty ? "exclamationmark.triangle" : "text.magnifyingglass",
+                                 title: scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…") : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
                          : !scanError.isEmpty ? F("Filtering did not finish. Retry or review the unfiltered list.", "筛选未完成，可以重试或查看未筛选的词条。")
                          : !filterSummary.isEmpty ? F("The model found no terms worth adding this time.", "这次没有筛选出值得加入词库的词条。")
                          : scan?.filesRead == 0
                          ? F("No readable Codex or Claude context was found in this account's home folder.", "在当前账户的用户目录中，没有找到可读取的 Codex 或 Claude 上下文。")
                          : F("No new candidate terms were found. Existing vocabulary words are excluded.", "没有找到新的候选词，词库中已有的词条已排除。"))
-                        .foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 260)
+                        .multilineTextAlignment(.center).padding(.horizontal, VD.Space.xl)
+                        .frame(maxWidth: .infinity, minHeight: 260)
+                        .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
                 } else {
                     List(candidates) { entry in
                         HStack {
                             Toggle(entry.text, isOn: Binding(get: { selected.contains(entry.id) }, set: { value in if value { selected.insert(entry.id) } else { selected.remove(entry.id) } }))
                             Spacer()
-                            if let source = sources[entry.text] { Text(source).font(.caption).foregroundStyle(.secondary) }
+                            if let source = sources[entry.text] { Text(source).font(VD.Font.footnote).foregroundStyle(.secondary) }
                         }
-                    }.frame(height: 260)
+                    }.scrollContentBackground(.hidden).frame(height: 260)
+                        .background(VD.Palette.field, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous).strokeBorder(VD.Palette.line))
                 }
                 HStack {
-                    Button(L("Cancel")) { showPreview = false }; Spacer()
+                    Spacer()
+                    Button(L("Cancel")) { showPreview = false }.keyboardShortcut(.cancelAction)
                     Button(F("Import selected words", "导入所选词条")) {
                         do {
                             var copy = state.settings
                             try VocabularyFile.merge(candidates.filter { selected.contains($0.id) }, into: &copy.vocabulary)
                             state.save(copy); if state.error.isEmpty { showPreview = false }
                         } catch { state.error = .init(error: error) }
-                    }.disabled(scanning || selected.isEmpty)
+                    }.buttonStyle(.borderedProminent).disabled(scanning || selected.isEmpty)
                 }
-            }.padding(24).frame(width: 600)
+            }.vdSheet(width: 600)
                 .task(id: scanAttempt) { await findAndFilter() }
         }
     }
@@ -455,16 +482,25 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(F("Welcome to VoiceDraft", "欢迎使用 VoiceDraft")).font(.largeTitle.bold())
-            Text("\(step + 1) / 4").foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            VStack(alignment: .leading, spacing: VD.Space.s) {
+                Text(F("Welcome to VoiceDraft", "欢迎使用 VoiceDraft")).font(VD.Font.pageTitle).tracking(-0.8)
+                HStack(spacing: VD.Space.s) {
+                    HStack(spacing: 6) {
+                        ForEach(0..<4, id: \.self) { index in
+                            Circle().fill(index <= step ? VD.Palette.accent : VD.Palette.line).frame(width: 8, height: 8)
+                        }
+                    }.accessibilityHidden(true)
+                    Text("\(step + 1) / 4").font(VD.Font.detail).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
             ScrollView {
                 stepContent
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.trailing, 8)
-                    .padding(.vertical, 4)
+                    .padding(.trailing, VD.Space.s)
+                    .padding(.vertical, VD.Space.xs)
             }
-            if saveFailed { Text(L(state.error)).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
+            if saveFailed { VDInlineNotice(kind: .error, text: L(state.error)) }
             Divider()
             HStack {
                 Button(F("Set up later", "稍后设置")) { state.completeOnboarding() }
@@ -484,7 +520,7 @@ struct OnboardingView: View {
                     if step == 3 { state.completeOnboarding(); state.page = "Studio" } else { step += 1 }
                 }.buttonStyle(.borderedProminent)
             }
-        }.padding(30).frame(width: 740, height: 620)
+        }.padding(VD.Space.xxl).frame(width: 740, height: 620).background(VD.Palette.canvas)
         .task {
             // macOS has no Accessibility authorization-change notification. Keep
             // this sheet current even while System Settings is still frontmost.
@@ -516,59 +552,101 @@ struct OnboardingView: View {
 
     private var domainContent: some View {
         let known = DomainVocabularySelection.knownTerms(in: state.settings.vocabulary)
-        return VStack(alignment: .leading, spacing: 16) {
-            Text(F("What fields do you work in?", "你从事哪些领域？")).font(.title2)
-            Text(F("Choose any that fit, or continue without choosing. Review a few specialist names to help recognize your first dictations.", "可以多选，也可以直接跳过。先选一些常用的专业名称，帮助识别最初几次输入。"))
-                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
-                ForEach(VocabularyDomain.allCases) { domain in
-                    Toggle(domainTitle(domain), isOn: Binding(get: { vocabulary.domains.contains(domain) }, set: {
-                        if $0 { vocabulary.domains.insert(domain) } else { vocabulary.domains.remove(domain) }
-                    })).frame(maxWidth: .infinity, alignment: .leading)
+        return VStack(alignment: .leading, spacing: VD.Space.l) {
+            stepHeading(F("What fields do you work in?", "你从事哪些领域？"),
+                        detail: F("Choose any that fit, or continue without choosing. Review a few specialist names to help recognize your first dictations.", "可以多选，也可以直接跳过。先选一些常用的专业名称，帮助识别最初几次输入。"))
+            VDSurface {
+                VDSectionHeader(icon: "square.grid.2x2", title: D("Your fields"))
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: VD.Space.m) {
+                    ForEach(VocabularyDomain.allCases) { domain in
+                        Toggle(domainTitle(domain), isOn: Binding(get: { vocabulary.domains.contains(domain) }, set: {
+                            if $0 { vocabulary.domains.insert(domain) } else { vocabulary.domains.remove(domain) }
+                        })).frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
             if !vocabulary.terms.isEmpty {
-                Divider()
-                Text(F("Your starter vocabulary", "你的初始词库")).font(.headline)
-                Text(F("Uncheck words you do not need. Existing words keep their settings. You can edit these later in Vocabulary.", "取消不需要的词。已有词条会保留原来的设置，之后也可以在词库中修改。"))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
-                    ForEach(vocabulary.terms, id: \.self) { term in
-                        let existing = known.contains(AppVocabulary.automaticTermKey(term))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Toggle(term, isOn: Binding(get: { existing || vocabulary.isSelected(term) }, set: { vocabulary.select(term, enabled: $0) }))
-                                .disabled(existing)
-                            if existing { Text(F("Already in vocabulary", "词库中已有")).font(.caption2).foregroundStyle(.secondary) }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
+                VDSurface {
+                    VDSectionHeader(icon: "text.book.closed", title: F("Your starter vocabulary", "你的初始词库"))
+                    Text(F("Uncheck words you do not need. Existing words keep their settings. You can edit these later in Vocabulary.", "取消不需要的词。已有词条会保留原来的设置，之后也可以在词库中修改。"))
+                        .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: VD.Space.m) {
+                        ForEach(vocabulary.terms, id: \.self) { term in
+                            let existing = known.contains(AppVocabulary.automaticTermKey(term))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Toggle(term, isOn: Binding(get: { existing || vocabulary.isSelected(term) }, set: { vocabulary.select(term, enabled: $0) }))
+                                    .disabled(existing)
+                                if existing { Text(F("Already in vocabulary", "词库中已有")).font(VD.Font.footnote).foregroundStyle(.secondary) }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
             }
         }
     }
 
+    private func stepHeading(_ title: String, detail: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            Text(title).font(VD.Font.sectionTitle)
+            if let detail {
+                Text(detail).font(VD.Font.body).foregroundStyle(.secondary).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func permissionRow(icon: String, title: String, detail: String, granted: Bool, allowLabel: String, allow: @escaping () -> Void) -> some View {
+        HStack(alignment: .center, spacing: VD.Space.m) {
+            Image(systemName: icon).font(.system(size: 16, weight: .medium)).foregroundStyle(VD.Palette.accent)
+                .frame(width: 36, height: 36)
+                .background(VD.Palette.accentSoft, in: RoundedRectangle(cornerRadius: VD.Radius.control, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(VD.Font.body.weight(.medium))
+                Text(detail).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: VD.Space.l)
+            if granted {
+                VDBadge(text: D("Allowed"), tint: VD.Palette.success)
+            } else {
+                VDBadge(text: D("Not allowed"), tint: VD.Palette.warning)
+                Button(D("Allow"), action: allow).buttonStyle(.bordered).accessibilityLabel(allowLabel)
+            }
+        }
+    }
+
     private var stepContent: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: VD.Space.l) {
             if step == 0 {
                 domainContent
             } else if step == 1 {
-                Text(F("Connect your speech and writing models", "连接你的语音与写作模型")).font(.title2)
-                Text(F("Model calls go directly to your chosen provider. Keys are saved in Keychain. You can add Qwen, Doubao, Whisper-compatible or Google speech, and choose a writing protocol in Models.", "模型调用直接发送给你选择的服务商，密钥保存在钥匙串中。你可以在模型设置中添加 Qwen、豆包、Whisper 兼容服务或 Google Speech，并选择写作接口。"))
+                stepHeading(F("Connect your speech and writing models", "连接你的语音与写作模型"),
+                            detail: F("Model calls go directly to your chosen provider. Keys are saved in Keychain. You can add Qwen, Doubao, Whisper-compatible or Google speech, and choose a writing protocol in Models.", "模型调用直接发送给你选择的服务商，密钥保存在钥匙串中。你可以在模型设置中添加 Qwen、豆包、Whisper 兼容服务或 Google Speech，并选择写作接口。"))
                 ModelsView(state: state, showsHeading: false)
             } else if step == 2 {
-                Text(F("Microphone and text insertion", "麦克风与文字插入")).font(.title2)
-                Button(mic ? F("Microphone allowed", "已允许麦克风") : F("Allow microphone", "允许麦克风")) {
-                    guard !state.preview else { return }
-                    AVCaptureDevice.requestAccess(for: .audio) { allowed in Task { @MainActor in mic = allowed } }
-                }.disabled(mic)
-                Button(accessibilityAllowed ? F("Accessibility allowed", "已允许辅助功能") : L("Allow Accessibility")) {
-                    if !state.preview { TextInsertion.requestAccess() }
-                    accessibilityAllowed = state.insertionAuthorized
-                }.disabled(accessibilityAllowed)
+                stepHeading(F("Microphone and text insertion", "麦克风与文字插入"))
+                VDSurface(spacing: VD.Space.m) {
+                    permissionRow(icon: "mic", title: D("Microphone"), detail: D("Records your voice only while you dictate."),
+                                  granted: mic, allowLabel: F("Allow microphone", "允许麦克风")) {
+                        guard !state.preview else { return }
+                        AVCaptureDevice.requestAccess(for: .audio) { allowed in Task { @MainActor in mic = allowed } }
+                    }
+                    Divider()
+                    permissionRow(icon: "accessibility", title: D("Accessibility"), detail: D("Runs shortcuts in any app and inserts text where you type."),
+                                  granted: accessibilityAllowed, allowLabel: L("Allow Accessibility")) {
+                        if !state.preview { TextInsertion.requestAccess() }
+                        accessibilityAllowed = state.insertionAuthorized
+                    }
+                }
                 Text(F("Accessibility enables shortcuts and insertion into other apps. You can also use VoiceDraft's editor without insertion permission.", "辅助功能权限用于全局快捷键和向其他应用插入文字。也可以先在 VoiceDraft 编辑器中使用。"))
+                    .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(F("Ready to try", "开始试用")).font(.title2)
-                Text(state.shortcutLabel(.dictate)).font(.title.monospaced())
-                Text(F("Hold to speak, release to finish. Tap to lock recording and tap again to finish. Recordings can last up to 10 minutes. Try a short sentence in the home editor first.", "按住说话，松开结束；轻按锁定录音，再按一次结束。最长支持 10 分钟。先回到首页试说一句短句吧。"))
+                stepHeading(F("Ready to try", "开始试用"))
+                VDSurface(style: .shaded, spacing: VD.Space.m) {
+                    Text(ShortcutAction.dictate.title).font(VD.Font.body.weight(.medium)).foregroundStyle(.secondary)
+                    VDKeyCaps(label: state.shortcutLabel(.dictate), size: 22)
+                    Text(F("Hold to speak, release to finish. Tap to lock recording and tap again to finish. Recordings can last up to 10 minutes. Try a short sentence in the home editor first.", "按住说话，松开结束；轻按锁定录音，再按一次结束。最长支持 10 分钟。先回到首页试说一句短句吧。"))
+                        .font(VD.Font.body).foregroundStyle(.secondary).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+                }
                 FnShortcutStatus(state: state, showReady: true)
             }
         }.fixedSize(horizontal: false, vertical: true)

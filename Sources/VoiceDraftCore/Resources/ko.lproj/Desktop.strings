@@ -112,3 +112,20 @@
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "삽입 후 45초 동안 지원되는 편집기에서 음성 입력 문장의 수정 내용을 학습합니다. 문서의 다른 내용은 전송하지 않습니다. 삭제한 단어는 자동으로 다시 추가하지 않습니다.";
 "Added to vocabulary:" = "어휘에 추가됨:";
 "Could not learn words this time. Your dictation is unaffected." = "이번에는 단어를 학습하지 못했습니다. 음성 입력에는 영향이 없습니다.";
+
+// Design refresh: onboarding and sheets
+"Active" = "사용 중";
+"No profiles yet" = "프로필이 없습니다";
+"Add a profile to connect your own provider." = "프로필을 추가해 사용하는 제공업체에 연결하세요.";
+"Sync passphrase" = "동기화 암호 문구";
+"Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model." = "음성 모델은 단어와, 지원되는 경우 그 강도를 사용합니다. 다른 항목은 이를 지원하는 모델을 위해 보관되며, 표기와 별칭은 작성 모델에도 반영됩니다.";
+"Writing style" = "작성 스타일";
+"Style name" = "스타일 이름";
+"Style instructions" = "스타일 지침";
+"Your fields" = "내 분야";
+"Microphone" = "마이크";
+"Records your voice only while you dictate." = "받아쓰기 중에만 음성을 녹음합니다.";
+"Runs shortcuts in any app and inserts text where you type." = "모든 앱에서 단축키를 사용하고 입력 중인 위치에 텍스트를 삽입합니다.";
+"Allowed" = "허용됨";
+"Not allowed" = "허용 안 됨";
+"Allow" = "허용";

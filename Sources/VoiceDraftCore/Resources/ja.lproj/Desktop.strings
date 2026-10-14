@@ -112,3 +112,20 @@
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "挿入後45秒間、対応エディタで音声入力文への修正から学習します。文書の他の内容は送信しません。削除した単語は自動追加されません。";
 "Added to vocabulary:" = "語彙に追加しました：";
 "Could not learn words this time. Your dictation is unaffected." = "今回は単語を学習できませんでした。音声入力には影響しません。";
+
+// Design refresh: onboarding and sheets
+"Active" = "使用中";
+"No profiles yet" = "プロファイルがありません";
+"Add a profile to connect your own provider." = "プロファイルを追加して、ご自身のプロバイダに接続します。";
+"Sync passphrase" = "同期パスフレーズ";
+"Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model." = "音声モデルは語句と、対応している場合はその強度を使用します。その他の項目は対応するモデルのために保持され、表記とエイリアスは文章モデルにも反映されます。";
+"Writing style" = "文体スタイル";
+"Style name" = "スタイル名";
+"Style instructions" = "スタイルの指示";
+"Your fields" = "あなたの分野";
+"Microphone" = "マイク";
+"Records your voice only while you dictate." = "音声入力中のみ録音します。";
+"Runs shortcuts in any app and inserts text where you type." = "どのアプリでもショートカットを使い、入力中の位置にテキストを挿入します。";
+"Allowed" = "許可済み";
+"Not allowed" = "未許可";
+"Allow" = "許可";

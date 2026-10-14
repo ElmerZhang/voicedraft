@@ -66,6 +66,8 @@ final class GlobalShortcuts {
                             guard event.getIntegerValueField(.keyboardEventKeycode) == 63,
                                   let binding = owner.bindings.first(where: { $0.enabled && $0.keyCode == 63 }) else { return Unmanaged.passUnretained(event) }
                             owner.dispatch(binding.action, down: event.flags.contains(.maskSecondaryFn))
+                            // Consume both edges. macOS's separate Globe system action
+                            // must also be set to Do Nothing (see FnShortcutStatus).
                             return nil
                         }
                     }, userInfo: context)

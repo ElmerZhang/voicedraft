@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-14 · Fn system-action conflict
+
+- Confirmed the existing active event tap already consumes Fn press/release. The Mac's native Keyboard settings still showed **Press Globe key to → Change Input Source**; changed it through System Settings to **Do Nothing** and verified the displayed value plus `AppleFnUsageType = 0`. This is a persistent system-wide preference, not an app-lifetime interception or automatic restore.
+- Added read-only conflict guidance for enabled Fn bindings to Home, Shortcuts and the final onboarding page. Missing preferences require a check rather than being assumed disabled. The cancellable mounted view refreshes every second; preview does not read OS settings. The native settings link applies the change through macOS instead of relying on a preferences write that may require login to take effect.
+- Final `./scripts/test-all.sh` passed **140 Swift tests, zero failures/skips**, Go vet/build/race checks, local synthetic integrations and both localization checks. Release packaging and strict/deep signing passed. Native UI validation caught and fixed a first-display lifecycle issue: a task on an empty SwiftUI Group did not start. The final installed Shortcuts page visibly shows **Fn system action is off**, and **Open Keyboard Settings** opens the Keyboard pane. Home has no conflict banner with the system action disabled. No automated microphone capture, real model request or synthetic global Fn press was performed; physical Fn/input-source behavior remains a user acceptance check.
+
 ## 2026-10-14 · Preserve mixed languages during Polish
 
 - Added a Polish-only language policy covering every retained word/phrase/clause, including ordinary expressions and conjunctions, with mixed-language examples and a final comparison instruction. Style, application, recent context and vocabulary cannot request language normalization; vocabulary still supports clear recognition/canonical-spelling corrections but is not a translation glossary. A spoken translation request remains dictated content in Polish. Same-language cleanup and explicit self-corrections remain supported. Moved translation workflow guidance exclusively into Translate; explicit Edit instructions remain available. No raw-input rewriting, language-ratio heuristic, output replacement or extra provider call was added.

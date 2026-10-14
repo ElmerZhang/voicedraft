@@ -484,6 +484,11 @@ final class AppState: ObservableObject {
     }
     private func fail(_ error: Error, id: UUID) {
         guard generation == id else { return }
+        if case SpeechRecognitionError.noSpeech = error {
+            cancel()
+            self.error = ""; status = "Ready when you are"
+            return
+        }
         effects.end(sound: device.features.sounds); gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false
         if runAudio == nil { runAudio = liveFeed?.archivedWAV }
         if runAudio != nil, !(error is CancellationError) { saveHistory(mode: .verbatim, original: liveTranscript, output: liveTranscript, app: target?.name ?? "VoiceDraft", duration: elapsed) }

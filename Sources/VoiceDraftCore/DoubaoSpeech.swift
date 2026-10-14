@@ -120,7 +120,7 @@ public enum DoubaoSpeech {
                         if !result.text.isEmpty { await onUpdate(result.text) }
                         if result.final {
                             guard client.uploaded else { throw FeatureError("Doubao ended before the recording finished.") }
-                            return try QwenRequests.nonempty(result.text)
+                            return try SpeechClient.transcript(result.text)
                         }
                     }
                 }

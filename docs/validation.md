@@ -1,5 +1,14 @@
 # Validation record
 
+## 2026-10-14 · Onboarding layout, permission refresh and silent takes
+
+- Fixed the first onboarding step by removing the nested Models page heading and placing step content in a scroll view, with a separate fixed heading/footer. The mounted sheet polls microphone/Accessibility authorization every 500 ms and renders granted buttons as disabled “allowed” states.
+- Completed empty ASR responses now have a dedicated no-speech outcome. The coordinator cancels/releases the take and closes the HUD without empty history or writing requests. Malformed/filtered/truncated responses, incomplete live hypotheses and empty writing results remain errors. Qwen recordings with multiple chunks skip individual silent chunks.
+- `./scripts/test-all.sh` passed: 113 Swift tests, zero skips/failures, including the real localhost Swift-to-Go sync, mock speech/writing HTTP and all three SSE writing protocols; Go vet/build/race tests; 303 shared and 75 desktop localization messages across eight languages. New synthetic tests cover silent live socket completion/cleanup, empty speech versus writing, malformed/filtered speech and incomplete hypotheses. The first sandbox attempt could not bind localhost; the authorized rerun passed. No real audio or provider credentials were used.
+- Release packaging and plist checks passed. Inspected all three native onboarding captures in `.local/onboarding-previews/`, generated with `VOICEDRAFT_CAPTURE_ONBOARDING`. They show wrapped explanatory copy, separate navigation, scrollable model content and the granted Accessibility label. Permission status in these previews is synthetic; a real deny-to-allow OS transition and microphone-to-provider silent-take behavior still need user acceptance.
+- Installed and launched **0.2.1 (build 3)** at `/Applications/VoiceDraft.app`, signed by the same personal Apple Development certificate, Team `G5G46WU2P2`. Both staged and installed signatures passed strict/deep verification. Installed and packaged executable SHA-256: `c9455fef79d9ec9aee48057c9e12de2460cbddebfc370773d8ad0e19674a0c11`; CDHash: `9432aaffc7756fc2acbcd323ae70c296c94f11f5`.
+- Quit the old app normally, preserved it at `.local/install-backups/VoiceDraft-0.2.0-before-onboarding-fix.app`, and replaced only the application bundle. No Application Support, credentials or TCC settings were cleared. Verified the new process runs from Applications with a visible VoiceDraft window, and left it open.
+
 ## 2026-10-14 · Personal developer signing and Applications installation
 
 - Built source commit `39931b8` as VoiceDraft 0.2.0 (build 2), bundle ID `com.voicedraft.mac`, macOS arm64. Signed with the user's Apple Development identity belonging to personal Team `G5G46WU2P2`; the certificate's organization and Team were checked against the other available corporate identities before signing. Certificate SHA-1: `A2F02B556D1E44D6AD703E7A2173CA88CFC96A60`; expiration: 2026-10-28 08:30:39 UTC.

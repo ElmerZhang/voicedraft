@@ -58,10 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         let previewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_PREVIEWS"]
+        let onboardingPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_ONBOARDING"]
         let hudPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_HUD_PREVIEWS"]
         let hudPreview = ProcessInfo.processInfo.environment["VOICEDRAFT_HUD_PREVIEW"]
         hudPreviewOnly = hudPreview != nil
-        let isolatedPreview = (Bundle.main.object(forInfoDictionaryKey: "VoiceDraftPreviewMode") as? Bool == true) || previewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
+        let isolatedPreview = (Bundle.main.object(forInfoDictionaryKey: "VoiceDraftPreviewMode") as? Bool == true) || previewDirectory != nil || onboardingPreviewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
         state = AppState(preview: isolatedPreview)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -102,7 +103,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do { try shortcuts.install(state.device.features.shortcuts) } catch { state.error = .init(error: error) }
         }
         if !hudPreviewOnly { showWindow() }
-        if let previewDirectory { capturePreviews(to: previewDirectory) }
+        if let onboardingPreviewDirectory { captureOnboardingPreviews(to: onboardingPreviewDirectory) }
+        else if let previewDirectory { capturePreviews(to: previewDirectory) }
         else if let hudPreviewDirectory { captureHUDPreviews(to: hudPreviewDirectory) }
         else if let hudPreview { state.prepareHUDPreview(hudPreview); showHUD() }
     }
@@ -151,6 +153,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         if let menu = NSApp.mainMenu { update(menu) }
+    }
+    private func captureOnboardingPreviews(to path: String) {
+        Task {
+            do {
+                let directory = URL(fileURLWithPath: path, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                for step in 0..<3 {
+                    let view = NSHostingView(rootView: OnboardingView(state: state, initialStep: step)
+                        .background(Color(nsColor: .windowBackgroundColor)))
+                    window.contentView = view
+                    window.setContentSize(NSSize(width: 740, height: 620))
+                    try await Task.sleep(nanoseconds: 600_000_000)
+                    view.layoutSubtreeIfNeeded()
+                    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
+                    try data.write(to: directory.appendingPathComponent("onboarding-\(step + 1).png"))
+                }
+                print("Rendered three isolated onboarding steps with synthetic authorized permissions.")
+            } catch { fputs("Onboarding preview failed: \(error.localizedDescription)\n", stderr) }
+            NSApp.terminate(nil)
+        }
     }
     private func capturePreviews(to path: String) {
         Task {

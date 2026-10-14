@@ -52,7 +52,22 @@ Secondary text uses `.secondary`; tertiary hints use `.tertiary`. Error text use
 | `.vdEditorBox()` | Every `TextEditor`, so inputs look like inputs. |
 | `.vdSheet(width:)` | Every sheet: padding 24, fixed width, canvas background, accent tint. |
 
-Sheet layout: `sheetTitle`, optional detail, content, then a footer `HStack` ordered destructive action · `Spacer` · secondary actions · Cancel · confirming `.borderedProminent` action. Escape cancels.
+Sheet layout: `sheetTitle`, optional detail, content, then a footer `HStack` ordered destructive action · `Spacer` · secondary actions · Cancel · confirming `.borderedProminent` action. Escape cancels (`.cancelAction`) and Return confirms (`.defaultAction`). Return inside a `TextEditor` still inserts a newline.
+
+## Hit targets
+
+The clickable area of a control must match the shape the user sees.
+
+| Rule | Detail |
+| --- | --- |
+| Minimum size | Icon-only actions use `VDIconButton` (28×28pt). Text pills and overflow triggers are at least 28pt tall. Nothing interactive is smaller than about 22pt in either dimension, including text-only links. |
+| Shape the label | With `.plain` or a custom `ButtonStyle`, SwiftUI hit-tests only drawn content. Padding, `Spacer`s and `.clear` or hover-only backgrounds are not clickable. Apply `.contentShape(…)` after the padding and background, matching the visible shape (`Capsule`, `RoundedRectangle`, `Circle`). Shared components already do this. |
+| Overflow menus | Use `VDOverflowMenu`. It uses `.menuStyle(.button)` with `.buttonStyle(.plain)`. `.borderlessButton` wraps the label in an AppKit pop-up that ignores the label frame and shrinks the hit area to the glyph, about 26×15pt. |
+| Rows and navigation | A selectable row, nav item or chip is one button whose whole rounded rectangle, including the empty area after the label, is the target. |
+| Row actions | Keep row actions in the tree and visible as subdued `VDIconButton`s. Do not insert them on hover. If a reveal is ever needed, use opacity so the layout and hit area stay stable. |
+| No nested buttons | A row or card that is itself a button contains no other buttons; put secondary actions in its context menu. A card with inner buttons (model profiles) is not itself clickable. |
+| Switches | Only the native `Toggle` switch toggles. The row text does not. |
+| Disabled | A disabled control must look disabled. `.plain` and native styles dim automatically; custom styles read `isEnabled` (see `VDPillButtonStyle`). |
 
 ## Surfaces
 
@@ -62,7 +77,7 @@ Sheet layout: `sheetTitle`, optional detail, content, then a footer `HStack` ord
 
 **History.** Header with the “Only on this Mac” label and an overflow menu (keep history toggle, clear history). When history is off, an inline notice says so. Filter pills and search on one row. Entries grouped by day in a plain card list with 28pt action buttons; the expanded original transcript sits in a shaded box. Privacy sentence as a footnote under the list.
 
-**Vocabulary.** Header with the New word pill and an overflow menu for import, export, context extraction and bulk add. One control row: filter pills, status picker, master enable toggle, search. Chip grid, then the learning box as a shaded surface with setting rows, then the model projection disclosure and the sync footnote.
+**Vocabulary.** Header with the New word pill and an overflow menu for bulk add. Import, export and context extraction stay as buttons in their own section because they own a review sheet. One control row: filter pills, status picker, master enable toggle, search. Chip grid, then the learning box as a shaded surface with setting rows, then the model projection disclosure and the sync footnote.
 
 **Settings overlay.** In-window modal over a scrim, `panel` radius. Rail with the selected trait. Each tab has exactly one `VDPageHeader`. General is ordered Shortcuts · Recording · Audio · Language · General · Updates, every section a `VDSectionHeader` with `VDSettingRow`s and switch toggles. Models and Sync reuse their editors without a second title; Sync fields have visible labels (server address, access token, passphrase), and connection status is a shaded box with a status dot. Personalization groups styles, per-app routing, writing style prompt and translation target; the explicit save action sits under the fields it saves.
 

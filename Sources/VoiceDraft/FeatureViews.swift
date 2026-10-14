@@ -308,7 +308,7 @@ private struct StyleEditor: View {
                 Spacer()
                 Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(L("Save")) { if save(style) { dismiss() } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     .disabled(style.name.trimmingCharacters(in: .whitespaces).isEmpty || style.prompt.utf8.count > 20_000)
             }
         }.vdSheet(width: 560)
@@ -410,7 +410,7 @@ struct VocabularyFileControls: View {
                             try VocabularyFile.merge(candidates.filter { selected.contains($0.id) }, into: &copy.vocabulary)
                             state.save(copy); if state.error.isEmpty { showPreview = false }
                         } catch { state.error = .init(error: error) }
-                    }.buttonStyle(.borderedProminent).disabled(scanning || selected.isEmpty)
+                    }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(scanning || selected.isEmpty)
                 }
             }.vdSheet(width: 600)
                 .task(id: scanAttempt) { await findAndFilter() }
@@ -518,7 +518,7 @@ struct OnboardingView: View {
                     }
                     saveFailed = false
                     if step == 3 { state.completeOnboarding(); state.page = "Studio" } else { step += 1 }
-                }.buttonStyle(.borderedProminent)
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }.padding(VD.Space.xxl).frame(width: 740, height: 620).background(VD.Palette.canvas).tint(VD.Palette.accent)
         .task {

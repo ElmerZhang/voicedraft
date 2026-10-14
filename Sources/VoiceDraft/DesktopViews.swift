@@ -353,9 +353,10 @@ private struct DesktopVocabularyView: View {
                 Spacer(minLength: 0)
                 if entry.priority { Image(systemName: "star.fill").foregroundStyle(VD.Palette.warning) }
                 if !entry.enabled { Image(systemName: "pause.circle").foregroundStyle(.secondary).accessibilityLabel(D("Disabled")) }
-            }.padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.l).contentShape(Rectangle())
+            }.padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.l)
                 .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous).strokeBorder(VD.Palette.line))
+                .contentShape(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
                 .opacity(entry.enabled ? 1 : 0.65)
         }.buttonStyle(.plain).help(entry.text)
             .contextMenu {

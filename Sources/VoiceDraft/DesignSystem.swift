@@ -295,14 +295,18 @@ struct VDLabeledField<Content: View>: View {
 }
 
 /// Borderless "more" menu for page-level secondary actions.
+/// Uses the button menu style with a plain button so the whole 28pt square opens the menu;
+/// `.borderlessButton` wraps the label in an AppKit pop-up that ignores the frame (about 26×15pt hit area).
 struct VDOverflowMenu<Content: View>: View {
     let label: String
     @ViewBuilder var content: Content
     var body: some View {
         Menu { content } label: {
-            Image(systemName: "ellipsis.circle").font(.system(size: 17)).frame(width: 28, height: 28)
+            Image(systemName: "ellipsis.circle").font(.system(size: 17))
+                .frame(width: 28, height: 28).contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().tint(.secondary)
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .foregroundStyle(.secondary)
         .help(label).accessibilityLabel(label)
     }
 }
@@ -347,16 +351,26 @@ struct VDInlineNotice: View {
 // MARK: - Styles
 
 /// Page-level call to action: ink pill (`prominent`) or surface pill.
+/// The whole capsule is the hit area, and a disabled pill is dimmed (custom styles do not dim on their own).
 struct VDPillButtonStyle: ButtonStyle {
     var prominent = true
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 14, weight: .medium))
-            .padding(.horizontal, 18).padding(.vertical, 10)
-            .foregroundStyle(prominent ? VD.Palette.canvas : VD.Palette.ink)
-            .background(prominent ? VD.Palette.ink : VD.Palette.surface, in: Capsule())
-            .opacity(configuration.isPressed ? 0.75 : 1)
-            .contentShape(Capsule())
+        Pill(configuration: configuration, prominent: prominent)
+    }
+
+    private struct Pill: View {
+        let configuration: ButtonStyleConfiguration
+        let prominent: Bool
+        @Environment(\.isEnabled) private var isEnabled
+        var body: some View {
+            configuration.label
+                .font(.system(size: 14, weight: .medium))
+                .padding(.horizontal, 18).padding(.vertical, 10)
+                .foregroundStyle(prominent ? VD.Palette.canvas : VD.Palette.ink)
+                .background(prominent ? VD.Palette.ink : VD.Palette.surface, in: Capsule())
+                .opacity(!isEnabled ? 0.4 : configuration.isPressed ? 0.75 : 1)
+                .contentShape(Capsule())
+        }
     }
 }
 

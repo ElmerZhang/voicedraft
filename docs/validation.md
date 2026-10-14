@@ -1,5 +1,15 @@
 # Validation record
 
+## 2026-10-14 · Go sync server migration
+
+- Replaced the Python sync service and Python HTTP fixtures with Go. Protocol v1, encrypted-envelope limits, bearer-token validation, environment variables, SQLite schema, revision conflict behavior, and Docker UID/GID/volume compatibility are retained. Unsupported authenticated methods now return HTTP 405. Production contains no mock provider routes.
+- `go fmt ./...`, `go vet ./...`, `go build ./...`, `go test -race ./...`, and `go mod verify` passed in `server/`. Ten top-level tests (plus table cases) cover protocol validation, independent concurrent SQLite connections, stale writes, cancellation, persistence, permissions, opaque storage failures, invalid startup configuration, and provider fixture contracts. No listener is required for these Go tests.
+- The committed synthetic `legacy-vault.db` was created with the original Python `VaultStore` from `16fe81e`. Go read revision 7, rejected stale/cancelled writes, saved revision 8, and preserved the legacy SQL/JSON layout. No real database was opened or migrated during validation.
+- `CGO_ENABLED=0` builds passed for macOS arm64 and Linux amd64/arm64. `file` identifies both Linux artifacts as statically linked ELF executables. The binary's token generator passed a format/length smoke check; shell syntax and `docker compose config --quiet` passed.
+- `./scripts/test-all.sh` passed both localization checks (303 shared and 75 desktop messages, eight languages), Go vet/build/race tests, then stopped because the sandbox rejected `listen tcp 127.0.0.1:0` with `bind: operation not permitted`. A separate `swift test --disable-sandbox` with repository-local caches and the existing synthetic signed-release fixture completed 110 tests: 107 passed, three HTTP integrations skipped, zero failures.
+- Docker daemon access was denied at its Unix socket, so no image build/container startup was performed. Full Swift-to-Go HTTP integration, signal shutdown of a listening process, and Docker runtime remain unverified in this environment. No service deployment or existing app/data replacement was performed.
+- Dependencies were resolved using the local module cache and pinned upstream checksums. An initial `go mod tidy` attempt could not fetch uncached dependency-test tooling in this network-restricted environment; normal builds, repository tests, and module integrity verification passed. Online dependency refresh remains separate from these checks.
+
 ## 2026-10-13 · Automatic vocabulary learning
 
 - Implemented both user-requested learning paths: explicit spoken/editor corrections and distinctive terms appearing in two separate dictations. Learning uses the selected writing model after delivery, merges into the current vocabulary, preserves manual/disabled entries, and suppresses deleted spellings. Dictionary adds source filters, sparkle/leaf badges, a separate enabled-state filter, and independent learning switches. Existing terms migrate to manual origin in settings v4 with their IDs/metadata preserved.

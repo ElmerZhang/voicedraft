@@ -190,7 +190,7 @@ final class CoreTests: XCTestCase {
 
     func testFullQwenPipelineAndTransportAgainstLocalFixture() async throws {
         guard let address = ProcessInfo.processInfo.environment["VOICEDRAFT_TEST_SERVER"] else {
-            throw XCTSkip("Run scripts/test-all.py for HTTP integration coverage.")
+            throw XCTSkip("Run scripts/test-all.sh for HTTP integration coverage.")
         }
         let transport = HTTPTransport()
         var speech = ModelProfile.qwen(.speech), writing = ModelProfile.qwen(.writing)

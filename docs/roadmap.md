@@ -20,7 +20,7 @@ Baseline reviewed against the public [Typeless quickstart](https://www.typeless.
 | History | Local search, copy, delete, opt-out; maximum 500 entries | Export, retention controls, optional encrypted history sync |
 | Model configuration | Model-first Qwen ASR/LLM profiles, adapter-specific options, saved-key indicators, schema v1/v2 migration | Other vendors only after individual adapter work |
 | Cross-device model and hotword sync | Implemented, end-to-end encrypted including API keys | Field-level conflict resolution, device management, key rotation |
-| Sync service | Self-hosted single vault, SQLite, token, Docker configuration | Production hosting, multi-user accounts, organizations, audit and recovery workflows |
+| Sync service | Go binary, self-hosted single vault, SQLite, token, Docker configuration; compatible with existing Python-era vaults | Production hosting, multi-user accounts, organizations, audit and recovery workflows |
 | Live partial transcription | Qwen Audio 3.1 Message PCM streaming with revisable live text and spoken correction prompts | Real-device/account acceptance; additional streaming adapters, endpoint detection/VAD, network reconnection |
 | Long dictation | Four-minute takes | Chunking, long-session recovery, audio interruption handling |
 | Microphone controls | App input picker, per-take device binding and device name in the HUD tooltip | Real microphone/device-disconnect validation |

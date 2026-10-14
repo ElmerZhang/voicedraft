@@ -55,7 +55,7 @@ final class WritingProtocolTests: XCTestCase {
         XCTAssertEqual(parts.queryItems?.count, 2); XCTAssertEqual(parts.queryItems?.last?.value, "a&secret=x")
     }
     func testRealHTTPStreamingForEveryProtocol() async throws {
-        guard let address = ProcessInfo.processInfo.environment["VOICEDRAFT_TEST_SERVER"] else { throw XCTSkip("Run scripts/test-all.py for local transport fixtures.") }
+        guard let address = ProcessInfo.processInfo.environment["VOICEDRAFT_TEST_SERVER"] else { throw XCTSkip("Run scripts/test-all.sh for local transport fixtures.") }
         for adapter in [ModelAdapter.chatCompletions, .anthropic, .responses] {
             var profile = profile(adapter); profile.endpoint = address + "/mock/stream/" + adapter.rawValue
             let request = try QwenRequests.writing(profile: profile, key: "test-only-key", text: "fixture", mode: .polish, settings: SharedSettings())

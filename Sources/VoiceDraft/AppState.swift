@@ -128,6 +128,7 @@ final class AppState: ObservableObject {
         liveTranscript = "周二下午三点开会。\n不对，把刚才的周二改成周四，时间不变。"
         hudText = "周四下午三点开会。"; result = hudText
         switch name {
+        case "starting": phase = "starting"; hudKind = .compact
         case "recording": phase = "recording"; hudKind = .compact
         case "live": phase = "recording"; hudKind = .live
         case "processing": phase = "processing"; hudKind = .live
@@ -491,6 +492,13 @@ final class AppState: ObservableObject {
                 learnVocabulary(from: sample, configuration: configuration)
             }
         }
+    }
+    @discardableResult
+    func cancelActiveInput() -> Bool {
+        // `busy` also includes update installation, which Escape must not cancel.
+        guard phase != "idle" else { return false }
+        cancel()
+        return true
     }
     func cancel() {
         target?.focusGuard?.stop()

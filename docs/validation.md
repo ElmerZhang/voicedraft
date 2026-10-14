@@ -1,5 +1,9 @@
 # Validation record
 
+## 2026-10-14 · Personal developer signing and Applications installation
+
+The packaged macOS app passed signature verification and launched from /Applications. This check used a development identity.
+
 ## 2026-10-14 · Go sync server migration
 
 - Replaced the Python sync service and Python HTTP fixtures with Go. Protocol v1, encrypted-envelope limits, bearer-token validation, environment variables, SQLite schema, revision conflict behavior, and Docker UID/GID/volume compatibility are retained. Unsupported authenticated methods now return HTTP 405. Production contains no mock provider routes.

@@ -223,43 +223,59 @@ struct ModelsView: View {
     @State private var editing: ModelProfile?
     var body: some View {
         let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: VD.Space.xl) {
             if showsHeading {
                 PageHeading(title: L("Choose how you think."), detail: F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
             }
             ForEach(ModelRole.allCases) { role in
-                HStack {
-                    Text(role.title.uppercased()).font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
-                    Spacer()
-                    Button { editing = ModelProfile.qwen(role) } label: { Label(L("Add profile"), systemImage: "plus") }
-                }
-                ForEach(state.settings.profiles.filter { $0.role == role }) { profile in
-                    Card {
-                        HStack {
-                            Image(systemName: role == .speech ? "waveform" : "sparkles").font(.title2).foregroundStyle(accent)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(profile.name).font(.headline).lineLimit(2)
-                                Text(profile.model).font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary).lineLimit(2)
-                            }
-                            Spacer()
-                            if profile.id == state.settings.speechID || profile.id == state.settings.writingID {
-                                Text(L("ACTIVE")).font(.system(size: 10, weight: .bold)).foregroundStyle(accent).padding(7).background(accent.opacity(0.1), in: Capsule())
-                            } else {
-                                Button(L("Use")) {
-                                    var copy = state.settings
-                                    if role == .speech { copy.speechID = profile.id } else { copy.writingID = profile.id }
-                                    state.save(copy)
-                                }
-                            }
-                            Button(L("Edit")) { editing = profile }
-                        }
-                        Text("\(profile.adapter.title) · \(profile.endpoint)").font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+                let profiles = state.settings.profiles.filter { $0.role == role }
+                VStack(alignment: .leading, spacing: VD.Space.m) {
+                    HStack(alignment: .center) {
+                        Label(role.title, systemImage: icon(role)).font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button { editing = ModelProfile.qwen(role) } label: { Label(L("Add profile"), systemImage: "plus") }
+                            .buttonStyle(.vdPillSecondary)
                     }
+                    if profiles.isEmpty {
+                        VDSurface(style: .shaded, padding: 0) {
+                            VDEmptyState(icon: icon(role), title: D("No profiles yet"), detail: D("Add a profile to connect your own provider."))
+                        }
+                    }
+                    ForEach(profiles) { profile in card(profile, role: role) }
                 }
             }
             Text(D("Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model."))
-                .font(.caption).foregroundStyle(.secondary).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
         }.sheet(item: $editing) { profile in ProfileEditor(state: state, profile: profile) }
+    }
+
+    private func icon(_ role: ModelRole) -> String { role == .speech ? "waveform" : "sparkles" }
+
+    private func card(_ profile: ModelProfile, role: ModelRole) -> some View {
+        VDSurface(padding: VD.Space.l, spacing: VD.Space.m) {
+            HStack(alignment: .center, spacing: VD.Space.m) {
+                Image(systemName: icon(role)).font(.system(size: 16, weight: .medium)).foregroundStyle(VD.Palette.accent)
+                    .frame(width: 36, height: 36)
+                    .background(VD.Palette.accentSoft, in: RoundedRectangle(cornerRadius: VD.Radius.control, style: .continuous))
+                VStack(alignment: .leading, spacing: VD.Space.xs) {
+                    Text(profile.name).font(VD.Font.cardTitle).lineLimit(1)
+                    Text(profile.model).font(VD.Font.mono).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: VD.Space.m)
+                if profile.id == state.settings.speechID || profile.id == state.settings.writingID {
+                    VDBadge(text: D("Active"))
+                } else {
+                    Button(L("Use")) {
+                        var copy = state.settings
+                        if role == .speech { copy.speechID = profile.id } else { copy.writingID = profile.id }
+                        state.save(copy)
+                    }.buttonStyle(.bordered)
+                }
+                Button(L("Edit")) { editing = profile }.buttonStyle(.bordered)
+            }
+            Text("\(profile.adapter.title) · \(profile.endpoint)").font(VD.Font.footnote).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+        }
     }
 }
 
@@ -274,8 +290,8 @@ struct ProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 16) {
-            Text(profile.role.title).font(.title2.weight(.semibold))
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            Text(profile.role.title).font(VD.Font.sheetTitle)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Form {
@@ -330,7 +346,7 @@ struct ProfileEditor: View {
                         LabeledContent(L("Full endpoint URL")) { SingleLineField(L("Full endpoint URL"), text: $profile.endpoint) }
                         if profile.adapter != .unconfigured {
                             HStack {
-                                Text(L("Endpoint must match your key's region or workspace.")).font(.caption).foregroundStyle(.secondary)
+                                Text(L("Endpoint must match your key's region or workspace.")).font(VD.Font.detail).foregroundStyle(.secondary)
                                 Spacer()
                                 Button(L("Use model endpoint")) { profile.endpoint = ModelCatalog.endpoint(profile.endpoint, for: profile.adapter) }
                             }
@@ -342,7 +358,7 @@ struct ProfileEditor: View {
                     }.textFieldStyle(.roundedBorder)
                     if profile.adapter == .googleSpeech {
                         Text(F("Replace PROJECT in the endpoint with your Google Cloud project. Paste a service account JSON key or OAuth access token. Set languageCodes in advanced options, for example [\"en-US\"].", "将地址中的 PROJECT 替换为 Google Cloud 项目 ID。凭证可使用服务账号 JSON 密钥或 OAuth access token；在高级参数中设置 languageCodes，例如 [\"cmn-Hans-CN\"]。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(VD.Font.detail).foregroundStyle(.secondary)
                         Button(F("Import service account JSON", "导入服务账号 JSON")) {
                             let panel = NSOpenPanel(); panel.allowsMultipleSelection = false; panel.canChooseDirectories = false
                             if panel.runModal() == .OK, let url = panel.url {
@@ -355,7 +371,7 @@ struct ProfileEditor: View {
                     }
                     if profile.adapter == .doubao {
                         Text(F("Use the new console API key. Legacy credentials: put app_id in advanced options and the access token in the credential field. Optional resource_id selects your purchased speech resource.", "新版控制台直接填写 API Key。旧版凭证可在高级参数中填写 app_id，密钥栏填写 Access Token；resource_id 可选择已开通的语音资源。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(VD.Font.detail).foregroundStyle(.secondary)
                     }
                     if keyDraft.hasSavedKey {
                         HStack {
@@ -364,7 +380,7 @@ struct ProfileEditor: View {
                                  : (keyDraft.credentialUpdate == nil
                                     ? L("API key saved on this Mac. Enter a new key to replace it.")
                                     : L("The new API key will replace the saved key when you save.")))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(VD.Font.detail).foregroundStyle(.secondary)
                             Spacer()
                             Button(keyDraft.removeSavedKey ? L("Keep saved key") : L("Remove saved key")) {
                                 keyDraft.removeSavedKey.toggle()
@@ -373,16 +389,16 @@ struct ProfileEditor: View {
                         }
                     }
                     if profile.role == .speech { VocabularyProjectionView(vocabulary: state.settings.vocabulary, profile: profile) }
-                    Text(L("Advanced model parameters (JSON)")).font(.headline)
+                    Text(L("Advanced model parameters (JSON)")).font(VD.Font.body.weight(.semibold))
                     if profile.adapter == .qwenMessageWebSocket || profile.adapter == .qwenAudioHTTP {
                         Text(L("Optional parameters for the selected model, such as language_hints. Selecting a different protocol resets this JSON."))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(VD.Font.detail).foregroundStyle(.secondary)
                     }
-                    TextEditor(text: $profile.extraJSON).font(.system(size: 12, design: .monospaced)).frame(height: 85).border(.gray.opacity(0.2))
-                    Text(L("API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region.")).font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $profile.extraJSON).font(VD.Font.mono).vdEditorBox(minHeight: 85)
+                    Text(L("API keys are stored in this Mac's Keychain and encrypted before sync. The endpoint must match the API key's region.")).font(VD.Font.detail).foregroundStyle(.secondary)
                 }.padding(.trailing, 4)
             }.frame(maxHeight: 560).disabled(testing)
-            if !problem.isEmpty { Text(problem).font(.callout).foregroundStyle(.orange).textSelection(.enabled) }
+            if !problem.isEmpty { VDInlineNotice(kind: problem == L("Connection successful.") ? .success : .error, text: problem) }
             HStack {
                 if state.settings.profiles.contains(where: { $0.id == profile.id }),
                    state.settings.speechID != profile.id && state.settings.writingID != profile.id {
@@ -404,7 +420,7 @@ struct ProfileEditor: View {
                         }
                     }.disabled(testing)
                 }
-                Button(L("Cancel")) { dismiss() }
+                Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(L("Save profile")) {
                     var copy = state.settings
                     if let i = copy.profiles.firstIndex(where: { $0.id == profile.id }) { copy.profiles[i] = profile }
@@ -417,7 +433,7 @@ struct ProfileEditor: View {
                     } catch { problem = error.localizedDescription }
                 }.buttonStyle(.borderedProminent).disabled(testing)
             }
-        }.padding(28).frame(width: 680).onAppear {
+        }.vdSheet(width: 680).onAppear {
             profile = profile.normalizedInput
             do { keyDraft = APIKeyDraft(hasSavedKey: try state.hasKey(for: profile)) }
             catch { problem = L("\(error.localizedDescription) The existing key will be kept unless you enter a replacement.") }
@@ -570,13 +586,15 @@ struct VocabularyEntryEditor: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 16) {
-            Text(L("Vocabulary term")).font(.title2)
-            Label(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"), systemImage: entry.origin == .automatic ? "sparkle" : "leaf.fill")
-                .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            VStack(alignment: .leading, spacing: VD.Space.xs) {
+                Text(L("Vocabulary term")).font(VD.Font.sheetTitle)
+                Label(entry.origin == .automatic ? D("Auto-added") : D("Manually-added"), systemImage: entry.origin == .automatic ? "sparkle" : "leaf.fill")
+                    .font(VD.Font.detail).foregroundStyle(.secondary)
+            }
             if entry.origin == .automatic {
                 Text(F("Automatic terms have lower priority than manual spellings. Saving here confirms this spelling as a manual term.", "自动词条的优先级低于手动拼写。在此保存后，此拼写将确认为手动词条。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Form {
                 LabeledContent(L("Word or phrase")) { SingleLineField(L("Word or phrase"), text: $entry.text) }
@@ -590,13 +608,16 @@ struct VocabularyEntryEditor: View {
                 LabeledContent(L("Preferred spelling (optional)")) { SingleLineField(L("Preferred spelling"), text: $entry.displayAs) }
                 LabeledContent(L("Pronunciation (IPA, optional)")) { SingleLineField(L("IPA pronunciation"), text: $entry.pronunciation) }
             }
-            Text(L("Spoken aliases · one per line")).font(.headline)
-            TextEditor(text: $aliases).frame(height: 75)
-            Text(L("Current Qwen ASR adapters use the term and supported strength only. Other fields are kept for compatible adapters; spelling and aliases also guide the writing model.")).font(.caption).foregroundStyle(.secondary)
-            if !problem.isEmpty { Text(problem).foregroundStyle(.orange) }
+            VStack(alignment: .leading, spacing: VD.Space.s) {
+                Text(L("Spoken aliases · one per line")).font(VD.Font.body.weight(.semibold))
+                TextEditor(text: $aliases).font(VD.Font.body).vdEditorBox(minHeight: 75)
+            }
+            Text(D("Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model."))
+                .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if !problem.isEmpty { VDInlineNotice(kind: .error, text: problem) }
             HStack {
                 Spacer()
-                Button(L("Cancel")) { dismiss() }
+                Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(L("Done")) {
                     entry.aliases = aliases.split(whereSeparator: \.isNewline).map(String.init)
                     entry.origin = .manual
@@ -608,7 +629,7 @@ struct VocabularyEntryEditor: View {
                     catch { problem = error.localizedDescription }
                 }.buttonStyle(.borderedProminent)
             }
-        }.padding(28).frame(width: 620).onAppear { aliases = entry.aliases.joined(separator: "\n") }
+        }.vdSheet(width: 620).onAppear { aliases = entry.aliases.joined(separator: "\n") }
     }
 }
 
@@ -620,21 +641,25 @@ struct SyncView: View {
     @State private var passphrase = ""
     @State private var automatic = false
     @State private var confirmDownload = false
+    var showsHeading = true
     var body: some View {
         let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 20) {
-            PageHeading(title: L("One setup. Every device."), detail: L("Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase."))
-            Card {
-                Label(L("End-to-end encrypted"), systemImage: "lock.shield").font(.headline).foregroundStyle(accent)
-                Text(F("The sync server stores encrypted settings. Model calls go directly to your configured providers; history and retained audio stay on this Mac.", "同步服务器只保存加密配置。模型调用直接发送到你配置的服务商；历史和保留的录音留在本机。"))
-                    .font(.callout).foregroundStyle(.secondary).lineSpacing(5)
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            if showsHeading {
+                PageHeading(title: L("One setup. Every device."), detail: L("Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase."))
             }
-            Card {
-                SingleLineField(L("Sync server URL"), text: $url)
-                SingleLineField(L("Server access token"), text: $token, secure: true)
-                SingleLineField(L("Sync passphrase · at least 12 characters"), text: $passphrase, secure: true)
-                Text(L("Use the same three values on each device. The passphrase is never sent to the server; losing it means the server copy cannot be recovered.")).font(.caption).foregroundStyle(.secondary)
-                Toggle(L("Sync automatically every 30 seconds and after saving"), isOn: $automatic)
+            VDSurface {
+                field(L("Sync server URL")) { SingleLineField(L("Sync server URL"), text: $url, placeholder: "https://") }
+                field(L("Server access token")) { SingleLineField(L("Server access token"), text: $token, secure: true) }
+                field(D("Sync passphrase")) {
+                    SingleLineField(D("Sync passphrase"), text: $passphrase, secure: true, placeholder: L("Sync passphrase · at least 12 characters"))
+                }
+                Text(L("Use the same three values on each device. The passphrase is never sent to the server; losing it means the server copy cannot be recovered."))
+                    .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+                Divider()
+                VDSettingRow(title: L("Sync automatically every 30 seconds and after saving")) {
+                    Toggle(L("Sync automatically every 30 seconds and after saving"), isOn: $automatic).labelsHidden().toggleStyle(.switch)
+                }
                 HStack {
                     Button(L("Save connection")) { state.configureSync(url: url, token: token, passphrase: passphrase, automatic: automatic) }
                     Spacer()
@@ -642,11 +667,23 @@ struct SyncView: View {
                     Button(state.syncing ? L("Syncing…") : L("Sync now")) { Task { await state.sync() } }
                         .buttonStyle(.borderedProminent).disabled(state.syncing || state.busy)
                 }
-            }.textFieldStyle(.roundedBorder)
-            Card {
-                Text(L(state.syncStatus)).font(.callout).textSelection(.enabled)
+            }
+            VDSurface(style: .shaded, spacing: VD.Space.s) {
+                HStack(alignment: .firstTextBaseline, spacing: VD.Space.s) {
+                    Circle().fill(statusTint).frame(width: 8, height: 8).accessibilityHidden(true)
+                    Text(L(state.syncStatus)).font(VD.Font.cardTitle).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    if state.syncing { ProgressView().controlSize(.small) }
+                }
                 Text(L("First Mac: save the connection, then Sync now.\nNew device: save the connection, then Download server copy.\nIf both devices have changes, sync pauses instead of overwriting either copy."))
-                    .font(.caption).foregroundStyle(.secondary).lineSpacing(5)
+                    .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+            }
+            VDSurface(style: .shaded, spacing: VD.Space.s) {
+                HStack(spacing: VD.Space.s) {
+                    Image(systemName: "lock.shield").font(.system(size: 15, weight: .semibold)).foregroundStyle(VD.Palette.accent)
+                    Text(L("End-to-end encrypted")).font(VD.Font.cardTitle)
+                }
+                Text(F("The sync server stores encrypted settings. Model calls go directly to your configured providers; history and retained audio stay on this Mac.", "同步服务器只保存加密配置。模型调用直接发送到你配置的服务商；历史和保留的录音留在本机。"))
+                    .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
         }.onAppear {
             url = state.device.serverURL; automatic = state.device.autoSync
@@ -654,6 +691,21 @@ struct SyncView: View {
         }.confirmationDialog(L("Replace this Mac's model settings and vocabulary with the server copy?"), isPresented: $confirmDownload, titleVisibility: .visible) {
             Button(L("Download and replace")) { Task { await state.sync(download: true) } }
         } message: { Text(L("Local history is kept. Current model settings are backed up on this Mac before replacement.")) }
+    }
+
+    private func field<Field: View>(_ label: String, @ViewBuilder _ content: () -> Field) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.system(size: 13, weight: .medium))
+            content()
+        }
+    }
+
+    /// Derived from the status message only: connected/synced, not connected, or anything that needs attention.
+    private var statusTint: Color {
+        let key = state.syncStatus.key
+        if state.device.serverURL.isEmpty || key == "Not connected" { return Color.secondary }
+        if key.hasPrefix("Synced") || key.hasPrefix("Connection saved") { return VD.Palette.success }
+        return VD.Palette.warning
     }
 }
 

@@ -2,6 +2,43 @@ import XCTest
 @testable import VoiceDraftCore
 
 final class InputFocusTests: XCTestCase {
+    func testOpaqueWeChatMainWindowWithPasteCanReceiveKeyboardInput() {
+        for title in ["Weixin", "WeChat", "微信"] {
+            for focused in [nil, TextInputCapabilities(role: "AXWindow"), .init(role: "AXGroup")] {
+                XCTAssertTrue(KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: "com.tencent.xinWeChat",
+                    focused: focused, editor: nil, standardWindow: true, modalWindow: false,
+                    windowTitle: title, pasteAvailable: true))
+            }
+        }
+    }
+
+    func testOpaqueWeChatFallbackRejectsOtherAppsDialogsAndUnavailablePaste() {
+        for (bundle, standard, modal, title, paste) in [
+            ("other.app", true, false, "Weixin", true),
+            ("com.tencent.xinWeChat", false, false, "Weixin", true),
+            ("com.tencent.xinWeChat", true, true, "Weixin", true),
+            ("com.tencent.xinWeChat", true, false, "Photos and Videos", true),
+            ("com.tencent.xinWeChat", true, false, "Weixin", false)
+        ] {
+            XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: bundle,
+                focused: nil, editor: nil, standardWindow: standard, modalWindow: modal,
+                windowTitle: title, pasteAvailable: paste))
+        }
+    }
+
+    func testWeChatExposedFieldsAndUnsafeFocusKeepNormalInputRules() {
+        for focused in [TextInputCapabilities(role: "AXButton"), .init(role: "AXStaticText"),
+                        .init(role: "AXTextField"), .init(role: "AXTextArea", canSetValue: true),
+                        .init(role: "AXGroup", enabled: false), .init(role: "AXGroup", secure: true)] {
+            XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: "com.tencent.xinWeChat",
+                focused: focused, editor: nil, standardWindow: true, modalWindow: false,
+                windowTitle: "Weixin", pasteAvailable: true))
+        }
+        XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: "com.tencent.xinWeChat",
+            focused: .init(role: "AXGroup"), editor: .init(role: "AXTextArea"),
+            standardWindow: true, modalWindow: false, windowTitle: "Weixin", pasteAvailable: true))
+    }
+
     private struct Node {
         var traits: TextInputCapabilities
         var parent: Int?

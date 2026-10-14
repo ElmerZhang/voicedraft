@@ -314,7 +314,8 @@ final class AppState: ObservableObject {
         if let override { mode = override }
         error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact
         generation = UUID(); let id = generation
-        target = external ? TextInsertion.capture() : nil
+        target?.focusGuard?.stop()
+        target = external ? TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true) : nil
         runMode = mode; runSettings = settings.resolved(for: target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier });
         if device.features.recentContext { runSettings?.recentInputContext = recentInputs.text(application: target?.name ?? "VoiceDraft") }
         runAutoPaste = device.autoPaste; runExternal = external
@@ -454,6 +455,7 @@ final class AppState: ObservableObject {
         recordVocabularyUsage(output)
         saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
         var delivery: TextInsertionOutcome?
+        defer { destination?.focusGuard?.stop() }
         if runExternal, runAutoPaste, mode != .ask, !insertionAuthorized {
             self.error = "Enable Accessibility to paste into other apps. The result is available here."
             status = "Result ready · open VoiceDraft to copy"
@@ -491,6 +493,7 @@ final class AppState: ObservableObject {
         }
     }
     func cancel() {
+        target?.focusGuard?.stop()
         effects.end(sound: false); gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false; runAudio = nil
         player?.stop(); playingAudioID = nil
         stopCorrectionObservation()
@@ -507,6 +510,7 @@ final class AppState: ObservableObject {
     }
     private func fail(_ error: Error, id: UUID) {
         guard generation == id else { return }
+        target?.focusGuard?.stop()
         if case SpeechRecognitionError.noSpeech = error {
             cancel()
             self.error = ""; status = "Ready when you are"

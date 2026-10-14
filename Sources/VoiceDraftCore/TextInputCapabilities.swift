@@ -1,5 +1,7 @@
 import Foundation
 
+public enum TextInputCapability: Equatable { case writable, notWritable, opaque }
+
 /// A focused editor can accept a paste even when AX cannot replace its text.
 /// Chromium's editable web fields expose a writable selection range in that case.
 public struct TextInputCapabilities {
@@ -19,17 +21,64 @@ public struct TextInputCapabilities {
     }
 
     public var acceptsInsertion: Bool {
-        guard enabled, !secure, isTextControl else { return false }
-        return canReplaceSelection || canSetValue || canSetSelectionRange
+        capability == .writable
     }
 
-    public var isTextControl: Bool { ["AXTextField", "AXTextArea", "AXComboBox"].contains(role) }
+    public var capability: TextInputCapability {
+        guard enabled, !secure else { return .notWritable }
+        if isTextControl {
+            return canReplaceSelection || canSetValue || canSetSelectionRange ? .writable : .opaque
+        }
+        return ["AXGroup", "AXUnknown", "AXLayoutArea", "AXWebArea", "AXScrollArea",
+                "AXWindow", "AXSplitGroup", "AXList", "AXOutline", "AXTable"].contains(role) ? .opaque : .notWritable
+    }
+
+    public var isTextControl: Bool { ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role) }
     public var canBeTextDescendant: Bool { ["AXStaticText", "AXGroup", "AXUnknown", "AXLayoutArea"].contains(role) }
 }
 
-/// Resolve only the focused node's ancestors, never another editor elsewhere in
-/// the window. Web composers can focus a replaceable paragraph/text child.
+/// Resolve explicit focus, then canonicalize focused paragraph/text children to
+/// their editor ancestors. Never choose an unrelated editor in the window.
 public enum FocusedInputResolver {
+    /// Only explicit focus evidence can promote a descendant. Finding an editor
+    /// elsewhere in the same window is not enough. Bounds also cover malformed trees.
+    public static func focusedTarget<Node>(from root: Node, capabilities: (Node) -> TextInputCapabilities,
+        nestedFocus: (Node) -> Node?, children: (Node) -> [Node], isFocused: (Node) -> Bool,
+        equals: (Node, Node) -> Bool, limit: Int = 32, seconds: TimeInterval = 0.5,
+        now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) -> Node? {
+        let deadline = now() + seconds
+        var remaining = limit
+        var visited: [Node] = []
+        func take(_ node: Node) -> Bool {
+            guard remaining > 0, now() < deadline, !visited.contains(where: { equals($0, node) }) else { return false }
+            remaining -= 1; visited.append(node); return true
+        }
+        var current = root
+        while take(current) {
+            let traits = capabilities(current)
+            if traits.secure || !traits.enabled || traits.isTextControl { return current }
+            // Known non-input controls cannot authorize searching another field.
+            guard traits.capability == .opaque else { return current }
+            if let nested = nestedFocus(current), !equals(nested, current) {
+                if visited.contains(where: { equals($0, nested) }) { return nil }
+                current = nested; continue
+            }
+            var pending = Array(children(current).prefix(max(0, remaining)))
+            var index = 0
+            while index < pending.count, remaining > 0, now() < deadline {
+                let child = pending[index]; index += 1
+                guard take(child) else { continue }
+                if isFocused(child) { return child }
+                let childTraits = capabilities(child)
+                if childTraits.enabled, !childTraits.secure, childTraits.capability == .opaque {
+                    pending.append(contentsOf: children(child).prefix(max(0, remaining - (pending.count - index))))
+                }
+            }
+            return current
+        }
+        return nil
+    }
+
     public static func resolve<Node>(from focused: Node, capabilities: (Node) -> TextInputCapabilities,
                                      parent: (Node) -> Node?, equals: (Node, Node) -> Bool) -> Node? {
         var node = focused
@@ -67,6 +116,14 @@ public enum InputSelectionPolicy {
 }
 
 public enum KeyboardSurfacePolicy {
+    /// A generic opaque target needs an actual focused control and an enabled
+    /// native Paste command. Window-only compatibility stays separately scoped.
+    public static func acceptsOpaque(focused: TextInputCapabilities?, standardWindow: Bool,
+                                     modalWindow: Bool, pasteEnabled: Bool) -> Bool {
+        guard let focused, focused.capability == .opaque, focused.role != "AXWindow",
+              standardWindow, !modalWindow, pasteEnabled else { return false }
+        return true
+    }
     /// WeChat 4.x can expose only the main window and its standard controls.
     /// Require its native Paste command as an additional input signal.
     public static func acceptsOpaqueWeChat(bundleIdentifier: String?, focused: TextInputCapabilities?,

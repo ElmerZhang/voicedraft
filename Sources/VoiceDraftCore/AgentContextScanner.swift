@@ -8,6 +8,10 @@ public enum AgentContextSource: String, CaseIterable, Sendable {
 public struct AgentContextCandidate: Sendable {
     public let text: String
     public let sources: [AgentContextSource]
+    public let isProject: Bool
+    public init(text: String, sources: [AgentContextSource], isProject: Bool = false) {
+        self.text = text; self.sources = sources; self.isProject = isProject
+    }
 }
 
 public struct AgentContextScan: Sendable {
@@ -42,9 +46,18 @@ public enum AgentContextScanner {
     static func scan(home: URL, limits: Limits, excluding: Set<String> = []) throws -> AgentContextScan {
         let fm = FileManager.default
         var report = AgentContextScan()
-        var words: [String: (text: String, sources: Set<AgentContextSource>, count: Int)] = [:]
+        var words: [String: (text: String, sources: Set<AgentContextSource>, count: Int, isProject: Bool)] = [:]
         var projects: [(URL, AgentContextSource)] = []
         var visited = Set<String>()
+
+        func add(_ word: String, source: AgentContextSource, isProject: Bool = false, declaredSpelling: Bool = false) {
+            let key = AppVocabulary.automaticTermKey(word)
+            var value = words[key] ?? (word, [], 0, false)
+            if declaredSpelling { value.text = word }
+            value.sources.insert(source); value.count += 1
+            value.isProject = value.isProject || isProject
+            words[key] = value
+        }
 
         func regular(_ url: URL) -> Bool {
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else { return false }
@@ -95,9 +108,7 @@ public enum AgentContextScanner {
                     }
                 }
                 for word in try ContextVocabulary.terms(in: document.text) {
-                    let key = AppVocabulary.automaticTermKey(word)
-                    var value = words[key] ?? (word, [], 0)
-                    value.sources.insert(item.source); value.count += 1; words[key] = value
+                    add(word, source: item.source)
                 }
             } catch is CancellationError { throw CancellationError() }
             catch { report.unreadableFiles += 1 }
@@ -153,8 +164,26 @@ public enum AgentContextScanner {
         // Read only exact conventional files, not the rest of a workspace or its parent directories.
         let referencedProjects = projects
         for (project, source) in referencedProjects {
-            guard project.resolvingSymlinksInPath().standardizedFileURL.path == project.path else { continue }
+            try Task.checkCancellation()
+            guard project != home.standardizedFileURL,
+                  (try? project.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+                  project.resolvingSymlinksInPath().standardizedFileURL.path == project.path else { continue }
             var budget = min(limits.bytesPerFile, 128_000)
+            if let name = ProjectVocabulary.name(project.lastPathComponent) { add(name, source: source, isProject: true) }
+            for name in ProjectVocabulary.manifests {
+                try Task.checkCancellation()
+                let url = project.appendingPathComponent(name)
+                guard regular(url), url.resolvingSymlinksInPath().path == url.path else { continue }
+                do {
+                    let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                    guard size <= min(32_000, budget) else { report.limited = true; continue }
+                    let handle = try FileHandle(forReadingFrom: url)
+                    defer { try? handle.close() }
+                    let data = try handle.read(upToCount: min(32_000, budget)) ?? Data()
+                    budget -= data.count; report.filesRead += 1
+                    if let term = ProjectVocabulary.declaredName(data: data, filename: name) { add(term, source: source, isProject: true, declaredSpelling: true) }
+                } catch { report.unreadableFiles += 1 }
+            }
             for name in ["AGENTS.md", "CLAUDE.md", ".claude/CLAUDE.md"] {
                 let url = project.appendingPathComponent(name)
                 guard url.resolvingSymlinksInPath().path == url.path else { continue }
@@ -162,8 +191,11 @@ public enum AgentContextScanner {
             }
         }
         report.sources.sort { $0.rawValue < $1.rawValue }
-        report.candidates = words.filter { !excluding.contains($0.key) }.values.sorted { $0.count == $1.count ? $0.text < $1.text : $0.count > $1.count }.prefix(200).map {
-            AgentContextCandidate(text: $0.text, sources: $0.sources.sorted { $0.rawValue < $1.rawValue })
+        report.candidates = words.filter { !excluding.contains($0.key) }.values.sorted {
+            if $0.isProject != $1.isProject { return $0.isProject }
+            return $0.count == $1.count ? $0.text < $1.text : $0.count > $1.count
+        }.prefix(200).map {
+            AgentContextCandidate(text: $0.text, sources: $0.sources.sorted { $0.rawValue < $1.rawValue }, isProject: $0.isProject)
         }
         return report
     }

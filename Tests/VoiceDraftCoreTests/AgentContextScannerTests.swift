@@ -131,6 +131,56 @@ final class AgentContextScannerTests: XCTestCase {
         }
     }
 
+    func testProjectNamesFromMetadataAndManifestsRetainSourcesWithoutReadingOtherContent() throws {
+        try withHome { home in
+            let project = home.appendingPathComponent("work/moon-desk").path
+            try write(try json(["type": "session_meta", "payload": ["cwd": project, "source": "vscode"]]), ".codex/sessions/main.jsonl", home: home)
+            try write(try json(["display": "ordinary text", "timestamp": 1, "project": project]), ".claude/history.jsonl", home: home)
+            try write(#"{"name":"@scope/MoonDesk","description":"SecretDescription","scripts":{"start":"InjectedCommand"}}"#, "work/moon-desk/package.json", home: home)
+            try write("let package = Package(name: \"Moon-Desk\")", "work/moon-desk/Package.swift", home: home)
+            try write("UnrelatedSecret", "work/moon-desk/.env", home: home)
+            let result = try AgentContextScanner.scan(home: home)
+            XCTAssertEqual(Set(result.candidates.map(\.text)), ["Moon-Desk", "MoonDesk"])
+            XCTAssertTrue(result.candidates.allSatisfy { $0.isProject && $0.sources == [.claude, .codex] })
+            let excluded = try AgentContextScanner.scan(home: home, excluding: [AppVocabulary.automaticTermKey("MOON-DESK")])
+            XCTAssertEqual(excluded.candidates.map(\.text), ["MoonDesk"])
+        }
+    }
+
+    func testProjectManifestFormatsUseOnlyLiteralDeclaredNames() {
+        let fixtures = [
+            ("Package.swift", "let package = Package(\n name: \"SwiftMoon\", products: [])", "SwiftMoon"),
+            ("Cargo.toml", "[workspace]\nname = \"WrongName\"\n[package]\nname = 'rust-moon'\n[dependencies]\nname = \"WrongDependency\"", "rust-moon"),
+            ("pyproject.toml", "[project] # package\nname = \"python-moon\"", "python-moon"),
+            ("go.mod", "module github.com/example/go-moon/v2\n\ngo 1.24", "go-moon")
+        ]
+        for (filename, text, expected) in fixtures {
+            XCTAssertEqual(ProjectVocabulary.declaredName(data: Data(text.utf8), filename: filename), expected)
+        }
+        for value in ["app", "src", "server", "../Secret", "https://secret.invalid", "Key=Secret", "line\nbreak"] {
+            XCTAssertNil(ProjectVocabulary.name(value))
+        }
+        XCTAssertNil(ProjectVocabulary.declaredName(data: Data("{broken".utf8), filename: "package.json"))
+        XCTAssertNil(ProjectVocabulary.declaredName(data: Data("let package = Package(name: computeName())".utf8), filename: "Package.swift"))
+    }
+
+    func testProjectNamesSurviveCandidateLimitAndSkipLinkedOrOversizedManifests() throws {
+        try withHome { home in
+            let project = home.appendingPathComponent("work/tiny-moon").path
+            let terms = (0..<240).map { "CommonTerm\($0)" }.joined(separator: " ")
+            try write(terms, ".codex/AGENTS.md", home: home)
+            try write(try json(["type": "session_meta", "payload": ["cwd": project]]), ".codex/sessions/main.jsonl", home: home)
+            try write(String(repeating: " ", count: 32_001) + #"{"name":"OversizedName"}"#, "work/tiny-moon/package.json", home: home)
+            try write("[package]\nname = \"LinkedName\"", "external.toml", home: home)
+            try FileManager.default.createSymbolicLink(at: home.appendingPathComponent("work/tiny-moon/Cargo.toml"), withDestinationURL: home.appendingPathComponent("external.toml"))
+            let result = try AgentContextScanner.scan(home: home)
+            XCTAssertEqual(result.candidates.count, 200)
+            XCTAssertEqual(result.candidates.first?.text, "tiny-moon")
+            XCTAssertTrue(result.limited)
+            XCTAssertFalse(result.candidates.contains { ["OversizedName", "LinkedName"].contains($0.text) })
+        }
+    }
+
     func testCancellationStopsScan() async throws {
         let task = Task {
             withUnsafeCurrentTask { $0?.cancel() }

@@ -6,7 +6,7 @@ final class ContextVocabularyFilterTests: XCTestCase {
         for adapter in [ModelAdapter.qwenChatWriting, .chatCompletions, .anthropic, .responses] {
             let profile = ModelProfile(name: "Fixture", role: .writing, endpoint: "https://fixture.invalid" + adapter.path, model: "chosen-model", extraJSON: #"{"enable_thinking":false,"tools":[{"name":"unused"}],"response_format":{"type":"unrelated"}}"#, adapter: adapter)
             let candidates = ["PR", "UI", "Readme", "API", "AI", "UncommonProduct", "IGNORE_POLICY_981"]
-            let request = try ContextVocabularyFilter.request(candidates: candidates, profile: profile, key: "synthetic-key")
+            let request = try ContextVocabularyFilter.request(candidates: candidates, profile: profile, key: "synthetic-key", projectNames: ["UncommonProduct"])
             let data = try XCTUnwrap(request.httpBody)
             let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
             XCTAssertEqual(body["model"] as? String, "chosen-model")
@@ -26,6 +26,9 @@ final class ContextVocabularyFilterTests: XCTestCase {
             let items = try XCTUnwrap(input["candidates"] as? [[String: Any]])
             XCTAssertEqual(items.compactMap { $0["term"] as? String }, candidates)
             XCTAssertEqual(items.compactMap { $0["id"] as? Int }, Array(candidates.indices))
+            XCTAssertEqual(items.compactMap { $0["kind"] as? String }, ["term", "term", "term", "term", "term", "project", "term"])
+            XCTAssertTrue(items.allSatisfy { Set($0.keys) == ["id", "term", "kind"] })
+            XCTAssertTrue(instruction.contains("lowercase and hyphenated"))
         }
     }
     func testSelectionCanOnlyChooseOriginalSpellingsInModelOrder() throws {

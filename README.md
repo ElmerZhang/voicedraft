@@ -100,6 +100,6 @@ Other model providers are intentionally out of scope for this release.
 
 ## Selected feature expansion (0.2)
 
-VoiceDraft now includes hold/tap recording shortcuts, configurable keys, 10-minute capture, recording sounds/mute, Doubao/Whisper-compatible/Google speech, three writing protocols with streaming/model discovery, reusable per-app writing styles, local context, vocabulary files, automatic Codex/Claude context discovery with writing-model filtering, usage counts, retained audio and history retry/expiry, login launch and onboarding.
+VoiceDraft now includes hold/tap recording shortcuts, configurable keys, 10-minute capture, recording sounds/mute, Doubao/Whisper-compatible/Google speech, three writing protocols with streaming/model discovery, reusable per-app writing styles, local context, vocabulary files, automatic Codex/Claude context and project-name discovery with writing-model filtering, usage counts, retained audio and history retry/expiry, login launch and onboarding with optional domain vocabulary packs.
 
 See [the selected feature checklist and provider setup](docs/selected-features.md) and [self-hosted signed update publishing](docs/updates.md). The new controls have English and Chinese copy; other interface languages currently fall back to English for these additions. This is a local implementation, not a deployed update service or a claim of real-account provider acceptance.

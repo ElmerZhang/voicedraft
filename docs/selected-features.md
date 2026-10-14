@@ -23,13 +23,13 @@ The checklist below describes implementation coverage, not proof of microphone, 
 | C3 | Select text externally, invoke style shortcut, choose style in a nonactivating menu, replace through existing focus checks | `AppDelegate.showStyleMenu`, `applyStyleToSelection` |
 | C4 | Opt-in last three outputs per app, 30-minute window, 2,000 characters each, memory only, clear button | `RecentInputContext` |
 | C5 | UTF-8 text / VoiceDraft JSON import preview; JSON export preserves rich metadata; merge without overwriting existing terms | `VocabularyFile`, Vocabulary controls |
-| C6 | One-click discovery of local Codex / Claude memories, recent user messages and referenced project instructions; writing-model filtering and source-labelled candidate review before import | `AgentContextScanner`, `ContextVocabulary`, `ContextVocabularyFilter` |
+| C6 | One-click discovery of local Codex / Claude memories, recent user messages, referenced project instructions and directory/manifest project names; writing-model filtering and source-labelled candidate review before import | `AgentContextScanner`, `ProjectVocabulary`, `ContextVocabulary`, `ContextVocabularyFilter` |
 | C7 | Per-take term usage counts, frequency ordering in Vocabulary and provider projections | `AppVocabulary.recordUsage` |
 | D1 | Opt-in private local WAV files; playback/stop in history; no configuration sync | `LocalStore`, `LiveAudioFeed` |
 | D2 | Rerun retained audio or rewrite the original transcript with current models/style; create a new history item without auto-pasting | `AppState.reprocess` |
 | D4 | Forever, 1/7/30/90 days; expiry removes text and associated audio; confirmation before enabling deletion | Recording preferences / `pruneHistory` |
 | F1 | macOS login item via SMAppService; explicit toggle | Settings → Launch at login |
-| F2 | Reopenable model/permission/shortcut guide; explicit permission buttons | `OnboardingView` |
+| F2 | Reopenable field/starter-vocabulary/model/permission/shortcut guide; six optional domains with per-term review and deduplication; explicit permission buttons | `OnboardingView`, `DomainVocabularySelection` |
 | F3 | Optional daily HTTPS checks, Ed25519 manifest verification, SHA-256 package checks, bounded ZIP validation, explicit install/restart with rollback | `UpdateController`, [updates.md](updates.md) |
 
 ## Data and compatibility
@@ -40,7 +40,7 @@ Audio retention, recent context, system mute, login items and automatic update c
 
 New UI copy supports English, Simplified Chinese and Traditional Chinese; the other existing interface languages use English for the new controls. Existing translated screens retain their localization coverage.
 
-C6 automatically discovers context when the user clicks Extract; it does not open a file picker or run continuously. It reads known local Codex/Claude context paths with bounded file/byte budgets, filters conversation records to user messages, and passes at most 200 new candidate words to the selected writing model for classification. The review shows at most 40 useful terms with source labels. Existing terms, aliases and preferred spellings are excluded. Only candidate words are sent to the model; raw conversations and local paths stay local. Only checked terms are merged after confirmation. Failed filtering offers retry or explicit unfiltered review. Candidate extraction favors product/code names, acronyms, underscore identifiers and quoted terminology; ordinary vocabulary file import/export remains available.
+C6 automatically discovers context when the user clicks Extract; it does not open a file picker or run continuously. It reads known local Codex/Claude context paths with bounded file/byte budgets, filters conversation records to user messages, and includes project names from referenced directories and allowlisted package declarations. It passes at most 200 new candidate words to the selected writing model for classification. The review shows at most 40 useful terms with source labels, marking project names explicitly. Existing terms, aliases and preferred spellings are excluded. Only candidate IDs, words and term/project labels are sent to the model; raw conversations, manifest contents and local paths stay local. Only checked terms are merged after confirmation. Failed filtering offers retry or explicit unfiltered review. Candidate extraction favors product/code names, acronyms, underscore identifiers and quoted terminology; ordinary vocabulary file import/export remains available.
 
 ## Provider setup
 

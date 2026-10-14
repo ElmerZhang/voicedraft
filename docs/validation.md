@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-10-14 · Personal developer signing and Applications installation
+
+- Built source commit `39931b8` as VoiceDraft 0.2.0 (build 2), bundle ID `com.voicedraft.mac`, macOS arm64. Signed with the user's Apple Development identity belonging to personal Team `G5G46WU2P2`; the certificate's organization and Team were checked against the other available corporate identities before signing. Certificate SHA-1: `A2F02B556D1E44D6AD703E7A2173CA88CFC96A60`; expiration: 2026-10-28 08:30:39 UTC.
+- Installed to `/Applications/VoiceDraft.app` after confirming no app existed at that path. The installed app passed `codesign --verify --deep --strict` in the authorized system context, with an Apple Development → Apple Worldwide Developer Relations → Apple Root CA chain and Team `G5G46WU2P2`. This is a personal development signature; notarization and public distribution were not performed.
+- Packaged and installed executables both have SHA-256 `5566f5c0cbf51d623f7735aa4b6823064c6ee854454dbd892f2a4742f5d98f31`. The signed CodeDirectory hash is `c77c4f5c63e2d178aad0d5e17d80693831b27176`.
+- Launched the installed path and verified the running executable was `/Applications/VoiceDraft.app/Contents/MacOS/VoiceDraft`, with a visible main window named VoiceDraft. Left the app open. No microphone capture or provider call was made for this installation check, and no Application Support or Keychain data was explicitly cleared.
+- Earlier sandbox-only identity queries returned zero identities and signature verification could not resolve certificate trust. After the user enabled interactive authorization, the same system checks succeeded; those sandbox errors were not evidence of a missing or invalid personal certificate.
+
 ## 2026-10-14 · Go sync server migration
 
 - Replaced the Python sync service and Python HTTP fixtures with Go. Protocol v1, encrypted-envelope limits, bearer-token validation, environment variables, SQLite schema, revision conflict behavior, and Docker UID/GID/volume compatibility are retained. Unsupported authenticated methods now return HTTP 405. Production contains no mock provider routes.

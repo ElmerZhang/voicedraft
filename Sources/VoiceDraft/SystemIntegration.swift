@@ -14,6 +14,8 @@ struct InputTarget {
     let secure: Bool
     let editable: Bool
     let keyboardSurface: Bool
+    let opaqueApplication: Bool
+    let focusGuard: OpaqueInputFocusGuard?
 }
 
 enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWithoutConfirmation }
@@ -25,7 +27,7 @@ enum TextInsertion {
         guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
         return value
     }
-    static func capture() -> InputTarget? {
+    static func capture(ignoring shortcuts: [ShortcutBinding] = [], trackOpaqueFocus: Bool = false) -> InputTarget? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
         let root = AXUIElementCreateApplication(app.processIdentifier)
@@ -42,6 +44,12 @@ enum TextInsertion {
             focused: focused.map(capabilities), editor: editor.map(capabilities),
             standardWindow: window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole,
             modalWindow: window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true)
+        let opaqueApplication = KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: app.bundleIdentifier,
+            focused: focused.map(capabilities), editor: editor.map(capabilities),
+            standardWindow: window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole,
+            modalWindow: window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true,
+            windowTitle: window.flatMap { attribute($0, kAXTitleAttribute) as? String },
+            pasteAvailable: app.bundleIdentifier == "com.tencent.xinWeChat" && editor == nil && nativePasteAvailable(root))
         let element = editor ?? focused
         let range = element.flatMap(selectedRange)
         let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
@@ -49,8 +57,33 @@ enum TextInsertion {
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
                            element: element, window: window, range: range, selection: selection,
                            value: terminalSurface ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,
-                           editable: terminalSurface || (editor.map { capabilities($0).acceptsInsertion } ?? false),
-                           keyboardSurface: terminalSurface)
+                           editable: terminalSurface || opaqueApplication || (editor.map { capabilities($0).acceptsInsertion } ?? false),
+                           keyboardSurface: terminalSurface || opaqueApplication,
+                           opaqueApplication: opaqueApplication,
+                           focusGuard: opaqueApplication && trackOpaqueFocus ? OpaqueInputFocusGuard(ignoring: shortcuts) : nil)
+    }
+    private static func nativePasteAvailable(_ root: AXUIElement) -> Bool {
+        guard let menuBar = uiElement(attribute(root, kAXMenuBarAttribute)) else { return false }
+        var level = [menuBar], remaining = 160
+        // Menu bar → top-level item → menu → command. No chat-tree traversal.
+        for _ in 0..<4 {
+            var next: [AXUIElement] = []
+            for item in level {
+                remaining -= 1
+                guard remaining >= 0 else { return false }
+                let command = attribute(item, kAXMenuItemCmdCharAttribute) as? String
+                let identifier = attribute(item, kAXIdentifierAttribute) as? String
+                let modifiers = (attribute(item, kAXMenuItemCmdModifiersAttribute) as? NSNumber)?.intValue
+                if (command?.lowercased() == "v" && modifiers == 0) || identifier == "paste:" {
+                    // Enabled depends on the old clipboard contents, not just focus.
+                    // The dictation supplies its own text immediately before pasting.
+                    return true
+                }
+                next += (attribute(item, kAXChildrenAttribute) as? [AXUIElement]) ?? []
+            }
+            level = next
+        }
+        return false
     }
     private static func uiElement(_ value: CFTypeRef?) -> AXUIElement? {
         guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
@@ -83,13 +116,15 @@ enum TextInsertion {
         try Task.checkCancellation()
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
-        guard let current = capture(), current.pid == target.pid else {
+        guard let current = capture(trackOpaqueFocus: false), current.pid == target.pid else {
             throw VoiceDraftError.message("The active app changed. Copy the result when ready.")
         }
         guard sameElement(target.window, current.window) else {
             throw VoiceDraftError.message("The active window changed. Copy the result when ready.")
         }
         guard target.editable, current.editable, !current.secure,
+              target.opaqueApplication == current.opaqueApplication,
+              (!target.opaqueApplication || target.focusGuard?.valid == true),
               target.keyboardSurface == current.keyboardSurface, sameElement(target.element, current.element) else {
             throw VoiceDraftError.message("The focused input changed. Copy the result when ready.")
         }
@@ -100,6 +135,7 @@ enum TextInsertion {
         }
         let receiptRange = nsRange(current.range) ?? (current.value == "" ? NSRange(location: 0, length: 0) : nil)
         let receipt = TextInsertionReceipt(value: current.value, range: receiptRange, replacement: text)
+        target.focusGuard?.stop()
 
         // Chromium can acknowledge AXSelectedText writes without implementing
         // the replacement action. Use the editor's normal paste path instead.
@@ -142,7 +178,7 @@ enum TextInsertion {
         try Task.checkCancellation()
         // Terminal echo is not an AX value/selection replacement. Keep the
         // honest distinction between sending paste and observing inserted text.
-        if target.keyboardSurface { return .sentToTerminal }
+        if target.keyboardSurface && !target.opaqueApplication { return .sentToTerminal }
         // A rich editor can accept paste without exposing an exact AX receipt.
         // Missing confirmation is not a failed send: prompting Copy here can
         // duplicate text that already arrived. Keep it distinct from confirmed.

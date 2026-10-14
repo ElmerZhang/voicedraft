@@ -67,6 +67,18 @@ public enum InputSelectionPolicy {
 }
 
 public enum KeyboardSurfacePolicy {
+    /// WeChat 4.x can expose only the main window and its standard controls.
+    /// Require its native Paste command as an additional input signal.
+    public static func acceptsOpaqueWeChat(bundleIdentifier: String?, focused: TextInputCapabilities?,
+                                          editor: TextInputCapabilities?, standardWindow: Bool,
+                                          modalWindow: Bool, windowTitle: String?, pasteAvailable: Bool) -> Bool {
+        guard bundleIdentifier == "com.tencent.xinWeChat", standardWindow, !modalWindow,
+              ["Weixin", "WeChat", "微信"].contains(windowTitle ?? ""), editor == nil, pasteAvailable else { return false }
+        guard let focused else { return true }
+        return focused.enabled && !focused.secure
+            && ["AXWindow", "AXGroup", "AXUnknown", "AXLayoutArea"].contains(focused.role)
+    }
+
     public static func accepts(bundleIdentifier: String?, focused: TextInputCapabilities?, editor: TextInputCapabilities?,
                                standardWindow: Bool, modalWindow: Bool) -> Bool {
         guard bundleIdentifier == "dev.warp.Warp-Stable", standardWindow, !modalWindow else { return false }

@@ -1,5 +1,10 @@
 # Validation record
 
+## 2026-10-14 · Preserve mixed languages during Polish
+
+- Added a Polish-only language policy covering every retained word/phrase/clause, including ordinary expressions and conjunctions, with mixed-language examples and a final comparison instruction. Style, application, recent context and vocabulary cannot request language normalization; vocabulary still supports clear recognition/canonical-spelling corrections but is not a translation glossary. A spoken translation request remains dictated content in Polish. Same-language cleanup and explicit self-corrections remain supported. Moved translation workflow guidance exclusively into Translate; explicit Edit instructions remain available. No raw-input rewriting, language-ratio heuristic, output replacement or extra provider call was added.
+- `./scripts/test-all.sh` passed **140 Swift tests, zero failures/skips**, Go vet/build/race tests, local sync/provider/SSE integrations and both localization checks. Two new request-contract tests cover five synthetic mixed-language/instruction inputs across all four writing adapters, conflicting style/target/context/vocabulary hints, unchanged structured input and mode isolation. No real audio, selections or credentials were used in tests, and no real writing-model call was made. These checks establish request behavior, not model compliance or measured translation-error reduction.
+
 ## 2026-10-14 · Domain starter vocabulary and context project names
 
 - Context discovery now includes referenced project directory names and literal declared names from Node, Swift, Rust, Python and Go manifests. Declared capitalization takes precedence over an equivalent directory spelling. Reads remain local, bounded and allowlisted; no manifest execution or repository traversal. Project names survive the candidate cap, carry their Codex/Claude provenance into review and receive a project label in the model's candidate-only request. They still require model filtering and user selection before import.

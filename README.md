@@ -78,7 +78,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 
 Requires Go 1.25+, the Swift toolchain, and Python 3 for the localization checks only. This runs Go vet/build/race tests, then starts an isolated Go localhost service and tests encryption, two-device synchronization, stale revisions, concurrent updates, authentication, malformed input, request construction, response parsing, redirect rejection, streaming writing, and a simulated Qwen audio-to-writing pipeline. It does not access a microphone or a real model account. Server tests can run without network sockets using `cd server && go test -race ./...`; full Swift integration requires loopback listening permission.
 
-To inspect the interface without credentials, microphone or provider calls, run the packaged binary with `VOICEDRAFT_CAPTURE_PREVIEWS=<dir>` (pages and settings tabs), `VOICEDRAFT_CAPTURE_ONBOARDING=<dir>` or `VOICEDRAFT_CAPTURE_HUD_PREVIEWS=<dir>`; add `VOICEDRAFT_PREVIEW_APPEARANCE=dark` for dark mode. Each mode writes PNGs and exits.
+To inspect the interface without credentials, microphone or provider calls, run the packaged binary with `VOICEDRAFT_CAPTURE_PREVIEWS=<dir>` (pages and settings tabs), `VOICEDRAFT_CAPTURE_ONBOARDING=<dir>` or `VOICEDRAFT_CAPTURE_HUD_PREVIEWS=<dir>`; add `VOICEDRAFT_PREVIEW_APPEARANCE=dark` for dark mode, or the arguments `-interfaceLanguage zh-Hans` (any supported code) for another interface language. Each mode writes PNGs and exits. Keep the capture process frontmost: when another app is active, native controls are captured in their inactive gray state.
 
 See [architecture](docs/architecture.md), [deployment](docs/server.md), [feature parity and roadmap](docs/roadmap.md), and [validation](docs/validation.md).
 

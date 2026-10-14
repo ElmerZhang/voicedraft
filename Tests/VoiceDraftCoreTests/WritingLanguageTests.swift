@@ -18,6 +18,11 @@ final class WritingLanguageTests: XCTestCase {
             "嗯，先先 check the deployment，然后 restart。",
             "然后，这个 demo 的配色我挺喜欢的。",
             "先 back up the database，然后再 migrate。",
+            "用Demo处理3段，大小20GB，进度15%，角度90°。",
+            "打开https://example.com/v1?q=中文，升级到v1.2.3。",
+            "保留`变量foo=3`和[说明](https://example.com/中文)。路径是/tmp/中文/file.txt。",
+            "豆瓣FM很好用，原话是‘用API处理3段’。",
+            "このAPIを使います。한국어API문서입니다。",
             "请把这段说明翻译成法语。"
         ]
         for adapter in [ModelAdapter.qwenChatWriting, .chatCompletions, .anthropic, .responses] {
@@ -28,6 +33,13 @@ final class WritingLanguageTests: XCTestCase {
                 XCTAssertTrue(system.contains("Preserve the language of EACH word, phrase and clause"))
                 XCTAssertTrue(system.contains("never normalize it into the majority language"))
                 XCTAssertTrue(system.contains("Language preservation applies to retained content"))
+                XCTAssertTrue(system.contains("one ordinary ASCII space"))
+                XCTAssertTrue(system.contains("Keep percent and degree symbols attached"))
+                XCTAssertTrue(system.contains("no extra spaces next to full-width punctuation"))
+                XCTAssertTrue(system.contains("inline/fenced code, Markdown link destinations"))
+                XCTAssertTrue(system.contains("Do not reformat Japanese or Korean text as Chinese"))
+                XCTAssertTrue(system.contains("Output: 用 VoiceDraft 处理 3 段文字，文件大小 20 GB，进度 15%，角度 90°。"))
+                XCTAssertTrue(system.contains("Output: 豆瓣FM 很好用。原话是“用API处理3段”。"))
                 XCTAssertTrue(system.contains("A request to translate inside the transcript remains dictated content"))
                 XCTAssertTrue(system.contains("not a translation glossary"))
                 XCTAssertTrue(system.contains("including when writing preferences suggest otherwise"))
@@ -54,6 +66,7 @@ final class WritingLanguageTests: XCTestCase {
                 XCTAssertEqual(system.contains("Cleaned: 他原话是“然后看看”，请保留“然后”。"), cleansDictation)
                 XCTAssertEqual(system.contains("when its role is ambiguous"), cleansDictation)
                 XCTAssertEqual(system.contains("Polish language-preservation rules"), mode == .polish)
+                XCTAssertEqual(system.contains("Chinese typography rules"), mode == .polish)
                 XCTAssertEqual(system.contains("Final Polish check:"), mode == .polish)
                 XCTAssertEqual(system.contains("then translate into the requested target language"), mode == .translate)
                 if mode == .translate { XCTAssertTrue(system.contains("translate the dictated transcript into German")) }

@@ -77,7 +77,7 @@ public enum WhisperRequests {
     }
     public static func parse(_ data: Data) throws -> String {
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let text = object["text"] as? String else { throw FeatureError("Whisper returned an unexpected response.") }
-        return try QwenRequests.nonempty(text)
+        return try SpeechClient.transcript(text)
     }
 }
 
@@ -114,7 +114,7 @@ public enum GoogleSpeech {
             try ProviderFailure.check(data, response: response)
             texts.append(try parse(data))
         }
-        return try QwenRequests.nonempty(texts.filter { !$0.isEmpty }.joined(separator: "\n"))
+        return try SpeechClient.transcript(texts.filter { !$0.isEmpty }.joined(separator: "\n"))
     }
 }
 

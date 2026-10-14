@@ -219,11 +219,14 @@ struct StudioView: View {
 struct ModelsView: View {
     @Environment(\.locale) private var interfaceLocale
     @ObservedObject var state: AppState
+    var showsHeading = true
     @State private var editing: ModelProfile?
     var body: some View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: 18) {
-            PageHeading(title: L("Choose how you think."), detail: F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
+            if showsHeading {
+                PageHeading(title: L("Choose how you think."), detail: F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
+            }
             ForEach(ModelRole.allCases) { role in
                 HStack {
                     Text(role.title.uppercased()).font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
@@ -235,8 +238,8 @@ struct ModelsView: View {
                         HStack {
                             Image(systemName: role == .speech ? "waveform" : "sparkles").font(.title2).foregroundStyle(accent)
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(profile.name).font(.headline)
-                                Text(profile.model).font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary)
+                                Text(profile.name).font(.headline).lineLimit(2)
+                                Text(profile.model).font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary).lineLimit(2)
                             }
                             Spacer()
                             if profile.id == state.settings.speechID || profile.id == state.settings.writingID {
@@ -255,7 +258,7 @@ struct ModelsView: View {
                 }
             }
             Text(D("Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model."))
-                .font(.caption).foregroundStyle(.secondary).lineSpacing(4)
+                .font(.caption).foregroundStyle(.secondary).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
         }.sheet(item: $editing) { profile in ProfileEditor(state: state, profile: profile) }
     }
 }

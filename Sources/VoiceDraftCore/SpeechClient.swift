@@ -1,6 +1,18 @@
 import Foundation
 
+/// A successfully completed recognition with no speech is a quiet end to a take.
+/// Protocol errors, unfinished hypotheses and empty writing results stay errors.
+public enum SpeechRecognitionError: Error {
+    case noSpeech
+}
+
 public enum SpeechClient {
+    static func transcript(_ text: String) throws -> String {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw SpeechRecognitionError.noSpeech }
+        return text
+    }
+
     public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) async throws -> String {
         try profile.validateForInference()
         try QwenRequests.validateAudio(wav)
@@ -11,9 +23,14 @@ public enum SpeechClient {
             var transcripts: [String] = []
             for chunk in chunks {
                 try Task.checkCancellation()
-                transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary))
+                do {
+                    transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary))
+                } catch SpeechRecognitionError.noSpeech {
+                    // A silent chunk must not discard speech in the other chunks.
+                    continue
+                }
             }
-            return try QwenRequests.nonempty(transcripts.joined(separator: "\n"))
+            return try transcript(transcripts.joined(separator: "\n"))
         }
         switch profile.adapter {
         case .whisper:
@@ -27,7 +44,9 @@ public enum SpeechClient {
             return try await DoubaoSpeech.transcribe(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
         case .qwenChatSpeech:
             let request = try QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
-            return try await HTTPTransport().complete(request)
+            let (data, response) = try await HTTPTransport().send(request)
+            try ProviderFailure.check(data, response: response)
+            return try QwenRequests.parseSpeech(data)
         case .qwenAudioHTTP:
             let request = try AudioHTTPRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
             let (data, response) = try await HTTPTransport().send(request)
@@ -67,7 +86,7 @@ public enum AudioHTTPRequests {
               let output = root["output"] as? [String: Any], let text = output["text"] as? String else {
             throw VoiceDraftError.message("Qwen Audio returned an unexpected response. Check the model and endpoint.")
         }
-        return try QwenRequests.nonempty(text)
+        return try SpeechClient.transcript(text)
     }
 }
 
@@ -159,7 +178,7 @@ public struct MessageASRResults {
         guard finished, hypotheses.values.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw VoiceDraftError.message("The speech connection ended before the final result.")
         }
-        return try QwenRequests.nonempty(sentences.keys.sorted().compactMap { sentences[$0] }.joined(separator: "\n"))
+        return try SpeechClient.transcript(sentences.keys.sorted().compactMap { sentences[$0] }.joined(separator: "\n"))
     }
 }
 

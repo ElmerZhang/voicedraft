@@ -121,6 +121,14 @@ public enum QwenRequests {
     }
 
     public static func parse(_ data: Data) throws -> String {
+        try nonempty(responseText(data))
+    }
+
+    public static func parseSpeech(_ data: Data) throws -> String {
+        try SpeechClient.transcript(responseText(data))
+    }
+
+    private static func responseText(_ data: Data) throws -> String {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = root["choices"] as? [[String: Any]],
               let choice = choices.first, let message = choice["message"] as? [String: Any] else {
@@ -133,8 +141,10 @@ public enum QwenRequests {
         if let content = message["content"] as? String { text = content }
         else if let content = message["content"] as? [[String: Any]] {
             text = content.compactMap { $0["text"] as? String }.joined()
-        } else { text = "" }
-        return try nonempty(text)
+        } else {
+            throw VoiceDraftError.message("The model returned an unexpected response. Check model ID and endpoint.")
+        }
+        return text
     }
 
     static func nonempty(_ text: String) throws -> String {

@@ -1,5 +1,12 @@
 # Validation record
 
+## 2026-10-14 · Onboarding layout, permission refresh and silent takes
+
+- Fixed the first onboarding step by removing the nested Models page heading and placing step content in a scroll view, with a separate fixed heading/footer. The mounted sheet polls microphone/Accessibility authorization every 500 ms and renders granted buttons as disabled “allowed” states.
+- Completed empty ASR responses now have a dedicated no-speech outcome. The coordinator cancels/releases the take and closes the HUD without empty history or writing requests. Malformed/filtered/truncated responses, incomplete live hypotheses and empty writing results remain errors. Qwen recordings with multiple chunks skip individual silent chunks.
+- `./scripts/test-all.sh` passed: 113 Swift tests, zero skips/failures, including the real localhost Swift-to-Go sync, mock speech/writing HTTP and all three SSE writing protocols; Go vet/build/race tests; 303 shared and 75 desktop localization messages across eight languages. New synthetic tests cover silent live socket completion/cleanup, empty speech versus writing, malformed/filtered speech and incomplete hypotheses. The first sandbox attempt could not bind localhost; the authorized rerun passed. No real audio or provider credentials were used.
+- Release packaging and plist checks passed. Inspected all three native onboarding captures in `.local/onboarding-previews/`, generated with `VOICEDRAFT_CAPTURE_ONBOARDING`. They show wrapped explanatory copy, separate navigation, scrollable model content and the granted Accessibility label. Permission status in these previews is synthetic; a real deny-to-allow OS transition and microphone-to-provider silent-take behavior still need user acceptance.
+
 ## 2026-10-14 · Personal developer signing and Applications installation
 
 The packaged macOS app passed signature verification and launched from /Applications. This check used a development identity.

@@ -124,7 +124,22 @@ final class LiveSpeechTests: XCTestCase {
         try results.accept(event("result-generated", sentence: ["sentence_id": 1, "text": "Final first sentence", "sentence_end": true]))
         try results.accept(event("result-generated", sentence: ["sentence_id": 2, "text": "Unfinished correction", "sentence_end": false]))
         try results.accept(event("task-finished"))
-        XCTAssertThrowsError(try results.transcript())
+        XCTAssertThrowsError(try results.transcript()) { XCTAssertFalse($0 is SpeechRecognitionError) }
+    }
+    func testSilentLiveTakeFinishesAndClosesSocketWithoutFailure() async throws {
+        let socket = LiveFixtureSocket(), feed = LiveAudioFeed()
+        socket.onFinish = { socket.publish("task-finished") }
+        do {
+            _ = try await run(socket, feed: feed, ready: {
+                try feed.append(Data(repeating: 0, count: 3200))
+                try feed.finish()
+            })
+            XCTFail("Expected the no-speech outcome")
+        } catch {
+            guard case SpeechRecognitionError.noSpeech = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+        XCTAssertEqual(socket.state.sent, ["run-task", "audio", "finish-task"])
+        XCTAssertTrue(socket.state.closed)
     }
     func testLiveUpdatesBeforeStopAndFlushesExactTailAfterAcknowledgement() async throws {
         let socket = LiveFixtureSocket(), feed = LiveAudioFeed()

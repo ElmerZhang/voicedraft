@@ -268,28 +268,24 @@ struct OnboardingView: View {
     @ObservedObject var state: AppState
     @State private var step = 0
     @State private var mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    @State private var accessibilityAllowed = false
+
+    init(state: AppState, initialStep: Int = 0) {
+        self.state = state
+        _step = State(initialValue: initialStep)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 20) {
             Text(F("Welcome to VoiceDraft", "欢迎使用 VoiceDraft")).font(.largeTitle.bold())
             Text("\(step + 1) / 3").foregroundStyle(.secondary)
-            if step == 0 {
-                Text(F("Connect your speech and writing models", "连接你的语音与写作模型")).font(.title2)
-                Text(F("Model calls go directly to your chosen provider. Keys are saved in Keychain. You can add Qwen, Doubao, Whisper-compatible or Google speech, and choose a writing protocol in Models.", "模型调用直接发送给你选择的服务商，密钥保存在钥匙串中。你可以在模型设置中添加 Qwen、豆包、Whisper 兼容服务或 Google Speech，并选择写作接口。"))
-                ModelsView(state: state).frame(maxHeight: 330)
-            } else if step == 1 {
-                Text(F("Microphone and text insertion", "麦克风与文字插入")).font(.title2)
-                Button(mic ? F("Microphone allowed", "已允许麦克风") : F("Allow microphone", "允许麦克风")) {
-                    guard !state.preview else { return }
-                    AVCaptureDevice.requestAccess(for: .audio) { allowed in Task { @MainActor in mic = allowed } }
-                }.disabled(mic)
-                Button(L("Allow Accessibility")) { if !state.preview { TextInsertion.requestAccess() } }
-                Text(F("Accessibility enables shortcuts and insertion into other apps. You can also use VoiceDraft's editor without insertion permission.", "辅助功能权限用于全局快捷键和向其他应用插入文字。也可以先在 VoiceDraft 编辑器中使用。"))
-            } else {
-                Text(F("Ready to try", "开始试用")).font(.title2)
-                Text(state.shortcutLabel(.dictate)).font(.title.monospaced())
-                Text(F("Hold to speak, release to finish. Tap to lock recording and tap again to finish. Recordings can last up to 10 minutes. Try a short sentence in the home editor first.", "按住说话，松开结束；轻按锁定录音，再按一次结束。最长支持 10 分钟。先回到首页试说一句短句吧。"))
+            ScrollView {
+                stepContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 8)
+                    .padding(.vertical, 4)
             }
-            Spacer(minLength: 0)
+            Divider()
             HStack {
                 Button(F("Set up later", "稍后设置")) { state.completeOnboarding() }
                 Spacer()
@@ -299,5 +295,40 @@ struct OnboardingView: View {
                 }.buttonStyle(.borderedProminent)
             }
         }.padding(30).frame(width: 740, height: 620)
+        .task {
+            // macOS has no Accessibility authorization-change notification. Keep
+            // this sheet current even while System Settings is still frontmost.
+            repeat {
+                mic = state.preview || AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                accessibilityAllowed = state.insertionAuthorized
+                do { try await Task.sleep(nanoseconds: 500_000_000) }
+                catch { return }
+            } while !Task.isCancelled
+        }
+    }
+
+    private var stepContent: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            if step == 0 {
+                Text(F("Connect your speech and writing models", "连接你的语音与写作模型")).font(.title2)
+                Text(F("Model calls go directly to your chosen provider. Keys are saved in Keychain. You can add Qwen, Doubao, Whisper-compatible or Google speech, and choose a writing protocol in Models.", "模型调用直接发送给你选择的服务商，密钥保存在钥匙串中。你可以在模型设置中添加 Qwen、豆包、Whisper 兼容服务或 Google Speech，并选择写作接口。"))
+                ModelsView(state: state, showsHeading: false)
+            } else if step == 1 {
+                Text(F("Microphone and text insertion", "麦克风与文字插入")).font(.title2)
+                Button(mic ? F("Microphone allowed", "已允许麦克风") : F("Allow microphone", "允许麦克风")) {
+                    guard !state.preview else { return }
+                    AVCaptureDevice.requestAccess(for: .audio) { allowed in Task { @MainActor in mic = allowed } }
+                }.disabled(mic)
+                Button(accessibilityAllowed ? F("Accessibility allowed", "已允许辅助功能") : L("Allow Accessibility")) {
+                    if !state.preview { TextInsertion.requestAccess() }
+                    accessibilityAllowed = state.insertionAuthorized
+                }.disabled(accessibilityAllowed)
+                Text(F("Accessibility enables shortcuts and insertion into other apps. You can also use VoiceDraft's editor without insertion permission.", "辅助功能权限用于全局快捷键和向其他应用插入文字。也可以先在 VoiceDraft 编辑器中使用。"))
+            } else {
+                Text(F("Ready to try", "开始试用")).font(.title2)
+                Text(state.shortcutLabel(.dictate)).font(.title.monospaced())
+                Text(F("Hold to speak, release to finish. Tap to lock recording and tap again to finish. Recordings can last up to 10 minutes. Try a short sentence in the home editor first.", "按住说话，松开结束；轻按锁定录音，再按一次结束。最长支持 10 分钟。先回到首页试说一句短句吧。"))
+            }
+        }.fixedSize(horizontal: false, vertical: true)
     }
 }

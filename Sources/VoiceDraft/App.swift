@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hudPreviewOnly = false
     private var statusItem: NSStatusItem!
     private let shortcuts = GlobalShortcuts()
+    private let escapeCancellation = EscapeCancellationMonitor()
     private var menuKeys: [ObjectIdentifier: String] = [:]
     private var menuObserver: NSObjectProtocol?
 
@@ -92,6 +93,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         DispatchQueue.main.async { [weak self] in self?.updateMainMenu() }
         shortcuts.onEvent = { [weak self] action, down in self?.state.shortcutEvent(action, down: down) }
+        escapeCancellation.onCancel = { [weak self] in self?.state.cancelActiveInput() ?? false }
+        if !isolatedPreview { escapeCancellation.install() }
         state.configureShortcuts = { [weak self] bindings in
             guard let self, !isolatedPreview else { return }
             let previous = self.state.device.features.shortcuts
@@ -242,7 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quitApp() { state.cancel(); NSApp.terminate(nil) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
-    func applicationWillTerminate(_ notification: Notification) { shortcuts.uninstall(); state.cancel() }
+    func applicationWillTerminate(_ notification: Notification) { escapeCancellation.uninstall(); shortcuts.uninstall(); state.cancel() }
 }
 
 // The recording/result controls must never replace the original editor's keyboard focus.

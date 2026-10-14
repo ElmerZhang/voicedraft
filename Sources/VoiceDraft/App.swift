@@ -48,6 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private var hud: NSPanel!
     private var hudObservation: AnyCancellable?
+    private var phaseObservation: AnyCancellable?
+    /// Whether the HUD should be on screen; false while it fades out.
+    private var hudShown = false
+    /// Bumped on every show/hide so a stale fade-out completion cannot hide a newer show.
+    private var hudTransition = 0
+    private var hudTargetFrame = NSRect.zero
     private var hudScreen: NSScreen?
     private var hudPreviewOnly = false
     private var statusItem: NSStatusItem!
@@ -77,15 +83,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hud.title = "VoiceDraft Dictation"
         hud.hidesOnDeactivate = false
         hud.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        hud.contentView = NSHostingView(rootView: RecordingHUD(state: state))
+        hud.appearance = NSAppearance(named: .darkAqua)
+        hud.animationBehavior = .none
+        let hudHost = NSHostingView(rootView: RecordingHUD(state: state))
+        // The panel frame is driven (and animated) by resizeHUD, not by SwiftUI's ideal size.
+        hudHost.sizingOptions = []
+        hud.contentView = hudHost
         state.showMain = { [weak self] in self?.showWindow() }
         state.showHUD = { [weak self] in self?.showHUD() }
-        state.hideHUD = { [weak self] in self?.hud.orderOut(nil) }
-        hudObservation = state.$hudKind.sink { [weak self] kind in
-            DispatchQueue.main.async { self?.resizeHUD(kind) }
+        state.hideHUD = { [weak self] in self?.hideHUD() }
+        hudObservation = state.$hudKind.sink { [weak self] _ in
+            // @Published emits before the change lands; read the settled kind on the next turn.
+            DispatchQueue.main.async { guard let self else { return }; self.resizeHUD(self.state.hudKind, animated: true) }
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "VoiceDraft")
+        phaseObservation = state.$phase.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateStatusIcon() }
+        }
         updateStatusMenu()
         state.languageChanged = { [weak self] in self?.updateStatusMenu(); self?.updateMainMenu() }
         menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
@@ -134,6 +148,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let quit = NSMenuItem(title: L("Quit VoiceDraft"), action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit); statusItem.menu = menu
+        updateStatusIcon()
+    }
+    private func updateStatusIcon() {
+        let recording = state.recording
+        let description = recording ? "VoiceDraft · " + D("Recording") : "VoiceDraft"
+        let image = NSImage(systemSymbolName: recording ? "waveform.circle.fill" : "waveform", accessibilityDescription: description)
+        image?.isTemplate = true
+        statusItem.button?.image = image
+        statusItem.button?.toolTip = description
+        statusItem.button?.setAccessibilityLabel(description)
     }
     private func updateMainMenu() {
         // Relabel the existing menus; SwiftUI retains ownership and the native responder chain.
@@ -213,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for name in ["recording", "live", "processing", "result", "long-result", "failure"] {
+                for name in ["recording", "locked", "starting", "live", "processing", "result", "long-result", "failure"] {
                     state.prepareHUDPreview(name); showHUD()
                     try await Task.sleep(nanoseconds: 300_000_000)
                     guard let view = hud.contentView else { continue }
@@ -223,23 +247,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
-                print("Rendered six synthetic HUD states without microphone, model, Keychain, or persisted data access.")
+                print("Rendered eight synthetic HUD states without microphone, model, Keychain, or persisted data access.")
             } catch { fputs("HUD preview failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }
     }
     private func showHUD() {
-        if !hud.isVisible { hudScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main }
-        resizeHUD(state.hudKind)
-        hud.orderFrontRegardless()
+        hudTransition += 1
+        if !hud.isVisible {
+            hudScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+            hud.alphaValue = 0
+            resizeHUD(state.hudKind, animated: false)
+            hud.orderFrontRegardless()
+        } else {
+            // Already visible (or fading out): keep the screen and grow/shrink in place.
+            resizeHUD(state.hudKind, animated: hudShown)
+            hud.orderFrontRegardless()
+        }
+        hudShown = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.16
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            hud.animator().alphaValue = 1
+        }
     }
-    private func resizeHUD(_ kind: DictationHUDKind) {
+    private func hideHUD() {
+        guard hud.isVisible, hudShown else { return }
+        hudShown = false
+        hudTransition += 1
+        let transition = hudTransition
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            hud.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            Task { @MainActor in
+                // A show that started during the fade owns the panel now.
+                guard let self, self.hudTransition == transition, !self.hudShown else { return }
+                self.hud.orderOut(nil)
+            }
+        })
+    }
+    /// Places the panel bottom-centre on the HUD screen; the bottom edge stays fixed so cards grow upward.
+    private func resizeHUD(_ kind: DictationHUDKind, animated: Bool) {
         guard let hud else { return }
         let size = kind.size
-        if let screen = hudScreen ?? NSScreen.main {
-            hud.setFrame(NSRect(x: screen.visibleFrame.midX - size.width / 2,
-                                y: screen.visibleFrame.minY + 16, width: size.width, height: size.height), display: true)
-        } else { hud.setContentSize(size) }
+        guard let screen = hudScreen ?? NSScreen.main else { hud.setContentSize(size); return }
+        let frame = NSRect(x: (screen.visibleFrame.midX - size.width / 2).rounded(),
+                           y: screen.visibleFrame.minY + 16, width: size.width, height: size.height)
+        // Compare with the last requested frame: hud.frame lags behind an in-flight animation.
+        guard frame != hudTargetFrame else { return }
+        hudTargetFrame = frame
+        if animated && hud.isVisible && hudShown {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                hud.animator().setFrame(frame, display: true)
+            }, completionHandler: { [weak self] in
+                Task { @MainActor in self?.hud.invalidateShadow() }
+            })
+        } else {
+            hud.setFrame(frame, display: true)
+        }
     }
     @objc private func toggleRecording() { state.toggle(external: true) }
     @objc private func quitApp() { state.cancel(); NSApp.terminate(nil) }

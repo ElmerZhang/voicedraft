@@ -1,4 +1,12 @@
 // Desktop pages and settings
+// Design refresh: HUD
+"Result ready" = "結果已就緒";
+"Starting…" = "正在啟動…";
+"Processing…" = "正在處理…";
+"Locked" = "已鎖定";
+"Writing result" = "寫作結果";
+"Streaming…" = "生成中…";
+"Recording" = "正在錄音";
 "Home" = "首頁";
 "Vocabulary" = "詞庫";
 "Settings" = "設定";

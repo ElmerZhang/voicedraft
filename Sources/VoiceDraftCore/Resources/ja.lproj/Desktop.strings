@@ -1,4 +1,12 @@
 // Desktop pages and settings
+// Design refresh: HUD
+"Result ready" = "結果の準備ができました";
+"Starting…" = "開始しています…";
+"Processing…" = "処理しています…";
+"Locked" = "ロック中";
+"Writing result" = "書き直し結果";
+"Streaming…" = "生成中…";
+"Recording" = "録音中";
 "Home" = "ホーム";
 "Vocabulary" = "語彙";
 "Settings" = "設定";

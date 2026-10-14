@@ -344,6 +344,8 @@ private struct DesktopDictionaryView: View {
                 Toggle(D("Discover words from dictation"), isOn: Binding(get: { state.settings.vocabulary.discoverFromDictation }, set: { value in update { $0.discoverFromDictation = value } }))
                 Text(D("Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open."))
                     .font(.caption).foregroundStyle(.secondary)
+                Text(F("Manual spellings take priority. Automatic terms stay enabled with lower priority; edit and save a term to confirm it.", "手动拼写优先。自动词条保持启用，但优先级较低；编辑并保存即可确认该拼写。"))
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(D("For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning."))
                     .font(.caption).foregroundStyle(.secondary)
                 if !state.vocabularyLearningStatus.isEmpty {

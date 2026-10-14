@@ -150,7 +150,7 @@ final class VocabularyLearningTests: XCTestCase {
     func testAutoAddedTermsReachEveryExistingVocabularyProjection() {
         var vocabulary = AppVocabulary()
         vocabulary.learn(["herdr"])
-        XCTAssertEqual(VocabularyProjection.make(vocabulary, for: .weighted).weighted["herdr"], 3)
+        XCTAssertEqual(VocabularyProjection.make(vocabulary, for: .weighted).weighted["herdr"], 2)
         XCTAssertEqual(VocabularyProjection.make(vocabulary, for: .context).terms, ["herdr"])
         XCTAssertTrue(vocabulary.writingContext.contains("herdr"))
     }

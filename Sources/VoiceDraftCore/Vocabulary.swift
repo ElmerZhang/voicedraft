@@ -128,11 +128,27 @@ public struct AppVocabulary: Codable, Equatable {
         }
         for entry in entries { try entry.validate() }
     }
+    /// Manual spellings and aliases take precedence over an old automatically
+    /// discovered duplicate. This is a request projection, never a storage edit.
+    var inferenceEntries: [VocabularyEntry] {
+        guard enabled else { return [] }
+        let manualKeys = Set(entries.filter { $0.origin == .manual && $0.enabled }
+            .flatMap { [$0.text, $0.displayAs] + $0.aliases }.filter { !$0.isEmpty }.map(Self.automaticTermKey))
+        return entries.enumerated().filter {
+            $0.element.enabled && ($0.element.origin == .manual || !manualKeys.contains(Self.automaticTermKey($0.element.text)))
+        }.sorted {
+            if $0.element.origin != $1.element.origin { return $0.element.origin == .manual }
+            if $0.element.priority != $1.element.priority { return $0.element.priority }
+            if $0.element.boost != $1.element.boost { return $0.element.boost > $1.element.boost }
+            if $0.element.useCount != $1.element.useCount { return $0.element.useCount > $1.element.useCount }
+            return $0.offset < $1.offset
+        }.map(\.element)
+    }
     public var writingContext: String {
         guard enabled else { return "" }
         // These are structured spelling hints, not executable instructions or automatic replacements.
-        let values = entries.filter(\.enabled).prefix(300).map { entry in
-            ["term": entry.text, "display_as": entry.displayAs, "aliases": entry.aliases.joined(separator: ", ")]
+        let values = inferenceEntries.prefix(300).map { entry in
+            ["term": entry.text, "display_as": entry.displayAs, "aliases": entry.aliases.joined(separator: ", "), "source": entry.origin.rawValue]
         }
         return (try? JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])).map { String(decoding: $0, as: UTF8.self) } ?? ""
     }
@@ -179,6 +195,7 @@ public struct VocabularyProjection: Equatable {
     public var weighted: [String: Int] = [:]
     public var terms: [String] = []
     public var omitted = 0
+    public var shadowedAutomatic = 0
     public var downgradedPriority = 0
     public var hasUnsupportedMetadata = false
     public var context: String { terms.joined(separator: ", ") }
@@ -186,14 +203,10 @@ public struct VocabularyProjection: Equatable {
     public static func make(_ source: AppVocabulary, for capability: VocabularyCapability) -> Self {
         guard source.enabled else { return Self() }
         var result = Self()
-        let sorted = source.entries.enumerated().filter { $0.element.enabled }.sorted {
-            if $0.element.priority != $1.element.priority { return $0.element.priority }
-            if $0.element.boost != $1.element.boost { return $0.element.boost > $1.element.boost }
-            if $0.element.useCount != $1.element.useCount { return $0.element.useCount > $1.element.useCount }
-            return $0.offset < $1.offset
-        }
+        let sorted = source.inferenceEntries
+        result.shadowedAutomatic = source.entries.filter(\.enabled).count - sorted.count
         var seen = Set<String>(), priorityCount = 0, contextSize = 0
-        for (_, entry) in sorted {
+        for entry in sorted {
             if !entry.language.isEmpty || !entry.displayAs.isEmpty || !entry.pronunciation.isEmpty || !entry.aliases.isEmpty {
                 result.hasUnsupportedMetadata = true
             }
@@ -212,7 +225,11 @@ public struct VocabularyProjection: Equatable {
                 let validLength = ascii ? text.split(whereSeparator: \.isWhitespace).count <= 7 : text.unicodeScalars.count <= 15
                 guard !text.isEmpty, validLength, result.weighted.count < 2000 else { result.omitted += 1; continue }
                 var weight = 1 + Int((Double(entry.boost) / 25).rounded())
-                if entry.priority {
+                if entry.origin == .automatic {
+                    // Repeated recognition is weak evidence. A user edit confirms
+                    // the spelling as manual and restores the full strength range.
+                    weight = min(weight, 2)
+                } else if entry.priority {
                     if priorityCount < 50 { weight = 50; priorityCount += 1 }
                     else { weight = 5; result.downgradedPriority += 1 }
                 }

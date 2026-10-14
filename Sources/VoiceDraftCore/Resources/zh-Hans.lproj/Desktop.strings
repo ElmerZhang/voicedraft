@@ -126,6 +126,5 @@
 "Microphone" = "麦克风";
 "Records your voice only while you dictate." = "仅在你听写时录制声音。";
 "Runs shortcuts in any app and inserts text where you type." = "在任意应用中使用快捷键，并在你输入的位置插入文字。";
-"Allowed" = "已允许";
 "Not allowed" = "未允许";
 "Allow" = "允许";

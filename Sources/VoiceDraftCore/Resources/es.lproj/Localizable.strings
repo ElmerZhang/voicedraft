@@ -36,7 +36,7 @@
 "Cancelled" = "Cancelado";
 "Cannot decrypt. Check the sync passphrase; local settings were preserved." = "No se pudo descifrar. Revisa la frase de contraseña de sincronización. Se conservaron los ajustes locales.";
 "Check the API key, its region, and model access." = "Revisa la clave API, su región y el acceso al modelo.";
-"Check the dictionary, style prompt, and target language." = "Revisa el vocabulario, el estilo y el idioma de destino.";
+"Check the vocabulary, style prompt, and target language." = "Revisa el vocabulario, el estilo y el idioma de destino.";
 "Check the full endpoint URL and selected model." = "Revisa la URL completa del endpoint y el modelo seleccionado.";
 "Check the selected model, its protocol, and advanced parameters in Models." = "Revisa el modelo, su protocolo y los parámetros avanzados en «Modelos».";
 "Choose ASR" = "Elegir modelo de voz";

@@ -97,6 +97,28 @@ final class AppState: ObservableObject {
     var recording: Bool { phase == "recording" }
     var insertionAuthorized: Bool { preview || AXIsProcessTrusted() }
 
+    func scanAgentContext() async throws -> AgentContextScan {
+        guard !preview else { return AgentContextScan() }
+        let known = Set(settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
+        let worker = Task.detached(priority: .utility) {
+            try AgentContextScanner.scan(excluding: known)
+        }
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+    }
+
+    func filterAgentContext(_ candidates: [String]) async throws -> (terms: [String], model: String) {
+        guard !preview else { return ([], "Preview") }
+        guard let profile = settings.writing else { throw FeatureError("Choose a writing model in Models to filter vocabulary.") }
+        let credential = try key(for: profile)
+        let terms = try await ContextVocabularyFilter.filter(candidates: candidates, profile: profile, key: credential)
+        try Task.checkCancellation()
+        return (terms, profile.name)
+    }
+
     /// Synthetic UI fixtures only; this path cannot load keys, record, or call a model.
     func prepareHUDPreview(_ name: String) {
         guard preview else { return }
@@ -632,7 +654,7 @@ final class AppState: ObservableObject {
                 try self.store?.write(updated, name: "settings")
                 self.settings = updated; self.device.dirty = true
                 try self.persistDevice()
-                self.vocabularyLearningStatus = D("Added to dictionary:") + " " + added.joined(separator: ", ")
+                self.vocabularyLearningStatus = D("Added to vocabulary:") + " " + added.joined(separator: ", ")
                 if self.device.autoSync { await self.sync() }
             } catch {
                 guard !(error is CancellationError), self.vocabularyLearningID == id else { return }

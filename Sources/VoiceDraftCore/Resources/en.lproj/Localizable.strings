@@ -36,7 +36,7 @@
 "Cancelled" = "Cancelled";
 "Cannot decrypt. Check the sync passphrase; local settings were preserved." = "Cannot decrypt. Check the sync passphrase; local settings were preserved.";
 "Check the API key, its region, and model access." = "Check the API key, its region, and model access.";
-"Check the dictionary, style prompt, and target language." = "Check the dictionary, style prompt, and target language.";
+"Check the vocabulary, style prompt, and target language." = "Check the vocabulary, style prompt, and target language.";
 "Check the full endpoint URL and selected model." = "Check the full endpoint URL and selected model.";
 "Check the selected model, its protocol, and advanced parameters in Models." = "Check the selected model, its protocol, and advanced parameters in Models.";
 "Choose ASR" = "Choose ASR";

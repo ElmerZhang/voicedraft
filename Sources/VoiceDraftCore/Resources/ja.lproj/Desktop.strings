@@ -1,6 +1,6 @@
 // Desktop pages and settings
 "Home" = "ホーム";
-"Dictionary" = "辞書";
+"Vocabulary" = "語彙";
 "Settings" = "設定";
 "Personalization" = "パーソナライズ";
 "About" = "このアプリについて";
@@ -8,7 +8,7 @@
 "Dismiss" = "閉じる";
 "Close settings" = "設定を閉じる";
 "Made for your words" = "あなたの言葉のために";
-"Your models. Your vocabulary. A little less typing." = "自分のモデル、自分の辞書。タイピングを少し減らそう。";
+"Your models. Your vocabulary. A little less typing." = "自分のモデル、自分の語彙。タイピングを少し減らそう。";
 "Speak, don't type." = "タイプせず、話そう。";
 "Dictate" = "音声入力";
 "Messy thoughts → clear writing" = "まとまらない考え → 明確な文章";
@@ -35,7 +35,7 @@
 "No matching words" = "一致する単語はありません";
 "Disable word" = "単語を無効化";
 "Enable word" = "単語を有効化";
-"Model vocabulary details" = "モデルの辞書情報";
+"Model vocabulary details" = "モデルの語彙情報";
 "Only on this Mac" = "このMacのみ";
 "Keep history" = "履歴を保存";
 "Keep your latest 500 entries on this device." = "このデバイスに最新500件を保存します。";
@@ -63,7 +63,7 @@
 "Finish dictation" = "音声入力を完了";
 "Could not finish" = "完了できませんでした";
 "Copy last transcript" = "認識結果をコピー";
-"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "対応モデルを選択してください。Message モデルは話している間に文字を表示し、HTTP モデルは録音終了後に認識します。辞書は選択したモデルに合わせて適用されます。";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "対応モデルを選択してください。Message モデルは話している間に文字を表示し、HTTP モデルは録音終了後に認識します。語彙は選択したモデルに合わせて適用されます。";
 "Auto-added" = "自動追加";
 "Manually-added" = "手動追加";
 "Word status" = "単語の状態";
@@ -72,5 +72,5 @@
 "Discover words from dictation" = "音声入力から単語を発見";
 "Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "音声入力後に文章モデルで固有名詞や専門用語を学習します。修正語は直接追加され、新しい候補はアプリ起動中の別々の音声入力で2回出現すると追加されます。";
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "挿入後45秒間、対応エディタで音声入力文への修正から学習します。文書の他の内容は送信しません。削除した単語は自動追加されません。";
-"Added to dictionary:" = "辞書に追加しました：";
+"Added to vocabulary:" = "語彙に追加しました：";
 "Could not learn words this time. Your dictation is unaffected." = "今回は単語を学習できませんでした。音声入力には影響しません。";

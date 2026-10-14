@@ -7,15 +7,15 @@ public enum VocabularyFile {
         return try encoder.encode(Archive(version: 1, entries: vocabulary.entries))
     }
     public static func entries(_ data: Data) throws -> [VocabularyEntry] {
-        guard data.count <= 20_000_000 else { throw FeatureError("Dictionary files must be smaller than 20 MB.") }
+        guard data.count <= 20_000_000 else { throw FeatureError("Vocabulary files must be smaller than 20 MB.") }
         let trimmed = String(decoding: data.prefix(100), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
             let archive = try JSONDecoder().decode(Archive.self, from: data)
-            guard archive.version == 1, archive.entries.count <= 200_000, Set(archive.entries.map(\.id)).count == archive.entries.count else { throw FeatureError("Unsupported dictionary format.") }
+            guard archive.version == 1, archive.entries.count <= 200_000, Set(archive.entries.map(\.id)).count == archive.entries.count else { throw FeatureError("Unsupported vocabulary format.") }
             for entry in archive.entries { try entry.validate() }
             return archive.entries
         }
-        guard let text = String(data: data, encoding: .utf8) else { throw FeatureError("Use a UTF-8 text or VoiceDraft JSON dictionary.") }
+        guard let text = String(data: data, encoding: .utf8) else { throw FeatureError("Use a UTF-8 text or VoiceDraft JSON vocabulary.") }
         var vocabulary = AppVocabulary(); vocabulary.appendLines(text); try vocabulary.validate(); return vocabulary.entries
     }
     public static func merge(_ entries: [VocabularyEntry], into vocabulary: inout AppVocabulary) throws {
@@ -46,21 +46,62 @@ extension AppVocabulary {
     }
 }
 
-/// Offline, explicit file import. JSONL imports only user-authored text, not tool output or assistant replies.
+/// Local extraction shared by automatic discovery and explicit context-file callers.
 public enum ContextVocabulary {
+    struct Document { let text: String; let projects: [String] }
+
     public static func candidates(data: Data, filename: String) throws -> [String] {
-        guard data.count <= 5_000_000, let source = String(data: data, encoding: .utf8) else { throw FeatureError("Choose a UTF-8 context file smaller than 5 MB.") }
-        var text = source
-        if filename.lowercased().hasSuffix(".jsonl") {
-            text = source.split(separator: "\n").compactMap { line -> String? in
-                guard let root = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { return nil }
-                let payload = root["payload"] as? [String: Any] ?? root["message"] as? [String: Any] ?? root
-                guard payload["role"] as? String == "user" || (root["type"] as? String == "event_msg" && payload["type"] as? String == "user_message") else { return nil }
-                if let content = payload["content"] as? String { return content }
-                if let message = payload["message"] as? String { return message }
-                return (payload["content"] as? [[String: Any]] ?? []).filter { ["text", "input_text"].contains($0["type"] as? String ?? "") }.compactMap { $0["text"] as? String }.joined(separator: "\n")
-            }.joined(separator: "\n")
+        try terms(in: document(data: data, filename: filename).text)
+    }
+
+    static func document(data: Data, filename: String) throws -> Document {
+        guard data.count <= 5_000_000, let source = String(data: data, encoding: .utf8) else { throw FeatureError("Use a UTF-8 context file smaller than 5 MB.") }
+        guard filename.lowercased().hasSuffix(".jsonl") else { return Document(text: source, projects: []) }
+        var messages: [String] = []
+        var seen = Set<String>()
+        var projects: [String] = []
+        for line in source.split(separator: "\n") {
+            try Task.checkCancellation()
+            guard let root = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
+            if root["isSidechain"] as? Bool == true || root["isMeta"] as? Bool == true { continue }
+            let payload = root["payload"] as? [String: Any] ?? root["message"] as? [String: Any] ?? root
+            if root["type"] as? String == "session_meta" {
+                if (payload["source"] as? [String: Any])?["subagent"] != nil || payload["source"] as? String == "subagent" {
+                    return Document(text: "", projects: [])
+                }
+                if let cwd = payload["cwd"] as? String { projects.append(cwd) }
+                continue
+            }
+            var text: String?
+            if filename.lowercased() == "history.jsonl" {
+                if root["session_id"] is String, root["ts"] != nil { text = root["text"] as? String }
+                if root["timestamp"] != nil, let display = root["display"] as? String {
+                    text = display
+                    if let project = root["project"] as? String { projects.append(project) }
+                }
+            }
+            if payload["role"] as? String == "user" || (root["type"] as? String == "event_msg" && payload["type"] as? String == "user_message") {
+                if let content = payload["content"] as? String { text = content }
+                else if let message = payload["message"] as? String { text = message }
+                else {
+                    let blocks = payload["content"] as? [[String: Any]] ?? []
+                    // Claude wraps tool responses as user messages; none of that wrapper is user prose.
+                    guard !blocks.contains(where: { $0["type"] as? String == "tool_result" }) else { continue }
+                    text = blocks.filter { ["text", "input_text"].contains($0["type"] as? String ?? "") }.compactMap { $0["text"] as? String }.joined(separator: "\n")
+                }
+                if let cwd = root["cwd"] as? String { projects.append(cwd) }
+            }
+            guard let text, !text.isEmpty else { continue }
+            let start = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !["# agents.md instructions", "<environment_context>", "<instructions>", "<system-reminder>", "<local-command-", "<command-name>", "<turn_aborted>"].contains(where: start.hasPrefix) else { continue }
+            if seen.insert(text).inserted { messages.append(text) }
         }
+        // Most recent project references win the scanner's bounded project budget.
+        return Document(text: messages.joined(separator: "\n"), projects: projects.reversed())
+    }
+
+    static func terms(in source: String) throws -> [String] {
+        var text = source
         // Avoid lines containing credentials/URLs and cap the proposed list. The user reviews every import.
         text = text.components(separatedBy: .newlines).filter { line in
             !["api_key", "api-key", "secret", "password", "bearer ", "private key", "token=", "https://", "http://"].contains { line.lowercased().contains($0) }

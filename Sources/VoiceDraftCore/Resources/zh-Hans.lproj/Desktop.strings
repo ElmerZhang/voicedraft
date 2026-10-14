@@ -1,6 +1,6 @@
 // Desktop pages and settings
 "Home" = "首页";
-"Dictionary" = "词典";
+"Vocabulary" = "词库";
 "Settings" = "设置";
 "Personalization" = "个性化";
 "About" = "关于";
@@ -8,7 +8,7 @@
 "Dismiss" = "关闭提示";
 "Close settings" = "关闭设置";
 "Made for your words" = "为你的表达而生";
-"Your models. Your vocabulary. A little less typing." = "你的模型，你的词典。少打字，多表达。";
+"Your models. Your vocabulary. A little less typing." = "你的模型，你的词库。少打字，多表达。";
 "Speak, don't type." = "用说的，别打字。";
 "Dictate" = "听写";
 "Messy thoughts → clear writing" = "零散想法 → 清晰文字";
@@ -35,7 +35,7 @@
 "No matching words" = "没有匹配的词条";
 "Disable word" = "停用词条";
 "Enable word" = "启用词条";
-"Model vocabulary details" = "模型词典详情";
+"Model vocabulary details" = "模型词库详情";
 "Only on this Mac" = "仅保存在此 Mac";
 "Keep history" = "保留历史记录";
 "Keep your latest 500 entries on this device." = "在此设备上保留最近 500 条记录。";
@@ -63,7 +63,7 @@
 "Finish dictation" = "完成听写";
 "Could not finish" = "未能完成";
 "Copy last transcript" = "复制本次识别结果";
-"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "先选择支持的模型。Message 模型会在说话时实时显示文字；HTTP 模型在结束录音后识别。词典会自动适配所选模型。";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "先选择支持的模型。Message 模型会在说话时实时显示文字；HTTP 模型在结束录音后识别。词库会自动适配所选模型。";
 "Auto-added" = "自动添加";
 "Manually-added" = "手动添加";
 "Word status" = "词条状态";
@@ -72,5 +72,5 @@
 "Discover words from dictation" = "从口述中发现新词";
 "Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "口述完成后，使用你的润色模型学习专名和专业词。纠错词直接添加；发现的新词需要在本次应用运行期间的两次独立口述中出现。";
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "输入后的 45 秒内，可从受支持编辑器中对口述文字的修改学习。不会发送文档中的其他内容。删除的词不会自动加回。";
-"Added to dictionary:" = "已加入词典：";
+"Added to vocabulary:" = "已加入词库：";
 "Could not learn words this time. Your dictation is unaffected." = "本次未能学习新词，不影响语音输入。";

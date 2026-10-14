@@ -13,7 +13,7 @@ Baseline reviewed against the public [Typeless quickstart](https://www.typeless.
 | Translation | Configurable target language | Favorite targets and fast switching |
 | Voice editing of selected text | Accessibility selection plus Qwen rewrite | Rich text preservation, undo integration, broader editor coverage |
 | Ask anything | Text-only answer with optional selected text | Search integrations and explicit action execution |
-| Personal dictionary | One rich vocabulary, automatic correction learning and repeated-dictation discovery, origin filters, opt-outs and deletion suppression | Real-model learning precision, additional editor compatibility, file import/export, additional provider adapters |
+| Personal vocabulary | One rich vocabulary, automatic correction learning and repeated-dictation discovery, origin filters, opt-outs and deletion suppression | Real-model learning precision, additional editor compatibility, file import/export, additional provider adapters |
 | Personal style | User-edited global style prompt | Learning from corrections with explicit controls |
 | Per-application tone | App name available as context | Editable application-specific rules and routing |
 | Multilingual speech | Delegated to the chosen Qwen ASR model | Measured language coverage and language controls; no promise of Typeless's advertised count |

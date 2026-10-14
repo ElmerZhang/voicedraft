@@ -74,3 +74,20 @@
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "Pendant 45 secondes après l’insertion, apprend des modifications du texte dicté dans les éditeurs compatibles. Le reste du document n’est pas envoyé. Les mots supprimés ne sont pas ajoutés de nouveau automatiquement.";
 "Added to vocabulary:" = "Ajouté au vocabulaire :";
 "Could not learn words this time. Your dictation is unaffected." = "Impossible d’apprendre des mots cette fois. Votre dictée n’est pas affectée.";
+
+// Design refresh: onboarding and sheets
+"Active" = "Actif";
+"No profiles yet" = "Aucun profil pour l’instant";
+"Add a profile to connect your own provider." = "Ajoutez un profil pour connecter votre propre fournisseur.";
+"Sync passphrase" = "Phrase secrète de synchronisation";
+"Speech models use the word and, where supported, its strength. Other fields are kept for models that support them; spelling and aliases also guide the writing model." = "Les modèles vocaux utilisent le mot et, si possible, sa force. Les autres champs sont conservés pour les modèles qui les prennent en charge ; l’orthographe et les alias guident aussi le modèle d’écriture.";
+"Writing style" = "Style d’écriture";
+"Style name" = "Nom du style";
+"Style instructions" = "Instructions du style";
+"Your fields" = "Vos domaines";
+"Microphone" = "Micro";
+"Records your voice only while you dictate." = "Enregistre votre voix uniquement pendant la dictée.";
+"Runs shortcuts in any app and inserts text where you type." = "Active les raccourcis dans toutes les apps et insère le texte là où vous tapez.";
+"Allowed" = "Autorisé";
+"Not allowed" = "Non autorisé";
+"Allow" = "Autoriser";

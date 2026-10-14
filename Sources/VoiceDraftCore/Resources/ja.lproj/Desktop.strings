@@ -126,6 +126,5 @@
 "Microphone" = "マイク";
 "Records your voice only while you dictate." = "音声入力中のみ録音します。";
 "Runs shortcuts in any app and inserts text where you type." = "どのアプリでもショートカットを使い、入力中の位置にテキストを挿入します。";
-"Allowed" = "許可済み";
 "Not allowed" = "未許可";
 "Allow" = "許可";

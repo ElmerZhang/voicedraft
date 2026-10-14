@@ -16,6 +16,10 @@ SwiftUI views
 
 Views submit changes through AppState; they do not write storage. The model adapter owns provider protocol details; the coordinator owns capture, cancellation, output delivery, and history. The server stores opaque encrypted configuration and does not proxy inference, receive audio, or manage model billing.
 
+The sync server is a separate Go module in `server/`: `cmd/voicedraft-sync` owns environment configuration and graceful process shutdown; `internal/syncserver` owns HTTP validation/authentication and SQLite transactions. It uses Go's `net/http` and `database/sql` with a pinned [pure-Go SQLite driver](https://pkg.go.dev/modernc.org/sqlite), producing a binary with `CGO_ENABLED=0`. There is no Python server runtime. HTTP protocol v1, envelope fields, environment variables, and the existing `vault` table are unchanged. An immediate SQLite transaction protects revision comparison and replacement across independent connections/processes. See [server.md](server.md) for in-place migration and deployment.
+
+Synthetic provider endpoints live in `internal/testfixture`, linked only by `cmd/integration-test`; the production command does not expose or include them. Go service tests use `httptest.ResponseRecorder` and actual temporary SQLite databases, so validation/storage coverage does not require listening on a port. The separate integration command starts a loopback server for the existing Swift client tests.
+
 ## Desktop navigation and editing
 
 The main shell has Home, History, and Dictionary navigation. Home embeds the existing Studio recording and text-testing workspace, including all five modes, microphone selection, selection input, transcript processing, editable output, copying, and Accessibility controls. Shortcut hints show the saved bindings. Carbon receives press/release events; an explicitly configured Fn key uses an Accessibility event tap. The pure RecordingGesture state machine distinguishes hold-to-talk from tap-to-lock, including microphone startup.

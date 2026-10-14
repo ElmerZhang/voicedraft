@@ -66,17 +66,15 @@ Localhost is only reachable from the same machine. For multiple physical devices
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
 - Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
 - A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
-- No external Swift packages or Python packages; model calls go directly from Mac to the configured endpoint.
+- A Go sync server with SQLite persistence and a standalone binary; model calls go directly from Mac to the configured endpoint. No external Swift packages.
 
 ## Verification
 
 ```sh
-python3 scripts/check-localizations.py
-python3 scripts/check-desktop-localizations.py
-python3 scripts/test-all.py
+./scripts/test-all.sh
 ```
 
-This starts an isolated localhost service and tests encryption, two-device synchronization, stale revisions, concurrent updates, authentication, malformed input, request construction, response parsing, redirect rejection, and a simulated Qwen audio-to-writing pipeline. It does not access a microphone or a real model account.
+Requires Go 1.25+, the Swift toolchain, and Python 3 for the localization checks only. This runs Go vet/build/race tests, then starts an isolated Go localhost service and tests encryption, two-device synchronization, stale revisions, concurrent updates, authentication, malformed input, request construction, response parsing, redirect rejection, streaming writing, and a simulated Qwen audio-to-writing pipeline. It does not access a microphone or a real model account. Server tests can run without network sockets using `cd server && go test -race ./...`; full Swift integration requires loopback listening permission.
 
 See [architecture](docs/architecture.md), [deployment](docs/server.md), [feature parity and roadmap](docs/roadmap.md), and [validation](docs/validation.md).
 

@@ -36,7 +36,7 @@
 "Cancelled" = "已取消";
 "Cannot decrypt. Check the sync passphrase; local settings were preserved." = "無法解密，請檢查同步口令。本地設置已保留。";
 "Check the API key, its region, and model access." = "請檢查 API Key、所屬地域和模型訪問權限。";
-"Check the dictionary, style prompt, and target language." = "請檢查詞庫、寫作風格和翻譯目標語言。";
+"Check the vocabulary, style prompt, and target language." = "請檢查詞庫、寫作風格和翻譯目標語言。";
 "Check the full endpoint URL and selected model." = "請檢查完整接口地址和所選模型。";
 "Check the selected model, its protocol, and advanced parameters in Models." = "請在“模型”中檢查所選模型、調用協議和高級參數。";
 "Choose ASR" = "選擇語音模型";

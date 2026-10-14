@@ -1,6 +1,6 @@
 // Desktop pages and settings
 "Home" = "Startseite";
-"Dictionary" = "Wörterbuch";
+"Vocabulary" = "Wortschatz";
 "Settings" = "Einstellungen";
 "Personalization" = "Personalisierung";
 "About" = "Über";
@@ -63,7 +63,7 @@
 "Finish dictation" = "Diktat abschließen";
 "Could not finish" = "Abschluss fehlgeschlagen";
 "Copy last transcript" = "Letztes Transkript kopieren";
-"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "Wählen Sie zuerst ein unterstütztes Modell. Message-Modelle zeigen Text beim Sprechen; HTTP-Modelle erkennen nach Aufnahmeende. Das Wörterbuch wird an das Modell angepasst.";
+"Choose a supported model first. Message models show live text while you speak; HTTP models recognize after you finish. Your vocabulary is adapted to the selected model." = "Wählen Sie zuerst ein unterstütztes Modell. Message-Modelle zeigen Text beim Sprechen; HTTP-Modelle erkennen nach Aufnahmeende. Der Wortschatz wird an das Modell angepasst.";
 "Auto-added" = "Automatisch hinzugefügt";
 "Manually-added" = "Manuell hinzugefügt";
 "Word status" = "Wortstatus";
@@ -72,5 +72,5 @@
 "Discover words from dictation" = "Wörter im Diktat entdecken";
 "Learns names and specialist terms using your writing model after dictation. Corrections are added directly; discovered words need two separate takes while the app is open." = "Lernt nach dem Diktat Namen und Fachbegriffe mit deinem Schreibmodell. Korrekturen werden direkt ergänzt; entdeckte Wörter müssen in zwei getrennten Diktaten vorkommen, während die App geöffnet ist.";
 "For 45 seconds after insertion, supported editors can learn from changes to your dictated text. Other document text is not sent. Deleted words stay excluded from automatic learning." = "In unterstützten Editoren werden 45 Sekunden nach dem Einfügen Korrekturen am diktierten Text erkannt. Andere Dokumentinhalte werden nicht gesendet. Gelöschte Wörter werden nicht automatisch erneut hinzugefügt.";
-"Added to dictionary:" = "Zum Wörterbuch hinzugefügt:";
+"Added to vocabulary:" = "Zum Wortschatz hinzugefügt:";
 "Could not learn words this time. Your dictation is unaffected." = "Wörter konnten diesmal nicht gelernt werden. Dein Diktat ist davon nicht betroffen.";

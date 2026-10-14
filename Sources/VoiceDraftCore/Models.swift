@@ -170,7 +170,7 @@ public struct SharedSettings: Codable, Equatable {
         try vocabulary.validate()
         guard stylePrompt.utf8.count <= 20_000,
               !targetLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw VoiceDraftError.message("Check the dictionary, style prompt, and target language.")
+            throw VoiceDraftError.message("Check the vocabulary, style prompt, and target language.")
         }
         for p in profiles {
             // Keep legacy/custom addresses editable even when they need protocol repair.

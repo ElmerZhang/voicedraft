@@ -39,7 +39,7 @@ The floating recording panel does not take keyboard focus. If the original field
 
 - **Home**: shortcut guide, local usage counts, and the full recording/text-testing workspace. Transcribe, polish, translate, edit selection, and ask modes are preserved.
 - **History**: records grouped by day, search, dictation/question filters, original transcript details, copy, deletion, and the local-history toggle.
-- **Dictionary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
+- **Vocabulary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
 - **Settings** (sidebar or **Command-comma**): language, microphone, insertion and history preferences, plus Personalization, Models, Sync, About, and Help. Save writing style and translation target in Personalization.
 
 ## Start configuration sync locally
@@ -62,7 +62,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 - Multiple saved Qwen model profiles; speech and writing are selected independently.
 - Model catalog, protocol-specific endpoints, separate API keys, read-only vocabulary adaptation previews, and advanced JSON parameters.
 - Dictation cleanup, spoken self-corrections, structured formatting, translation, selected-text editing, and text-only question answering through Qwen.
-- One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Dictionary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
+- One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Vocabulary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
 - Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
 - A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
@@ -100,6 +100,6 @@ Other model providers are intentionally out of scope for this release.
 
 ## Selected feature expansion (0.2)
 
-VoiceDraft now includes hold/tap recording shortcuts, configurable keys, 10-minute capture, recording sounds/mute, Doubao/Whisper-compatible/Google speech, three writing protocols with streaming/model discovery, reusable per-app writing styles, local context, dictionary files/context extraction/usage counts, retained audio and history retry/expiry, login launch and onboarding.
+VoiceDraft now includes hold/tap recording shortcuts, configurable keys, 10-minute capture, recording sounds/mute, Doubao/Whisper-compatible/Google speech, three writing protocols with streaming/model discovery, reusable per-app writing styles, local context, vocabulary files, automatic Codex/Claude context discovery with writing-model filtering, usage counts, retained audio and history retry/expiry, login launch and onboarding.
 
 See [the selected feature checklist and provider setup](docs/selected-features.md) and [self-hosted signed update publishing](docs/updates.md). The new controls have English and Chinese copy; other interface languages currently fall back to English for these additions. This is a local implementation, not a deployed update service or a claim of real-account provider acceptance.

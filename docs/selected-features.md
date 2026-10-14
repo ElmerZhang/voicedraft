@@ -1,6 +1,6 @@
 # Typeflux comparison: selected VoiceDraft additions
 
-User scope confirmed 2026-10-13. B5 includes **Google Speech only**. F3 uses a **self-hosted HTTPS feed**; the user has no feed URL yet and requested configuration and publishing instructions. No cloud service deployment or real-account model calls are part of this change.
+User scope confirmed 2026-10-13. B5 includes **Google Speech only**. F3 uses a **self-hosted HTTPS feed**; the user has no feed URL yet and requested configuration and publishing instructions. No cloud service deployment is included. Model requests go directly to user-configured providers; automated tests use synthetic fixtures.
 
 The checklist below describes implementation coverage, not proof of microphone, Accessibility or vendor-account acceptance. See the validation section for that boundary.
 
@@ -22,9 +22,9 @@ The checklist below describes implementation coverage, not proof of microphone, 
 | C2 | Bundle-ID application bindings; snapshot the style when capture starts | `SharedSettings.resolved` |
 | C3 | Select text externally, invoke style shortcut, choose style in a nonactivating menu, replace through existing focus checks | `AppDelegate.showStyleMenu`, `applyStyleToSelection` |
 | C4 | Opt-in last three outputs per app, 30-minute window, 2,000 characters each, memory only, clear button | `RecentInputContext` |
-| C5 | UTF-8 text / VoiceDraft JSON import preview; JSON export preserves rich metadata; merge without overwriting existing terms | `VocabularyFile`, Dictionary controls |
-| C6 | Explicit local AGENTS.md / CLAUDE.md / Codex or Claude JSONL selection; user messages only; candidate preview before import | `ContextVocabulary` |
-| C7 | Per-take term usage counts, frequency ordering in Dictionary and provider projections | `AppVocabulary.recordUsage` |
+| C5 | UTF-8 text / VoiceDraft JSON import preview; JSON export preserves rich metadata; merge without overwriting existing terms | `VocabularyFile`, Vocabulary controls |
+| C6 | One-click discovery of local Codex / Claude memories, recent user messages and referenced project instructions; writing-model filtering and source-labelled candidate review before import | `AgentContextScanner`, `ContextVocabulary`, `ContextVocabularyFilter` |
+| C7 | Per-take term usage counts, frequency ordering in Vocabulary and provider projections | `AppVocabulary.recordUsage` |
 | D1 | Opt-in private local WAV files; playback/stop in history; no configuration sync | `LocalStore`, `LiveAudioFeed` |
 | D2 | Rerun retained audio or rewrite the original transcript with current models/style; create a new history item without auto-pasting | `AppState.reprocess` |
 | D4 | Forever, 1/7/30/90 days; expiry removes text and associated audio; confirmation before enabling deletion | Recording preferences / `pruneHistory` |
@@ -40,7 +40,7 @@ Audio retention, recent context, system mute, login items and automatic update c
 
 New UI copy supports English, Simplified Chinese and Traditional Chinese; the other existing interface languages use English for the new controls. Existing translated screens retain their localization coverage.
 
-C6 is deliberately an explicit, local file import. It does not continuously read all agent histories or send them to a model. Candidate extraction favors product/code names, acronyms and underscore identifiers; users may add other terminology using ordinary dictionary import.
+C6 automatically discovers context when the user clicks Extract; it does not open a file picker or run continuously. It reads known local Codex/Claude context paths with bounded file/byte budgets, filters conversation records to user messages, and passes at most 200 new candidate words to the selected writing model for classification. The review shows at most 40 useful terms with source labels. Existing terms, aliases and preferred spellings are excluded. Only candidate words are sent to the model; raw conversations and local paths stay local. Only checked terms are merged after confirmation. Failed filtering offers retry or explicit unfiltered review. Candidate extraction favors product/code names, acronyms, underscore identifiers and quoted terminology; ordinary vocabulary file import/export remains available.
 
 ## Provider setup
 

@@ -209,29 +209,80 @@ private struct StyleEditor: View {
     }
 }
 
-struct DictionaryFileControls: View {
+struct VocabularyFileControls: View {
     @ObservedObject var state: AppState
     @State private var candidates: [VocabularyEntry] = []
     @State private var selected: Set<UUID> = []
     @State private var showPreview = false
+    @State private var contextMode = false
+    @State private var scanning = false
+    @State private var scan: AgentContextScan?
+    @State private var sources: [String: String] = [:]
+    @State private var scanError = ""
+    @State private var filtering = false
+    @State private var filterSummary = ""
+    @State private var rawCandidates: [AgentContextCandidate] = []
+    @State private var scanAttempt = UUID()
+
     var body: some View {
         HStack {
-            Button(F("Import dictionary", "导入词库")) { importFile(context: false) }
-            Button(F("Export dictionary", "导出词库")) { exportFile() }
-            Button(F("Extract from Codex / Claude context", "从 Codex / Claude 上下文提取")) { importFile(context: true) }
+            Button(F("Import vocabulary", "导入词库")) { importFile() }
+            Button(F("Export vocabulary", "导出词库")) { exportFile() }
+            Button(F("Extract from Codex / Claude context", "从 Codex / Claude 上下文提取")) {
+                contextMode = true; scanning = true; scan = nil; scanError = ""
+                filtering = false; filterSummary = ""; rawCandidates = []; scanAttempt = UUID()
+                candidates = []; selected = []; sources = [:]; showPreview = true
+            }
         }.sheet(isPresented: $showPreview) {
             VStack(alignment: .leading, spacing: 16) {
                 Text(F("Review words to import", "选择要导入的词条")).font(.title2)
-                Text(F("Extraction runs locally. Choose AGENTS.md, CLAUDE.md or a Codex / Claude JSONL conversation file. Only selected terms are added.", "提取完全在本机进行。支持 AGENTS.md、CLAUDE.md 和 Codex / Claude 的 JSONL 对话文件。只添加勾选的词条。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(contextMode
+                     ? F("Finds local Codex and Claude context automatically, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing.", "自动查找本机 Codex 和 Claude 上下文，再将候选词交给你的写作模型筛除通用词。只发送候选词列表，最后由你勾选导入。")
+                     : F("Review the vocabulary before importing. Only selected terms are added.", "检查词库内容，只添加勾选的词条。"))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if scanning {
+                    HStack { ProgressView().controlSize(.small); Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…") : F("Finding local context…", "正在查找本机上下文…")) }
+                } else if let scan {
+                    Text(F("Context files read", "已读取上下文文件") + ": \(scan.filesRead) · " + (scan.sources.isEmpty ? "Codex / Claude" : scan.sources.map(\.rawValue).joined(separator: " / ")))
+                        .font(.caption).foregroundStyle(.secondary)
+                    if scan.limited { Text(F("Recent context was prioritized to keep the scan quick.", "已优先提取近期上下文，避免扫描时间过长。")).font(.caption).foregroundStyle(.secondary) }
+                    if scan.unreadableFiles > 0 { Text(F("Some context files could not be read", "部分上下文文件无法读取") + ": \(scan.unreadableFiles)").font(.caption).foregroundStyle(.secondary) }
+                }
+                if !filterSummary.isEmpty { Text(filterSummary).font(.caption).foregroundStyle(.secondary) }
+                if !scanError.isEmpty {
+                    Text(scanError).font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button(F("Retry filtering", "重新筛选")) { scanning = true; scanError = ""; filterSummary = ""; candidates = []; selected = []; scanAttempt = UUID() }
+                        if !rawCandidates.isEmpty {
+                            Button(F("Review unfiltered words", "查看未筛选的词条")) {
+                                present(rawCandidates)
+                                scanError = ""; filterSummary = F("Unfiltered candidates — review carefully", "未经过模型筛选，请逐项检查")
+                            }
+                        }
+                    }
+                }
                 HStack {
                     Button(F("Select all", "全选")) { selected = Set(candidates.map(\.id)) }
                     Button(F("Clear selection", "清空选择")) { selected.removeAll() }
                     Text("\(selected.count) / \(candidates.count)")
+                }.disabled(scanning || candidates.isEmpty)
+                if candidates.isEmpty {
+                    Text(scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…") : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
+                         : !scanError.isEmpty ? F("Filtering did not finish. Retry or review the unfiltered list.", "筛选未完成，可以重试或查看未筛选的词条。")
+                         : !filterSummary.isEmpty ? F("The model found no terms worth adding this time.", "这次没有筛选出值得加入词库的词条。")
+                         : scan?.filesRead == 0
+                         ? F("No readable Codex or Claude context was found in this account's home folder.", "在当前账户的用户目录中，没有找到可读取的 Codex 或 Claude 上下文。")
+                         : F("No new candidate terms were found. Existing vocabulary words are excluded.", "没有找到新的候选词，词库中已有的词条已排除。"))
+                        .foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 260)
+                } else {
+                    List(candidates) { entry in
+                        HStack {
+                            Toggle(entry.text, isOn: Binding(get: { selected.contains(entry.id) }, set: { value in if value { selected.insert(entry.id) } else { selected.remove(entry.id) } }))
+                            Spacer()
+                            if let source = sources[entry.text] { Text(source).font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }.frame(height: 260)
                 }
-                List(candidates) { entry in
-                    Toggle(entry.text, isOn: Binding(get: { selected.contains(entry.id) }, set: { value in if value { selected.insert(entry.id) } else { selected.remove(entry.id) } }))
-                }.frame(height: 300)
                 HStack {
                     Button(L("Cancel")) { showPreview = false }; Spacer()
                     Button(F("Import selected words", "导入所选词条")) {
@@ -240,24 +291,55 @@ struct DictionaryFileControls: View {
                             try VocabularyFile.merge(candidates.filter { selected.contains($0.id) }, into: &copy.vocabulary)
                             state.save(copy); if state.error.isEmpty { showPreview = false }
                         } catch { state.error = .init(error: error) }
-                    }.disabled(selected.isEmpty)
+                    }.disabled(scanning || selected.isEmpty)
                 }
             }.padding(24).frame(width: 600)
+                .task(id: scanAttempt) { await findAndFilter() }
         }
     }
-    private func importFile(context: Bool) {
+    private func findAndFilter() async {
+        guard contextMode else { return }
+        do {
+            let result = try await state.scanAgentContext()
+            try Task.checkCancellation()
+            scan = result
+            let known = Set(state.settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
+            let fresh = result.candidates.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
+            rawCandidates = fresh
+            if !fresh.isEmpty {
+                filtering = true
+                let filtered = try await state.filterAgentContext(fresh.map(\.text))
+                try Task.checkCancellation()
+                let byText = Dictionary(uniqueKeysWithValues: fresh.map { ($0.text, $0) })
+                present(filtered.terms.compactMap { byText[$0] })
+                filterSummary = F("Model selection", "模型筛选") + ": \(candidates.count) / \(fresh.count) · \(filtered.model)"
+            }
+            scanning = false; filtering = false
+        } catch is CancellationError { return }
+        catch {
+            guard !Task.isCancelled else { return }
+            scanError = error.localizedDescription; scanning = false; filtering = false
+        }
+    }
+    private func present(_ items: [AgentContextCandidate]) {
+        let known = Set(state.settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
+        let fresh = items.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
+        candidates = fresh.map { VocabularyEntry(text: $0.text) }; selected = []
+        sources = Dictionary(uniqueKeysWithValues: fresh.map { ($0.text, $0.sources.map(\.rawValue).joined(separator: " / ")) })
+    }
+    private func importFile() {
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = false; panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard size <= (context ? 5_000_000 : 20_000_000) else { throw FeatureError("The selected file is too large.") }
-            let data = try Data(contentsOf: url)
-            candidates = context ? try ContextVocabulary.candidates(data: data, filename: url.lastPathComponent).map { VocabularyEntry(text: $0) } : try VocabularyFile.entries(data)
-            selected = context ? [] : Set(candidates.map(\.id)); showPreview = true
+            guard size <= 20_000_000 else { throw FeatureError("The selected file is too large.") }
+            candidates = try VocabularyFile.entries(Data(contentsOf: url))
+            contextMode = false; scanning = false; filtering = false; filterSummary = ""; scan = nil; scanError = ""; sources = [:]
+            selected = Set(candidates.map(\.id)); showPreview = true
         } catch { state.error = .init(error: error) }
     }
     private func exportFile() {
-        let panel = NSSavePanel(); panel.nameFieldStringValue = "VoiceDraft-dictionary.json"; panel.allowedContentTypes = [.json]
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "VoiceDraft-vocabulary.json"; panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try VocabularyFile.export(state.settings.vocabulary).write(to: url, options: .atomic) }
         catch { state.error = .init(error: error) }

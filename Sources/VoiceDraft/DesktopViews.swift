@@ -27,7 +27,7 @@ struct DesktopRootView: View {
                             Group {
                                 switch settingsOpen ? returnPage : state.page {
                                 case "History": DesktopHistoryView(state: state)
-                                case "Vocabulary": DesktopDictionaryView(state: state)
+                                case "Vocabulary": DesktopVocabularyView(state: state)
                                 case "Models": ModelsView(state: state)
                                 case "Sync": SyncView(state: state)
                                 default: DesktopHomeView(state: state)
@@ -76,7 +76,7 @@ struct DesktopRootView: View {
             VStack(spacing: 5) {
                 navigation("Studio", title: D("Home"), icon: "house")
                 navigation("History", title: L("History"), icon: "clock.arrow.circlepath")
-                navigation("Vocabulary", title: D("Dictionary"), icon: "book.closed")
+                navigation("Vocabulary", title: D("Vocabulary"), icon: "book.closed")
             }
             Spacer(minLength: 20)
             VStack(alignment: .leading, spacing: 13) {
@@ -260,7 +260,7 @@ private struct FilterPills: View {
     }
 }
 
-private struct DesktopDictionaryView: View {
+private struct DesktopVocabularyView: View {
     @ObservedObject var state: AppState
     @State private var query = ""
     @State private var filter = 0
@@ -283,14 +283,14 @@ private struct DesktopDictionaryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                DesktopTitle(title: D("Dictionary"))
+                DesktopTitle(title: D("Vocabulary"))
                 Spacer()
                 Button { editing = VocabularyEntry() } label: {
                     Text(D("New word")).font(.system(size: 14, weight: .medium)).padding(.horizontal, 20).padding(.vertical, 12)
                         .foregroundStyle(.white).background(DesktopTheme.ink, in: Capsule())
                 }.buttonStyle(.plain)
             }
-            DictionaryFileControls(state: state)
+            VocabularyFileControls(state: state)
             HStack(spacing: 16) {
                 FilterPills(labels: [D("All"), D("Auto-added"), D("Manually-added")], selection: $filter)
                 Spacer()

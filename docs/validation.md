@@ -1,5 +1,12 @@
 # Validation record
 
+## 2026-10-14 · Fn system-action conflict
+
+- Confirmed the existing active event tap already consumes Fn press/release. The Mac's native Keyboard settings still showed **Press Globe key to → Change Input Source**; changed it through System Settings to **Do Nothing** and verified the displayed value plus `AppleFnUsageType = 0`. This is a persistent system-wide preference, not an app-lifetime interception or automatic restore.
+- Added read-only conflict guidance for enabled Fn bindings to Home, Shortcuts and the final onboarding page. Missing preferences require a check rather than being assumed disabled. The cancellable mounted view refreshes every second; preview does not read OS settings. The native settings link applies the change through macOS instead of relying on a preferences write that may require login to take effect.
+- Final `./scripts/test-all.sh` passed **140 Swift tests, zero failures/skips**, Go vet/build/race checks, local synthetic integrations and both localization checks. Release packaging and strict/deep signing passed. Native UI validation caught and fixed a first-display lifecycle issue: a task on an empty SwiftUI Group did not start. The final installed Shortcuts page visibly shows **Fn system action is off**, and **Open Keyboard Settings** opens the Keyboard pane. Home has no conflict banner with the system action disabled. No automated microphone capture, real model request or synthetic global Fn press was performed; physical Fn/input-source behavior remains a user acceptance check.
+- Installed and launched **0.2.7 (build 9)** in `/Applications/VoiceDraft.app`, personally signed with Team `G5G46WU2P2`. Installed/package executable SHA-256: `dc95f35f11c5ed01c47c1325935721012cda57f71d2dbeb11e1c08b5b03823e9`; CDHash: `b7afc323cbdbc41649b0a8f5ce26fd66d13e11bb`. Retained 0.2.6 at `.local/install-backups/VoiceDraft-0.2.6-before-fn-conflict.app`. Waited for active recording to finish; before the final restart verified both editor texts against the saved history entry. Existing vocabulary, models and history were preserved.
+
 ## 2026-10-14 · Preserve mixed languages during Polish
 
 - The user-supplied history screenshot shows an English opening/conjunction in the original transcript replaced with Chinese in the Polish result. The request previously had a general mixed-language preservation sentence, but its shared cleanup examples also mentioned the Translate workflow. This identifies an insufficient mode contract, not proof of which instruction caused the model's choice.

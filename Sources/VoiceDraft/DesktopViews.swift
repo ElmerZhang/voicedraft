@@ -172,6 +172,7 @@ private struct DesktopHomeView: View {
         VStack(alignment: .leading, spacing: 28) {
             Text(D("Speak, don't type.")).font(.system(size: 48, weight: .bold)).tracking(-1.8)
                 .minimumScaleFactor(0.8).lineLimit(1)
+            FnShortcutStatus(state: state)
             HStack(alignment: .top, spacing: 22) {
                 VStack(spacing: 0) {
                     shortcut(.polish, title: D("Dictate"), detail: D("Messy thoughts → clear writing"), key: "Space")

@@ -23,6 +23,47 @@ extension ShortcutAction {
     }
 }
 
+struct FnShortcutStatus: View {
+    @ObservedObject var state: AppState
+    var showReady = false
+    @State private var systemActionDisabled: Bool?
+    private var usesFn: Bool { state.device.features.shortcuts.contains { $0.enabled && $0.keyCode == 63 } }
+
+    var body: some View {
+        // Keep a mounted container while the first preference read is pending.
+        // A task on an empty Group has no rendered child on which to start.
+        VStack(alignment: .leading, spacing: 0) {
+            if usesFn, let systemActionDisabled, showReady || !systemActionDisabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(systemActionDisabled
+                          ? F("Fn system action is off", "Fn 系统动作已关闭")
+                          : F("Check the macOS Fn action", "检查 macOS 的 Fn 系统动作"),
+                          systemImage: systemActionDisabled ? "checkmark.circle" : "exclamationmark.triangle")
+                        .font(.callout.weight(.semibold))
+                    if !systemActionDisabled {
+                        Text(F("In System Settings → Keyboard, set ‘Press Fn (🌐) key to’ to ‘Do Nothing’ so recording does not also switch input sources, open emoji or start Dictation. This is a system-wide setting and stays in effect after VoiceDraft quits.", "在系统设置 → 键盘中，将“按 Fn（🌐）键”设为“不执行任何操作”，避免录音时同时切换输入法、打开表情或启动系统听写。这是系统级设置，退出 VoiceDraft 后也会保留。"))
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button(F("Open Keyboard Settings", "打开键盘设置")) {
+                        guard !state.preview, let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") else { return }
+                        NSWorkspace.shared.open(url)
+                    }
+                }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .task(id: usesFn) {
+            systemActionDisabled = nil
+            guard usesFn, !state.preview else { return }
+            repeat {
+                systemActionDisabled = FnSystemAction.isDisabled()
+                do { try await Task.sleep(nanoseconds: 1_000_000_000) }
+                catch { return }
+            } while !Task.isCancelled
+        }
+    }
+}
+
 struct ShortcutPreferences: View {
     @ObservedObject var state: AppState
     @State private var capturing: ShortcutAction?
@@ -43,6 +84,7 @@ struct ShortcutPreferences: View {
             Button(F("Restore default shortcuts", "恢复默认快捷键")) {
                 end(); var options = state.device.features; options.shortcuts = ShortcutBinding.defaults; state.saveFeatures(options)
             }
+            FnShortcutStatus(state: state, showReady: true)
         }.disabled(state.busy).onDisappear { end() }
     }
     private func change(_ binding: ShortcutBinding, update: (inout ShortcutBinding) -> Void) {
@@ -477,6 +519,7 @@ struct OnboardingView: View {
                 Text(F("Ready to try", "开始试用")).font(.title2)
                 Text(state.shortcutLabel(.dictate)).font(.title.monospaced())
                 Text(F("Hold to speak, release to finish. Tap to lock recording and tap again to finish. Recordings can last up to 10 minutes. Try a short sentence in the home editor first.", "按住说话，松开结束；轻按锁定录音，再按一次结束。最长支持 10 分钟。先回到首页试说一句短句吧。"))
+                FnShortcutStatus(state: state, showReady: true)
             }
         }.fixedSize(horizontal: false, vertical: true)
     }

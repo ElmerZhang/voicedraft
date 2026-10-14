@@ -36,8 +36,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
 PLIST
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VOICEDRAFT_VERSION:-0.2.6}" "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VOICEDRAFT_BUILD:-8}" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VOICEDRAFT_VERSION:-0.2.7}" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VOICEDRAFT_BUILD:-9}" "$APP/Contents/Info.plist"
 codesign --force --sign "${VOICEDRAFT_CODESIGN_IDENTITY:--}" "$APP"
 codesign --verify --deep --strict "$APP"
 plutil -lint "$APP/Contents/Info.plist"

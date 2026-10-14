@@ -110,11 +110,12 @@ final class AppState: ObservableObject {
         }
     }
 
-    func filterAgentContext(_ candidates: [String]) async throws -> (terms: [String], model: String) {
+    func filterAgentContext(_ candidates: [AgentContextCandidate]) async throws -> (terms: [String], model: String) {
         guard !preview else { return ([], "Preview") }
         guard let profile = settings.writing else { throw FeatureError("Choose a writing model in Models to filter vocabulary.") }
         let credential = try key(for: profile)
-        let terms = try await ContextVocabularyFilter.filter(candidates: candidates, profile: profile, key: credential)
+        let terms = try await ContextVocabularyFilter.filter(candidates: candidates.map(\.text), profile: profile, key: credential,
+            projectNames: Set(candidates.filter(\.isProject).map(\.text)))
         try Task.checkCancellation()
         return (terms, profile.name)
     }

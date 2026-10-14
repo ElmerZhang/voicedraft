@@ -308,7 +308,7 @@ struct VocabularyFileControls: View {
             rawCandidates = fresh
             if !fresh.isEmpty {
                 filtering = true
-                let filtered = try await state.filterAgentContext(fresh.map(\.text))
+                let filtered = try await state.filterAgentContext(fresh)
                 try Task.checkCancellation()
                 let byText = Dictionary(uniqueKeysWithValues: fresh.map { ($0.text, $0) })
                 present(filtered.terms.compactMap { byText[$0] })
@@ -325,7 +325,9 @@ struct VocabularyFileControls: View {
         let known = Set(state.settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
         let fresh = items.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
         candidates = fresh.map { VocabularyEntry(text: $0.text) }; selected = []
-        sources = Dictionary(uniqueKeysWithValues: fresh.map { ($0.text, $0.sources.map(\.rawValue).joined(separator: " / ")) })
+        sources = Dictionary(uniqueKeysWithValues: fresh.map {
+            ($0.text, ($0.isProject ? F("Project", "项目") + " · " : "") + $0.sources.map(\.rawValue).joined(separator: " / "))
+        })
     }
     private func importFile() {
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = false; panel.canChooseDirectories = false
@@ -349,31 +351,45 @@ struct VocabularyFileControls: View {
 struct OnboardingView: View {
     @ObservedObject var state: AppState
     @State private var step = 0
+    @State private var vocabulary: DomainVocabularySelection
+    @State private var saveFailed = false
     @State private var mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var accessibilityAllowed = false
 
-    init(state: AppState, initialStep: Int = 0) {
+    init(state: AppState, initialStep: Int = 0, initialDomains: Set<VocabularyDomain> = []) {
         self.state = state
         _step = State(initialValue: initialStep)
+        _vocabulary = State(initialValue: DomainVocabularySelection(domains: initialDomains))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(F("Welcome to VoiceDraft", "欢迎使用 VoiceDraft")).font(.largeTitle.bold())
-            Text("\(step + 1) / 3").foregroundStyle(.secondary)
+            Text("\(step + 1) / 4").foregroundStyle(.secondary)
             ScrollView {
                 stepContent
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.trailing, 8)
                     .padding(.vertical, 4)
             }
+            if saveFailed { Text(L(state.error)).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
             Divider()
             HStack {
                 Button(F("Set up later", "稍后设置")) { state.completeOnboarding() }
                 Spacer()
                 if step > 0 { Button(F("Back", "上一步")) { step -= 1 } }
-                Button(step == 2 ? F("Start using VoiceDraft", "开始使用") : F("Next", "下一步")) {
-                    if step == 2 { state.completeOnboarding(); state.page = "Studio" } else { step += 1 }
+                Button(nextTitle) {
+                    if step == 0 && !vocabulary.additions(to: state.settings.vocabulary).isEmpty {
+                        do {
+                            var copy = state.settings
+                            try vocabulary.merge(into: &copy.vocabulary)
+                            state.save(copy)
+                            saveFailed = !state.error.isEmpty
+                        } catch { state.error = .init(error: error); saveFailed = true }
+                        guard !saveFailed else { return }
+                    }
+                    saveFailed = false
+                    if step == 3 { state.completeOnboarding(); state.page = "Studio" } else { step += 1 }
                 }.buttonStyle(.borderedProminent)
             }
         }.padding(30).frame(width: 740, height: 620)
@@ -389,13 +405,64 @@ struct OnboardingView: View {
         }
     }
 
+    private var nextTitle: String {
+        if step == 3 { return F("Start using VoiceDraft", "开始使用") }
+        let count = vocabulary.additions(to: state.settings.vocabulary).count
+        return step == 0 && count > 0 ? F("Add \(count) words and continue", "添加 \(count) 个词并继续") : F("Next", "下一步")
+    }
+
+    private func domainTitle(_ domain: VocabularyDomain) -> String {
+        switch domain {
+        case .artificialIntelligence: return F("AI & machine learning", "AI 与机器学习")
+        case .software: return F("Software development", "软件开发")
+        case .design: return F("Product & design", "产品与设计")
+        case .data: return F("Data & analytics", "数据与分析")
+        case .hardware: return F("Hardware & engineering", "硬件与工程")
+        case .research: return F("Education & research", "教育与科研")
+        }
+    }
+
+    private var domainContent: some View {
+        let known = DomainVocabularySelection.knownTerms(in: state.settings.vocabulary)
+        return VStack(alignment: .leading, spacing: 16) {
+            Text(F("What fields do you work in?", "你从事哪些领域？")).font(.title2)
+            Text(F("Choose any that fit, or continue without choosing. Review a few specialist names to help recognize your first dictations.", "可以多选，也可以直接跳过。先选一些常用的专业名称，帮助识别最初几次输入。"))
+                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
+                ForEach(VocabularyDomain.allCases) { domain in
+                    Toggle(domainTitle(domain), isOn: Binding(get: { vocabulary.domains.contains(domain) }, set: {
+                        if $0 { vocabulary.domains.insert(domain) } else { vocabulary.domains.remove(domain) }
+                    })).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            if !vocabulary.terms.isEmpty {
+                Divider()
+                Text(F("Your starter vocabulary", "你的初始词库")).font(.headline)
+                Text(F("Uncheck words you do not need. Existing words keep their settings. You can edit these later in Vocabulary.", "取消不需要的词。已有词条会保留原来的设置，之后也可以在词库中修改。"))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
+                    ForEach(vocabulary.terms, id: \.self) { term in
+                        let existing = known.contains(AppVocabulary.automaticTermKey(term))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Toggle(term, isOn: Binding(get: { existing || vocabulary.isSelected(term) }, set: { vocabulary.select(term, enabled: $0) }))
+                                .disabled(existing)
+                            if existing { Text(F("Already in vocabulary", "词库中已有")).font(.caption2).foregroundStyle(.secondary) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
     private var stepContent: some View {
         VStack(alignment: .leading, spacing: 22) {
             if step == 0 {
+                domainContent
+            } else if step == 1 {
                 Text(F("Connect your speech and writing models", "连接你的语音与写作模型")).font(.title2)
                 Text(F("Model calls go directly to your chosen provider. Keys are saved in Keychain. You can add Qwen, Doubao, Whisper-compatible or Google speech, and choose a writing protocol in Models.", "模型调用直接发送给你选择的服务商，密钥保存在钥匙串中。你可以在模型设置中添加 Qwen、豆包、Whisper 兼容服务或 Google Speech，并选择写作接口。"))
                 ModelsView(state: state, showsHeading: false)
-            } else if step == 1 {
+            } else if step == 2 {
                 Text(F("Microphone and text insertion", "麦克风与文字插入")).font(.title2)
                 Button(mic ? F("Microphone allowed", "已允许麦克风") : F("Allow microphone", "允许麦克风")) {
                     guard !state.preview else { return }

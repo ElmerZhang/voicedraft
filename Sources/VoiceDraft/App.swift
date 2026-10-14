@@ -159,8 +159,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for step in 0..<3 {
-                    let view = NSHostingView(rootView: OnboardingView(state: state, initialStep: step)
+                for step in 0..<4 {
+                    let view = NSHostingView(rootView: OnboardingView(state: state, initialStep: step, initialDomains: [.artificialIntelligence, .software])
                         .background(Color(nsColor: .windowBackgroundColor)))
                     window.contentView = view
                     window.setContentSize(NSSize(width: 740, height: 620))
@@ -171,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent("onboarding-\(step + 1).png"))
                 }
-                print("Rendered three isolated onboarding steps with synthetic authorized permissions.")
+                print("Rendered four isolated onboarding steps with synthetic authorized permissions.")
             } catch { fputs("Onboarding preview failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

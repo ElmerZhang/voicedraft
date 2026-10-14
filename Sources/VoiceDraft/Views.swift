@@ -2,110 +2,6 @@ import SwiftUI
 import AppKit
 import VoiceDraftCore
 
-private let ink = Color(red: 0.10, green: 0.10, blue: 0.11)
-private let accent = Color(red: 0.15, green: 0.34, blue: 0.96)
-private let paper = Color.white
-
-struct RootView: View {
-    @Environment(\.locale) private var interfaceLocale
-    @ObservedObject var state: AppState
-    private let pages = [("Studio", "waveform"), ("Models", "cpu"), ("Vocabulary", "text.book.closed"),
-                         ("Sync", "arrow.triangle.2.circlepath"), ("History", "clock.arrow.circlepath")]
-    var body: some View {
-        let _ = interfaceLocale
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 28) {
-                HStack(spacing: 10) {
-                    Image(systemName: "waveform").font(.title2.bold()).foregroundStyle(accent)
-                    Text("VoiceDraft").font(.title3.weight(.semibold))
-                }.padding(.top, 24)
-                Text(L("THINK OUT LOUD")).font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
-                VStack(spacing: 7) {
-                    ForEach(pages, id: \.0) { title, icon in
-                        Button { state.page = title } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: icon).frame(width: 20)
-                                Text(L10n.text(title)).font(.system(size: 14, weight: state.page == title ? .semibold : .regular))
-                                Spacer()
-                            }.padding(12).foregroundStyle(state.page == title ? .white : ink)
-                                .background(state.page == title ? accent : .clear, in: RoundedRectangle(cornerRadius: 10))
-                        }.buttonStyle(.plain)
-                    }
-                }
-                Spacer()
-                VStack(alignment: .leading, spacing: 9) {
-                    Label(L("Your models. Your words."), systemImage: "lock.shield").font(.system(size: 11, weight: .medium))
-                    Text(F("Your models\nEncrypted configuration sync", "自选模型\n加密配置同步"))
-                        .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L("Interface language")).font(.caption).foregroundStyle(.secondary)
-                    Picker(L("Interface language"), selection: Binding(get: { state.interfaceLanguage }, set: { state.setLanguage($0) })) {
-                        ForEach(AppLanguage.allCases) { language in Text(language.title).tag(language) }
-                    }.labelsHidden().disabled(state.busy)
-                }
-                Divider()
-                Text(L("MAC PREVIEW  ·  0.1.0")).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-            }.padding(22).frame(width: 220).background(Color(red: 0.93, green: 0.94, blue: 0.90))
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(L10n.text(state.page).uppercased()).font(.system(size: 11, weight: .medium, design: .monospaced)).tracking(2)
-                    Spacer()
-                    Circle().fill(state.busy ? Color.orange : accent).frame(width: 7, height: 7)
-                    Text(state.busy ? L("In progress") : L("On your terms")).font(.system(size: 12)).foregroundStyle(.secondary)
-                }.padding(.horizontal, 32).padding(.top, 24).padding(.bottom, 20)
-                if !state.error.isEmpty {
-                    HStack(alignment: .top) {
-                        Image(systemName: "exclamationmark.circle")
-                        Text(L(state.error)).textSelection(.enabled)
-                        Spacer()
-                        Button { state.error = "" } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
-                    }.font(.callout).padding(14).foregroundStyle(Color(red: 0.55, green: 0.20, blue: 0.12))
-                        .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 10)).padding(.horizontal, 32).padding(.bottom, 12)
-                }
-                ScrollView {
-                    Group {
-                        switch state.page {
-                        case "Models": ModelsView(state: state)
-                        case "Vocabulary": VocabularyView(state: state)
-                        case "Sync": SyncView(state: state)
-                        case "History": HistoryView(state: state)
-                        default: StudioView(state: state)
-                        }
-                    }.padding(.horizontal, 32).padding(.bottom, 32).frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if !state.notice.isEmpty {
-                    Text(L(state.notice)).font(.caption).foregroundStyle(accent).padding(.horizontal, 32).padding(.bottom, 10)
-                }
-            }.background(paper)
-        }.environment(\.locale, L10n.locale).frame(minWidth: 940, minHeight: 700).foregroundStyle(ink).tint(accent).preferredColorScheme(.light)
-    }
-}
-
-private struct PageHeading: View {
-    @Environment(\.locale) private var interfaceLocale
-    let title: String
-    let detail: String
-    var body: some View {
-        let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.text(title)).font(.system(size: 34, weight: .bold))
-            Text(detail).font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(4)
-        }.padding(.bottom, 24)
-    }
-}
-
-private struct Card<Content: View>: View {
-    @Environment(\.locale) private var interfaceLocale
-    @ViewBuilder var content: Content
-    var body: some View {
-        let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 16) { content }.padding(22).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(ink.opacity(0.08)))
-    }
-}
-
 struct StudioView: View {
     var showsHeading = true
     @Environment(\.locale) private var interfaceLocale
@@ -259,7 +155,7 @@ struct ModelsView: View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: VD.Space.xl) {
             if showsHeading {
-                PageHeading(title: L("Choose how you think."), detail: F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
+                VDPageHeader(L("Choose how you think."), subtitle: F("Choose speech and writing services using your own credentials.", "使用自己的凭证，独立选择语音识别与写作服务。"))
             }
             ForEach(ModelRole.allCases) { role in
                 let profiles = state.settings.profiles.filter { $0.role == role }
@@ -505,109 +401,24 @@ struct VocabularyProjectionView: View {
                     Text(L("This model has no supported vocabulary adapter."))
                 }
                 if projection.omitted > 0 {
-                    Text(L("\(projection.omitted) terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged.")).foregroundStyle(.orange)
+                    Text(L("\(projection.omitted) terms exceed this adapter's length or count limits and will be omitted. The app vocabulary is unchanged.")).foregroundStyle(VD.Palette.warning)
                 }
                 if projection.shadowedAutomatic > 0 {
                     Text(F("\(projection.shadowedAutomatic) automatic terms are superseded by your manual spellings.", "\(projection.shadowedAutomatic) 个自动词条已由你的手动拼写覆盖。"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if projection.downgradedPriority > 0 {
-                    Text(L("\(projection.downgradedPriority) priority terms will use regular weight 5 because this model's priority limit is 50.")).foregroundStyle(.orange)
+                    Text(L("\(projection.downgradedPriority) priority terms will use regular weight 5 because this model's priority limit is 50.")).foregroundStyle(VD.Palette.warning)
                 }
                 if projection.hasUnsupportedMetadata {
                     Text(L("Language tags, aliases, preferred spelling, and pronunciation are retained in the app vocabulary. This ASR adapter sends only terms and supported weights."))
                 }
             }
             if !vocabulary.legacyReferences.isEmpty {
-                Text(L("A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them.")).foregroundStyle(.orange)
+                Text(L("A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them.")).foregroundStyle(VD.Palette.warning)
             }
         }.font(.caption).foregroundStyle(.secondary)
     }
-}
-
-struct VocabularyView: View {
-    @Environment(\.locale) private var interfaceLocale
-    @ObservedObject var state: AppState
-    @State private var vocabulary = AppVocabulary()
-    @State private var style = ""
-    @State private var language = ""
-    @State private var words = ""
-    @State private var query = ""
-    @State private var editing: VocabularyEntry?
-    @State private var loaded = false
-    var body: some View {
-        let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 18) {
-            PageHeading(title: L("Sounds like you."), detail: L("One app vocabulary for every model. Keep rich term data here; each adapter sends the fields it supports."))
-            Card {
-                Toggle(L("Enable app vocabulary"), isOn: $vocabulary.enabled).font(.headline)
-                Toggle(D("Learn from corrections"), isOn: $vocabulary.learnFromCorrections)
-                Toggle(D("Discover words from dictation"), isOn: $vocabulary.discoverFromDictation)
-                Text(L("Strength, priority, language, aliases, spelling, and pronunciation belong to the app. Unsupported fields remain saved when you switch models.")).font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    SingleLineField(L("Search vocabulary"), text: $query)
-                    Button(L("Add term")) { editing = VocabularyEntry() }
-                }
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach($vocabulary.entries) { $entry in
-                        if query.isEmpty || entry.text.localizedCaseInsensitiveContains(query) {
-                            HStack {
-                                Toggle(entry.text, isOn: $entry.enabled)
-                                Spacer()
-                                if entry.priority { Image(systemName: "star.fill").foregroundStyle(.orange).help(L("Priority term")) }
-                                Text(L("Strength \(entry.boost)")).font(.caption).foregroundStyle(.secondary)
-                                Button(L("Edit")) { editing = entry }
-                                Button(role: .destructive) { vocabulary.removeEntry(entry.id) } label: {
-                                    Image(systemName: "trash")
-                                }.help(L("Delete term"))
-                            }
-                        }
-                    }
-                }
-                if vocabulary.entries.isEmpty { Text(L("Add names, products, or phrases you often say.")).foregroundStyle(.secondary) }
-                DisclosureGroup(L("Add several terms")) {
-                    VStack(alignment: .leading) {
-                        Text(L("One word or phrase per line. Existing terms are kept.")).font(.caption)
-                        TextEditor(text: $words).frame(height: 90)
-                        Button(L("Add to vocabulary")) { vocabulary.appendLines(words); words = "" }
-                    }
-                }
-                Text(L("Save preferences below to apply your changes.")).font(.caption).foregroundStyle(.secondary)
-            }
-            if let speech = state.settings.speech { Card { VocabularyProjectionView(vocabulary: vocabulary, profile: speech) } }
-            if !vocabulary.legacyReferences.isEmpty {
-                Card {
-                    Text(L("Previous remote vocabularies")).font(.headline)
-                    Text(L("These references are kept for recovery. Their contents are not sent until you import the terms here.")).font(.caption)
-                    ForEach(vocabulary.legacyReferences.indices, id: \.self) { index in
-                        let reference = vocabulary.legacyReferences[index]
-                        Text("\(reference.model) · \(reference.resourceID)").textSelection(.enabled)
-                    }
-                }
-            }
-            Card {
-                Text(L("Your writing style")).font(.headline)
-                TextEditor(text: $style).font(.body).frame(height: 85).scrollContentBackground(.hidden)
-                SingleLineField(L("Translation target language"), text: $language)
-            }
-            HStack {
-                Text(L("Vocabulary and preferences are included in encrypted sync.")).font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button(L("Save preferences")) {
-                    var copy = state.settings; copy.vocabulary = vocabulary; copy.stylePrompt = style; copy.targetLanguage = language
-                    state.save(copy)
-                }.buttonStyle(.borderedProminent)
-            }
-        }.onAppear { if !loaded { load(); loaded = true } }
-            .onChange(of: state.settings) { _ in load() }
-            .sheet(item: $editing) { entry in
-                VocabularyEntryEditor(entry: entry) { value in
-                    if let index = vocabulary.entries.firstIndex(where: { $0.id == value.id }) { vocabulary.entries[index] = value }
-                    else { vocabulary.entries.append(value) }
-                }
-            }
-    }
-    private func load() { vocabulary = state.settings.vocabulary; style = state.settings.stylePrompt; language = state.settings.targetLanguage }
 }
 
 struct VocabularyEntryEditor: View {
@@ -680,7 +491,7 @@ struct SyncView: View {
         let _ = interfaceLocale
         VStack(alignment: .leading, spacing: VD.Space.l) {
             if showsHeading {
-                PageHeading(title: L("One setup. Every device."), detail: L("Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase."))
+                VDPageHeader(L("One setup. Every device."), subtitle: L("Your models, API keys, vocabulary, and writing preferences travel together. Only you hold the decryption passphrase."))
             }
             VDSurface {
                 field(L("Sync server URL")) { SingleLineField(L("Sync server URL"), text: $url, placeholder: "https://") }
@@ -740,52 +551,5 @@ struct SyncView: View {
         if state.device.serverURL.isEmpty || key == "Not connected" { return Color.secondary }
         if key.hasPrefix("Synced") || key.hasPrefix("Connection saved") { return VD.Palette.success }
         return VD.Palette.warning
-    }
-}
-
-struct HistoryView: View {
-    @Environment(\.locale) private var interfaceLocale
-    @ObservedObject var state: AppState
-    @State private var query = ""
-    @State private var confirmClear = false
-    private var entries: [HistoryEntry] {
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return state.history.filter { term.isEmpty || $0.result.localizedCaseInsensitiveContains(term) || $0.original.localizedCaseInsensitiveContains(term) }
-    }
-    var body: some View {
-        let _ = interfaceLocale
-        VStack(alignment: .leading, spacing: 18) {
-            PageHeading(title: L("A thought worth keeping."), detail: F("History and optional recordings, saved only on this Mac.", "历史与可选保留的录音，只存储在本机。"))
-            HStack {
-                SingleLineField(L("Search your words"), text: $query)
-                Button(L("Clear history…"), role: .destructive) { confirmClear = true }.disabled(state.history.isEmpty)
-            }
-            Toggle(L("Save future transcripts on this Mac"), isOn: Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) }))
-            if entries.isEmpty {
-                Card {
-                    Image(systemName: "text.alignleft").font(.largeTitle).foregroundStyle(accent.opacity(0.5))
-                    Text(L("Your words will find a home here.")).font(.headline)
-                    Text(L("Record your first thought in Studio, or use the shortcut in any app.")).font(.callout).foregroundStyle(.secondary)
-                }.padding(.top, 20)
-            }
-            ForEach(entries) { entry in
-                Card {
-                    HStack {
-                        Label(entry.mode.title, systemImage: entry.mode.icon).font(.caption.weight(.semibold)).foregroundStyle(accent)
-                        Text("· \(entry.application)").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Text(entry.date.formatted(.dateTime.year().month(.abbreviated).day().hour().minute().locale(L10n.locale))).font(.caption).foregroundStyle(.secondary)
-                        Button { state.copyResult(entry.result) } label: { Image(systemName: "doc.on.doc") }.help(L("Copy"))
-                        Button(role: .destructive) { state.deleteHistory(entry.id) } label: { Image(systemName: "trash") }.help(L("Delete history entry"))
-                    }
-                    Text(entry.result).font(.body).textSelection(.enabled).lineSpacing(4)
-                    if entry.original != entry.result {
-                        DisclosureGroup(L("Original transcript")) { Text(entry.original).font(.caption).textSelection(.enabled) }.font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }.confirmationDialog(L("Delete all local history?"), isPresented: $confirmClear, titleVisibility: .visible) {
-            Button(L("Delete history"), role: .destructive) { state.deleteHistory() }
-        }
     }
 }

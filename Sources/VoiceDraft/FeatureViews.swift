@@ -520,7 +520,7 @@ struct OnboardingView: View {
                     if step == 3 { state.completeOnboarding(); state.page = "Studio" } else { step += 1 }
                 }.buttonStyle(.borderedProminent)
             }
-        }.padding(VD.Space.xxl).frame(width: 740, height: 620).background(VD.Palette.canvas)
+        }.padding(VD.Space.xxl).frame(width: 740, height: 620).background(VD.Palette.canvas).tint(VD.Palette.accent)
         .task {
             // macOS has no Accessibility authorization-change notification. Keep
             // this sheet current even while System Settings is still frontmost.

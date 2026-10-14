@@ -22,6 +22,7 @@ enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWitho
 
 @MainActor
 enum TextInsertion {
+    private static var delivering = false
     static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
@@ -31,7 +32,16 @@ enum TextInsertion {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
         let root = AXUIElementCreateApplication(app.processIdentifier)
-        let focused = uiElement(attribute(root, kAXFocusedUIElementAttribute))
+        AXUIElementSetMessagingTimeout(root, 0.1)
+        let rawFocus = uiElement(attribute(root, kAXFocusedUIElementAttribute))
+        let focused = rawFocus.flatMap {
+            FocusedInputResolver.focusedTarget(from: $0, capabilities: capabilities,
+                nestedFocus: { uiElement(attribute($0, kAXFocusedUIElementAttribute)) },
+                children: { children($0) },
+                isFocused: { attribute($0, kAXFocusedAttribute) as? Bool == true },
+                equals: { CFEqual($0, $1) })
+        }
+        guard rawFocus == nil || focused != nil else { return nil }
         let window = uiElement(attribute(root, kAXFocusedWindowAttribute))
         let editor = focused.flatMap {
             FocusedInputResolver.resolve(from: $0, capabilities: capabilities,
@@ -40,20 +50,33 @@ enum TextInsertion {
         // Warp's TTY surface does not consistently expose an AX text editor.
         // This is a narrow compatibility path: no browser/app-wide fallback,
         // no dialogs/buttons, and the window + exposed surface must stay focused.
+        let standardWindow = window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole
+        let modalWindow = window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true
         let terminalSurface = KeyboardSurfacePolicy.accepts(bundleIdentifier: app.bundleIdentifier,
             focused: focused.map(capabilities), editor: editor.map(capabilities),
-            standardWindow: window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole,
-            modalWindow: window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true)
-        let opaqueApplication = KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: app.bundleIdentifier,
+            standardWindow: standardWindow, modalWindow: modalWindow)
+        let candidate = editor ?? focused
+        let paste = !terminalSurface && (candidate.map { capabilities($0).capability == .opaque }
+            ?? (rawFocus == nil && app.bundleIdentifier == "com.tencent.xinWeChat"))
+            ? nativePasteAvailability(root) : (present: false, enabled: false)
+        let hasSelection = !(candidate.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? "").isEmpty
+            || (candidate.flatMap(selectedRange)?.length ?? 0) > 0
+        let genericOpaque = !hasSelection && KeyboardSurfacePolicy.acceptsOpaque(focused: candidate.map(capabilities),
+            standardWindow: standardWindow, modalWindow: modalWindow, pasteEnabled: paste.enabled)
+        let weChatOpaque = KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: app.bundleIdentifier,
             focused: focused.map(capabilities), editor: editor.map(capabilities),
-            standardWindow: window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole,
-            modalWindow: window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true,
+            standardWindow: standardWindow, modalWindow: modalWindow,
             windowTitle: window.flatMap { attribute($0, kAXTitleAttribute) as? String },
-            pasteAvailable: app.bundleIdentifier == "com.tencent.xinWeChat" && editor == nil && nativePasteAvailable(root))
+            pasteAvailable: paste.present)
+        let opaqueApplication = !terminalSurface && (genericOpaque || weChatOpaque)
         let element = editor ?? focused
         let range = element.flatMap(selectedRange)
         let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
         let secure = element.flatMap { attribute($0, kAXSubroleAttribute) as? String } == "AXSecureTextField"
+        // Focus can change while a remote AX provider answers traversal/menu reads.
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
+              sameElement(rawFocus, uiElement(attribute(root, kAXFocusedUIElementAttribute))),
+              sameElement(window, uiElement(attribute(root, kAXFocusedWindowAttribute))) else { return nil }
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
                            element: element, window: window, range: range, selection: selection,
                            value: terminalSurface ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,
@@ -62,32 +85,40 @@ enum TextInsertion {
                            opaqueApplication: opaqueApplication,
                            focusGuard: opaqueApplication && trackOpaqueFocus ? OpaqueInputFocusGuard(ignoring: shortcuts) : nil)
     }
-    private static func nativePasteAvailable(_ root: AXUIElement) -> Bool {
-        guard let menuBar = uiElement(attribute(root, kAXMenuBarAttribute)) else { return false }
+    private static func nativePasteAvailability(_ root: AXUIElement) -> (present: Bool, enabled: Bool) {
+        guard let menuBar = uiElement(attribute(root, kAXMenuBarAttribute)) else { return (false, false) }
         var level = [menuBar], remaining = 160
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.5
         // Menu bar → top-level item → menu → command. No chat-tree traversal.
         for _ in 0..<4 {
             var next: [AXUIElement] = []
             for item in level {
                 remaining -= 1
-                guard remaining >= 0 else { return false }
+                guard remaining >= 0, ProcessInfo.processInfo.systemUptime < deadline else { return (false, false) }
                 let command = attribute(item, kAXMenuItemCmdCharAttribute) as? String
                 let identifier = attribute(item, kAXIdentifierAttribute) as? String
                 let modifiers = (attribute(item, kAXMenuItemCmdModifiersAttribute) as? NSNumber)?.intValue
                 if (command?.lowercased() == "v" && modifiers == 0) || identifier == "paste:" {
                     // Enabled depends on the old clipboard contents, not just focus.
                     // The dictation supplies its own text immediately before pasting.
-                    return true
+                    return (true, attribute(item, kAXEnabledAttribute) as? Bool == true)
                 }
-                next += (attribute(item, kAXChildrenAttribute) as? [AXUIElement]) ?? []
+                next += children(item).prefix(max(0, remaining - next.count))
             }
             level = next
         }
-        return false
+        return (false, false)
     }
     private static func uiElement(_ value: CFTypeRef?) -> AXUIElement? {
         guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        return (value as! AXUIElement)
+        let element = value as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        return element
+    }
+    private static func children(_ element: AXUIElement) -> [AXUIElement] {
+        let nodes = (attribute(element, kAXChildrenAttribute) as? [AXUIElement]) ?? []
+        for node in nodes.prefix(160) { AXUIElementSetMessagingTimeout(node, 0.1) }
+        return Array(nodes.prefix(160))
     }
     private static func selectedRange(_ element: AXUIElement) -> CFRange? {
         guard let value = attribute(element, kAXSelectedTextRangeAttribute), CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
@@ -114,8 +145,18 @@ enum TextInsertion {
     }
     static func insert(_ text: String, into target: InputTarget, onPasteSent: () -> Void) async throws -> TextInsertionOutcome {
         try Task.checkCancellation()
+        guard !delivering else { throw VoiceDraftError.message("Could not send the paste shortcut.") }
+        delivering = true
+        defer { delivering = false }
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
+        let board = NSPasteboard.general
+        guard let previous = await InsertionClipboardReader.shared.read(name: board.name) else {
+            throw VoiceDraftError.message("Could not copy the result.")
+        }
+        // Clipboard providers can yield. Revalidate the original take's target
+        // after the read; never follow a new caret into another application.
+        try Task.checkCancellation()
         guard let current = capture(trackOpaqueFocus: false), current.pid == target.pid else {
             throw VoiceDraftError.message("The active app changed. Copy the result when ready.")
         }
@@ -135,33 +176,24 @@ enum TextInsertion {
         }
         let receiptRange = nsRange(current.range) ?? (current.value == "" ? NSRange(location: 0, length: 0) : nil)
         let receipt = TextInsertionReceipt(value: current.value, range: receiptRange, replacement: text)
-        target.focusGuard?.stop()
-
         // Chromium can acknowledge AXSelectedText writes without implementing
         // the replacement action. Use the editor's normal paste path instead.
-        let board = NSPasteboard.general
-        let previous = board.pasteboardItems?.map { item -> [NSPasteboard.PasteboardType: Data] in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in item.data(forType: type).map { (type, $0) } })
-        } ?? []
-        board.clearContents()
-        let supplied = board.setString(text, forType: .string)
-        let generation = board.changeCount
-        defer {
-            if board.changeCount == generation {
-                board.clearContents()
-                let items = previous.map { values -> NSPasteboardItem in
-                    let item = NSPasteboardItem(); for (type, data) in values { item.setData(data, forType: type) }; return item
-                }
-                if !items.isEmpty { board.writeObjects(items) }
-            }
-        }
-        guard supplied else { throw VoiceDraftError.message("Could not copy the result.") }
         let source = CGEventSource(stateID: .privateState)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
             throw VoiceDraftError.message("Could not send the paste shortcut.")
         }
         down.flags = .maskCommand; up.flags = .maskCommand
+        let item = NSPasteboardItem()
+        guard item.setString(text, forType: .string),
+              item.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")),
+              board.changeCount == previous.generation else { throw VoiceDraftError.message("Could not copy the result.") }
+        board.clearContents()
+        let supplied = board.writeObjects([item])
+        let generation = board.changeCount
+        defer { previous.restore(board, ifGeneration: generation) }
+        guard supplied else { throw VoiceDraftError.message("Could not copy the result.") }
+        target.focusGuard?.stop()
         down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
         // UI completion does not need to wait for AX confirmation. Keep the
         // clipboard alive below until the editor has had time to consume it.

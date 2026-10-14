@@ -150,6 +150,17 @@ struct VDSettingRow<Control: View>: View {
 struct VDKeyCaps: View {
     let keys: [String]
     var size: CGFloat = 15
+
+    init(keys: [String], size: CGFloat = 15) { self.keys = keys; self.size = size }
+
+    /// Splits a `ShortcutBinding.label` such as "⌃⌥Space" or "Fn" into individual caps.
+    init(label: String, size: CGFloat = 15) {
+        var caps: [String] = []
+        var rest = Substring(label)
+        while let first = rest.first, "⌃⌥⇧⌘".contains(first) { caps.append(String(first)); rest = rest.dropFirst() }
+        if !rest.isEmpty { caps.append(String(rest)) }
+        self.init(keys: caps.isEmpty ? [label] : caps, size: size)
+    }
     var body: some View {
         HStack(spacing: 5) {
             ForEach(Array(keys.enumerated()), id: \.offset) { _, key in

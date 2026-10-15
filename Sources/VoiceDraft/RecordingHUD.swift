@@ -2,13 +2,15 @@ import SwiftUI
 import VoiceDraftCore
 
 enum DictationHUDKind {
-    case compact, live, result, failure
+    /// `notice` is a failure without transcript text: header, error line and footer only.
+    case compact, live, result, failure, notice
     var size: CGSize {
         switch self {
         case .compact: return CGSize(width: 250, height: 76)
         case .live: return CGSize(width: 520, height: 258)
         case .result: return CGSize(width: 520, height: 254)
         case .failure: return CGSize(width: 520, height: 302)
+        case .notice: return CGSize(width: 520, height: 160)
         }
     }
 }
@@ -22,7 +24,7 @@ struct RecordingHUD: View {
             case .live:
                 liveCard
                 capsule
-            case .result, .failure: resultCard
+            case .result, .failure, .notice: resultCard
             }
         }
         .padding(10).frame(width: state.hudKind.size.width, height: state.hudKind.size.height)
@@ -115,7 +117,8 @@ struct RecordingHUD: View {
     }
 
     private var resultCard: some View {
-        let failure = state.hudKind == .failure
+        let notice = state.hudKind == .notice
+        let failure = state.hudKind == .failure || notice
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: failure ? "exclamationmark.circle.fill" : "doc.on.clipboard")
@@ -126,16 +129,18 @@ struct RecordingHUD: View {
                 VDIconButton(systemName: "xmark", label: D("Dismiss"), tint: .white.opacity(0.6)) { state.dismissHUD() }
                     .padding(.trailing, -6)
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    if failure || !state.error.isEmpty {
-                        Text(L(state.error)).font(.system(size: 12)).foregroundStyle(.white.opacity(0.7)).lineSpacing(2)
+            if notice {
+                // No body text: the error line sits under the header and the footer stays at the bottom.
+                errorLine.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if failure || !state.error.isEmpty { errorLine }
+                        Text(state.hudText).font(.system(size: 15)).lineSpacing(5).foregroundStyle(.white.opacity(0.86))
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Text(state.hudText).font(.system(size: 15)).lineSpacing(5).foregroundStyle(.white.opacity(0.86))
-                        .fixedSize(horizontal: false, vertical: true)
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(maxHeight: .infinity)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }.frame(maxHeight: .infinity)
+            }
             HStack(spacing: 16) {
                 Spacer()
                 if !state.hudText.isEmpty {
@@ -155,6 +160,11 @@ struct RecordingHUD: View {
                 Spacer()
             }
         }.padding(20).hudChrome(RoundedRectangle(cornerRadius: VD.Radius.panel, style: .continuous))
+    }
+
+    private var errorLine: some View {
+        Text(L(state.error)).font(.system(size: 12)).foregroundStyle(.white.opacity(0.7)).lineSpacing(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

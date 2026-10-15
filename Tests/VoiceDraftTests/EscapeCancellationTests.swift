@@ -66,6 +66,53 @@ final class EscapeCancellationTests: XCTestCase {
         }
     }
 
+    func testIdleEscapeDismissesVisibleCardOnly() async {
+        await MainActor.run {
+            for name in ["result", "failure", "notice"] {
+                let state = AppState(preview: true)
+                state.prepareHUDPreview(name)
+                var hidden = 0
+                state.hideHUD = { hidden += 1 }
+                var visible = true
+                let monitor = EscapeCancellationMonitor()
+                monitor.onCancel = { state.handleEscape(hudVisible: visible) }
+
+                XCTAssertTrue(monitor.handle(event()), name)
+                XCTAssertEqual(hidden, 1, name)
+                XCTAssertEqual(state.phase, "idle", name)
+                visible = false
+                XCTAssertFalse(monitor.handle(event()), "Idle Escape without a visible card must pass through")
+                XCTAssertEqual(hidden, 1, name)
+            }
+        }
+    }
+
+    func testEscapeStillCancelsActiveRunWhenHUDVisible() async {
+        await MainActor.run {
+            let state = AppState(preview: true)
+            state.prepareHUDPreview("live")
+            var hidden = 0
+            state.hideHUD = { hidden += 1 }
+            XCTAssertTrue(state.handleEscape(hudVisible: true))
+            XCTAssertEqual(state.phase, "idle")
+            XCTAssertTrue(state.hudText.isEmpty)
+            XCTAssertEqual(hidden, 1)
+        }
+    }
+
+    func testFailureWithoutTextUsesNoticeKind() async {
+        await MainActor.run {
+            let state = AppState(preview: true)
+            state.prepareHUDPreview("notice")
+            XCTAssertEqual(state.hudKind, .notice)
+            XCTAssertTrue(state.hudText.isEmpty)
+            XCTAssertLessThan(DictationHUDKind.notice.size.height, DictationHUDKind.failure.size.height)
+            state.prepareHUDPreview("failure")
+            XCTAssertEqual(state.hudKind, .failure)
+            XCTAssertFalse(state.hudText.isEmpty)
+        }
+    }
+
     func testEscapeWhileHoldingFnIgnoresSubsequentRelease() async {
         await MainActor.run {
             let state = AppState(preview: true)

@@ -136,6 +136,7 @@ final class AppState: ObservableObject {
         case "live": phase = "recording"; hudKind = .live
         case "processing": phase = "processing"; hudKind = .live
         case "failure": hudKind = .failure; hudText = liveTranscript; error = "The speech connection ended before the final result."
+        case "notice": hudKind = .notice; hudText = ""; error = "Nothing to insert yet. Dictate first."
         case "long-result": hudKind = .result; hudText = Array(repeating: "这是用于检查长文本滚动的示例，不会发送到任何模型。", count: 18).joined(separator: "\n")
         default: hudKind = .result
         }
@@ -514,6 +515,20 @@ final class AppState: ObservableObject {
         liveTranscript = ""; hudText = ""; hudKind = .compact; hideHUD?()
     }
     func dismissHUD() { if busy { cancel() } else { hideHUD?() } }
+    /// Escape rule: cancel an active input run; otherwise, when idle, close a visible HUD card
+    /// the way its close button does. An update installation (`busy` while idle) is untouched.
+    /// Returning true only consumes VoiceDraft's own local Escape; the global monitor observes.
+    @discardableResult
+    func handleEscape(hudVisible: Bool) -> Bool {
+        if cancelActiveInput() { return true }
+        guard hudVisible, !busy else { return false }
+        dismissHUD()
+        return true
+    }
+    /// A failure without transcript text uses the compact notice card.
+    private var failureKind: DictationHUDKind {
+        hudText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .notice : .failure
+    }
     func copyHUDResult() {
         guard !hudText.isEmpty, copyResult(hudText) else { return }
         hudCopied = true
@@ -538,7 +553,7 @@ final class AppState: ObservableObject {
         else {
             self.error = .init(error: error); status = "Something needs attention"
             if hudText.isEmpty { hudText = liveTranscript }
-            hudKind = .failure; showHUD?()
+            hudKind = failureKind; showHUD?()
         }
     }
     private func saveHistory(mode: WritingMode, original: String, output: String, app: String, duration: Double) {
@@ -741,7 +756,7 @@ extension AppState {
         notice = ""; hudCopied = false
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             error = .init(error: VoiceDraftError.message("Nothing to insert yet. Dictate first."))
-            hudText = ""; hudKind = .failure; showHUD?()
+            hudText = ""; hudKind = .notice; showHUD?()
             return
         }
         error = ""

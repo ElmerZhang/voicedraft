@@ -61,6 +61,7 @@ struct RecordingHUD: View {
             VStack(spacing: 3) {
                 waveform
                 HStack(spacing: 3) {
+                    if state.screenContextTermCount != nil { Image(systemName: "text.viewfinder").font(.system(size: 8, weight: .semibold)) }
                     if state.recordingLocked { Image(systemName: "lock.fill").font(.system(size: 8, weight: .semibold)) }
                     Text(elapsedText).font(.system(size: 10, weight: .medium).monospacedDigit())
                 }.foregroundStyle(.white.opacity(0.7)).accessibilityHidden(true)
@@ -86,7 +87,20 @@ struct RecordingHUD: View {
             }.frame(width: 76, height: 20)
         }
         .accessibilityElement()
-        .accessibilityLabel(([D("Recording")] + (state.recordingLocked ? [D("Locked")] : []) + [elapsedText]).joined(separator: " · "))
+        .accessibilityLabel(([D("Recording")] + (state.recordingLocked ? [D("Locked")] : [])
+            + (state.screenContextTermCount != nil ? [D("On-screen context")] : []) + [elapsedText]).joined(separator: " · "))
+    }
+
+    /// While recording with on-screen context, the hint names it and the offered term count
+    /// (never any screen text); otherwise the correction hint. Writing shows streaming.
+    private var liveCardHint: String {
+        guard state.recording else { return D("Streaming…") }
+        switch state.screenContextTermCount {
+        case nil: return D("Say corrections before finishing")
+        case 0: return D("On-screen context")
+        case 1: return D("On-screen context · 1 term")
+        case let count?: return String(format: D("On-screen context · %d terms"), count)
+        }
     }
 
     private var elapsedText: String {
@@ -102,7 +116,7 @@ struct RecordingHUD: View {
                 Circle().fill(state.recording ? VD.Palette.recording : Color.white.opacity(0.5)).frame(width: 6, height: 6)
                 Text(state.recording ? D("Live transcript") : D("Writing result")).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.65))
                 Spacer()
-                Text(state.recording ? D("Say corrections before finishing") : D("Streaming…")).font(.system(size: 11)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
+                Text(liveCardHint).font(.system(size: 11)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
             }
             ScrollViewReader { reader in
                 ScrollView {

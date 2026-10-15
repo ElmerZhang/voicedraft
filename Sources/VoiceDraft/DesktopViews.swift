@@ -503,6 +503,7 @@ private struct DesktopSettingsView: View {
     @Binding var tab: String
     let close: () -> Void
     @State private var accessibilityAllowed: Bool?
+    @State private var screenRecordingAllowed: Bool?
     private let tabs = [("Settings", "gearshape"), ("Personalization", "pencil.and.outline"), ("Models", "cpu"),
                         ("Sync", "arrow.triangle.2.circlepath"), ("About", "info.circle"), ("Help", "questionmark.circle")]
     var body: some View {
@@ -548,9 +549,10 @@ private struct DesktopSettingsView: View {
             }
         }
         .task {
-            // Accessibility can be granted in System Settings while the overlay is open.
+            // Accessibility and Screen Recording can be granted in System Settings while the overlay is open.
             repeat {
                 accessibilityAllowed = state.insertionAuthorized
+                screenRecordingAllowed = state.preview || ScreenRecordingPermission.granted
                 do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
             } while !Task.isCancelled
         }
@@ -571,6 +573,7 @@ private struct DesktopSettingsView: View {
         VStack(alignment: .leading, spacing: VD.Space.xxl) {
             section(D("Shortcuts"), icon: "keyboard") { ShortcutPreferences(state: state) }
             RecordingPreferences(state: state)
+            ScreenContextPreferences(state: state, screenRecordingAllowed: screenRecordingAllowed)
             section(D("Audio"), icon: "mic") {
                 VDSettingRow(title: L("Input device"), detail: D("Used when you record with a shortcut or on Home.")) {
                     HStack(spacing: VD.Space.xs) {

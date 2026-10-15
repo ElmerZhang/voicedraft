@@ -32,6 +32,23 @@ The checklist below describes implementation coverage, not proof of microphone, 
 | F2 | Reopenable field/starter-vocabulary/model/permission/shortcut guide; six optional domains with per-term review and deduplication; explicit permission buttons | `OnboardingView`, `DomainVocabularySelection` |
 | F3 | Optional daily HTTPS checks, Ed25519 manifest verification, SHA-256 package checks, bounded ZIP validation, explicit install/restart with rollback | `UpdateController`, [updates.md](updates.md) |
 
+## 2026-10-15 · On-screen context (屏幕上下文)
+
+User-authorized expansion. All decisions follow the reviewed implementation spec: Message ASR screen terms use the leftover of `input.context`, global vocabulary disablement also disables screen recognition hints, the HUD counts offered terms, the OCR threshold is 120 content characters, built-in exclusions are not removable and there is no per-domain exclusion, extraction works with the master switch off, Ask receives no screen context, the Polish language-policy wording changes only when context is present, and only verified password-manager bundle IDs ship.
+
+| Selected | Delivered behavior | Main implementation |
+| --- | --- | --- |
+| G1 | Opt-in on-screen context from the front window's Accessibility text; focus-first, bounded walk; no new permission | `ScreenTextWalker`, `ScreenContextAXReader` |
+| G2 | Optional window-only on-device OCR when an app exposes too little text; Screen Recording required; never saved | `WindowTextRecognizer` |
+| G3 | Lowest-priority temporary ASR terms (≤ 300 / 6,000 B) for every adapter; never stored, counted or learned | `VocabularyProjection.make(screenTerms:)`, `ScreenContextPolicy` |
+| G4 | Bounded excerpt (≤ 1,500 characters) and ≤ 40 terms for Polish/Translate (terms only for Edit) as untrusted reference data | `QwenRequests.writing(screenContext:)` |
+| G5 | Extract words from the current screen into the Vocabulary review sheet (menu bar or Vocabulary) | `ScreenTermExtractor`, `ContextVocabularyFilter` |
+| G6 | Per-app exclusions with built-in password managers; HUD indicator; Screen Recording permission rows | Settings → On-screen context, `ScreenContextCoordinator` |
+
+**Defaults.** The master switch "Use on-screen text as context" is off. Under it, Recognition hints and Writing reference are on, and OCR is off. User exclusions start empty; 1Password 8 and 7, Bitwarden, Keychain Access, Passwords and VoiceDraft itself are always skipped. All settings live in the device file and never sync.
+
+**Privacy.** Screen text, excerpts, terms and OCR images live in memory only. Per-take data is dropped when the take ends. OCR snapshots are cached for at most 60 seconds and four windows, and the cache clears on sleep, lock, quit, app exit, and when the master switch, OCR or exclusions change. History stores only the output, and nothing enters shared settings or sync. Secure fields are never read or descended. Excluded apps are checked before any AX or capture call. Credential and URL lines are dropped, long digit runs and secret-like tokens are masked, and bidi and zero-width controls are stripped. The writing model receives the excerpt as a JSON field named `on_screen_context_reference_only` with an untrusted-data rule; model compliance is not guaranteed. Speech models receive only term-shaped tokens. A dictation only preflights Screen Recording and never triggers a permission prompt. Visible text can include other people's messages; the settings footnote says so and per-app exclusion is available. Extraction sends only candidate words to the writing model, never the screen text. No log, status or error contains screen text.
+
 ## Data and compatibility
 
 Shared settings migrate v1–v4 to v5 without changing existing profile IDs, credentials, vocabulary or general style. New style and application rules join the existing encrypted vault. Device-only settings, audio and context stay local. Older VoiceDraft versions cannot read v5; update other clients before downloading this vault.

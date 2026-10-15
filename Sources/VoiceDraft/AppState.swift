@@ -4,6 +4,12 @@ import SwiftUI
 import CryptoKit
 import VoiceDraftCore
 
+/// A status-menu request to extract words from an app's window.
+struct ScreenExtractionRequest: Equatable {
+    let id = UUID()
+    let app: ScreenContextApplication
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var settings = SharedSettings()
@@ -69,6 +75,14 @@ final class AppState: ObservableObject {
     @Published private(set) var inputDevices: [AudioInputDevice] = []
     @Published private(set) var defaultInputID: String?
     @Published private(set) var recordingDeviceName = ""
+    /// On-screen context for dictation into other apps; memory only, never persisted or synced.
+    let screenContext = ScreenContextCoordinator()
+    /// Screen terms offered to the current take, for the HUD indicator; nil when none.
+    @Published private(set) var screenContextTermCount: Int?
+    /// The last external app, which Vocabulary's "Extract from %@" reads.
+    @Published private(set) var screenContextApplication: ScreenContextApplication?
+    /// Set by the status menu; Vocabulary opens its review sheet in screen mode.
+    @Published var screenExtractionRequest: ScreenExtractionRequest?
     private var inputObservers: [NSObjectProtocol] = []
     func refreshInputDevices() {
         guard !preview else { return }
@@ -125,7 +139,7 @@ final class AppState: ObservableObject {
     /// Synthetic UI fixtures only; this path cannot load keys, record, or call a model.
     func prepareHUDPreview(_ name: String) {
         guard preview else { return }
-        phase = "idle"; elapsed = 12; level = 0.45; hudCopied = false; error = ""; recordingLocked = false
+        phase = "idle"; elapsed = 12; level = 0.45; hudCopied = false; error = ""; recordingLocked = false; screenContextTermCount = nil
         recordingDeviceName = "Preview microphone"
         liveTranscript = "周二下午三点开会。\n不对，把刚才的周二改成周四，时间不变。"
         hudText = "周四下午三点开会。"; result = hudText
@@ -134,6 +148,8 @@ final class AppState: ObservableObject {
         case "recording": phase = "recording"; hudKind = .compact
         case "locked": phase = "recording"; hudKind = .compact; recordingLocked = true; elapsed = 83
         case "live": phase = "recording"; hudKind = .live
+        case "screen-context": phase = "recording"; hudKind = .live; screenContextTermCount = 12
+        case "screen-context-compact": phase = "recording"; hudKind = .compact; screenContextTermCount = 12
         case "processing": phase = "processing"; hudKind = .live
         case "failure": hudKind = .failure; hudText = liveTranscript; error = "The speech connection ended before the final result."
         case "notice": hudKind = .notice; hudText = ""; error = "Nothing to insert yet. Dictate first."
@@ -144,6 +160,11 @@ final class AppState: ObservableObject {
 
     init(preview: Bool = false) {
         self.preview = preview
+        screenContext.onTakeUpdate = { [weak self] take in
+            guard let self, self.generation == take else { return }
+            self.screenContextTermCount = self.screenContext.termCount(take: take)
+        }
+        screenContext.onApplicationChange = { [weak self] app in self?.screenContextApplication = app }
         if preview {
             inputDevices = [.init(id: "preview-microphone", name: "MacBook Pro Microphone")]
             defaultInputID = "preview-microphone"
@@ -160,6 +181,11 @@ final class AppState: ObservableObject {
                 ]
                 history[1].date = Date().addingTimeInterval(-3600)
                 history[2].date = Date().addingTimeInterval(-86400)
+                // Show the whole On-screen context section in captures; nothing is read in preview.
+                device.features.screenContext = true
+                device.features.screenContextOCR = true
+                device.features.screenContextExcludedApps = ["com.tencent.xinWeChat"]
+                screenContextApplication = ScreenContextApplication(pid: 0, bundleID: "com.apple.Notes", name: "Notes")
             }
             return
         }
@@ -317,11 +343,12 @@ final class AppState: ObservableObject {
         player?.stop(); playingAudioID = nil
         runAudio = nil; runRetainAudio = device.keepHistory && device.features.retainAudio
         if let override { mode = override }
-        error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact
+        error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact; screenContextTermCount = nil
         generation = UUID(); let id = generation
         target?.focusGuard?.stop()
         target = external ? TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true) : nil
-        runMode = mode; runSettings = settings.resolved(for: target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier });
+        let targetBundleID = target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }
+        runMode = mode; runSettings = settings.resolved(for: targetBundleID);
         if device.features.recentContext { runSettings?.recentInputContext = recentInputs.text(application: target?.name ?? "VoiceDraft") }
         runAutoPaste = device.autoPaste; runExternal = external
         runSelection = external ? (target?.selection ?? "") : selection
@@ -337,6 +364,14 @@ final class AppState: ObservableObject {
             if mode != .verbatim, runWritingKey.isEmpty { throw VoiceDraftError.message("Add an API key for the writing model first.") }
             if mode == .edit && runSelection.isEmpty { throw VoiceDraftError.message("Select text in the destination app before using Edit selection.") }
         } catch { fail(error, id: id); return }
+        // Starts the background AX walk (and OCR when allowed) alongside microphone startup.
+        // Home takes, preview mode, excluded apps and secure fields never read the screen.
+        if external, !preview, let target {
+            screenContext.begin(take: id, target: target, bundleID: targetBundleID, mode: mode,
+                                options: device.features, vocabulary: settings.vocabulary)
+        }
+        let screenGate = ContinuousClock.now.advanced(by: .milliseconds(Int(screenContext.limits.asrGateSeconds * 1000)))
+        let coordinator = screenContext
         let inputDeviceID = device.inputDeviceID
         recordingDeviceName = ""; elapsed = 0; level = 0
         phase = "starting"; status = "Opening microphone…"
@@ -347,6 +382,8 @@ final class AppState: ObservableObject {
             task = Task { [self] in
                 do {
                     let raw = try await SpeechClient.transcribeLive(profile: speech, key: speechKey, audio: feed.stream, vocabulary: vocabulary,
+                        // Overlaps the socket handshake; never waits past t0 + 250 ms.
+                        screenTerms: { await coordinator.asrTerms(take: id, until: screenGate) },
                         onReady: { [weak self] in
                             guard let self else { throw CancellationError() }
                             try await self.beginLiveCapture(id: id, inputID: inputDeviceID, feed: feed)
@@ -428,7 +465,8 @@ final class AppState: ObservableObject {
                     effects.end(sound: device.features.sounds)
                     if runRetainAudio { runAudio = wav }
                     guard duration >= 0.25 else { throw VoiceDraftError.message("The recording was too short. Try again.") }
-                    let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary)
+                    let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary,
+                                                                screenTerms: screenContext.currentASRTerms(take: id))
                     try Task.checkCancellation(); guard generation == id else { return }
                     try await deliverTranscript(raw, id: id, duration: duration)
                 } catch { fail(error, id: id) }
@@ -437,13 +475,18 @@ final class AppState: ObservableObject {
     }
     private func deliverTranscript(_ raw: String, id: UUID, duration: Double) async throws {
         guard generation == id, let configuration = runSettings else { throw CancellationError() }
+        // The take's screen text is dropped on every exit; reprocess and style edits have none.
+        defer { screenContext.end(take: id) }
         let mode = runMode, selected = runSelection, destination = target, writingKey = runWritingKey
         transcript = raw; result = ""
         var output = raw
         if mode != .verbatim, let writing = configuration.writing {
             status = "Writing with \(writing.name)…"
+            // Usually ready already; never waits past the take's OCR deadline.
+            let screen = await screenContext.writingContext(take: id, mode: mode)
+            try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
             let request = try QwenRequests.writing(profile: writing, key: writingKey, text: raw, mode: mode,
-                settings: configuration, selection: selected, application: destination?.name ?? "VoiceDraft")
+                settings: configuration, selection: selected, application: destination?.name ?? "VoiceDraft", screenContext: screen)
             do { output = try await WritingClient.complete(request, profile: writing, key: writingKey) { [weak self] text in
                 await self?.updateWriting(text, id: id)
             } }
@@ -493,7 +536,8 @@ final class AppState: ObservableObject {
         if mode == .polish || mode == .verbatim {
             resultBeforeCorrection = output
             if let sample = VocabularyLearningSample(source: .dictation, before: raw, after: output) {
-                learnVocabulary(from: sample, configuration: configuration)
+                // Terms the screen offered cannot be promoted by discovery for this take.
+                learnVocabulary(from: sample, configuration: configuration, excluding: screenContext.learningExclusions(take: id))
             }
         }
     }
@@ -509,6 +553,7 @@ final class AppState: ObservableObject {
         effects.end(sound: false); gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false; runAudio = nil
         player?.stop(); playingAudioID = nil
         stopCorrectionObservation()
+        screenContext.end(take: generation); screenContextTermCount = nil
         generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
         recorder.cancel(); liveRecorder.cancel(); tick?.invalidate(); tick = nil
         phase = "idle"; level = 0; status = "Cancelled"; runSpeechKey = ""; runWritingKey = ""
@@ -537,6 +582,7 @@ final class AppState: ObservableObject {
     private func fail(_ error: Error, id: UUID) {
         guard generation == id else { return }
         target?.focusGuard?.stop()
+        screenContext.end(take: id)
         if case SpeechRecognitionError.noSpeech = error {
             cancel()
             self.error = ""; status = "Ready when you are"
@@ -654,7 +700,7 @@ final class AppState: ObservableObject {
             }
         }
     }
-    private func learnVocabulary(from sample: VocabularyLearningSample, configuration: SharedSettings) {
+    private func learnVocabulary(from sample: VocabularyLearningSample, configuration: SharedSettings, excluding: Set<String> = []) {
         let corrections = configuration.vocabulary.learnFromCorrections && settings.vocabulary.learnFromCorrections
         let discovery = configuration.vocabulary.discoverFromDictation && settings.vocabulary.discoverFromDictation && sample.source == .dictation
         guard !preview, configuration.vocabulary.enabled, settings.vocabulary.enabled,
@@ -677,7 +723,7 @@ final class AppState: ObservableObject {
                 var added = corrections ? updated.vocabulary.learn(VocabularyLearning.terms(from: response, sample: sample)) : []
                 if discovery, updated.vocabulary.discoverFromDictation {
                     let candidates = VocabularyLearning.discoveries(from: response, sample: sample)
-                    let confirmed = self.vocabularyDiscoveries.confirmed(candidates, takeID: takeID)
+                    let confirmed = self.vocabularyDiscoveries.confirmed(candidates, takeID: takeID, excluding: excluding)
                     added += updated.vocabulary.learn(confirmed, fromDiscovery: true)
                 }
                 guard !added.isEmpty else { return }
@@ -705,6 +751,11 @@ extension AppState {
             var updated = device; updated.features = options
             do { try store?.write(updated, name: "device") }
             catch { try? configureShortcuts?(device.features.shortcuts); throw error }
+            let previous = device.features
+            if (previous.screenContext && !options.screenContext) || (previous.screenContextOCR && !options.screenContextOCR)
+                || previous.screenContextExcludedApps != options.screenContextExcludedApps {
+                screenContext.clearCache()
+            }
             device = updated
             updater.configure(options, preview: preview)
             if !options.recentContext { recentInputs.clear() }
@@ -712,6 +763,20 @@ extension AppState {
         } catch { self.error = .init(error: error) }
     }
     func clearRecentContext() { recentInputs.clear(); notice = "Saved on this Mac" }
+    /// "Extract from this screen" for Vocabulary's review sheet. Preview mode never reads the screen.
+    func scanScreenContext(app: ScreenContextApplication) async throws -> ScreenContextScan {
+        guard !preview else { return ScreenContextScan(applicationName: app.name) }
+        return try await screenContext.extract(app: app, options: device.features, vocabulary: settings.vocabulary)
+    }
+    /// Status menu "Extract words from this screen…". The menu does not activate
+    /// VoiceDraft, so the frontmost app is still the one the user was reading.
+    func extractFromScreen() {
+        guard !busy else { return }
+        let own = ProcessInfo.processInfo.processIdentifier
+        let front = NSWorkspace.shared.frontmostApplication.flatMap { $0.processIdentifier == own ? nil : ScreenContextApplication($0) }
+        if let app = front ?? screenContextApplication { screenExtractionRequest = ScreenExtractionRequest(app: app) }
+        page = "Vocabulary"; showMain?()
+    }
     func completeOnboarding() {
         var options = device.features; options.onboardingCompleted = true; saveFeatures(options)
         showingOnboarding = false

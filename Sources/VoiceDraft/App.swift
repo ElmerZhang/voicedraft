@@ -43,7 +43,7 @@ private struct EditingCommands: Commands {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var state: AppState!
     private var window: NSWindow!
     private var hud: NSPanel!
@@ -116,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return false }
             return self.state.handleEscape(hudVisible: self.hudShown)
         }
-        if !isolatedPreview { escapeCancellation.install() }
+        if !isolatedPreview { escapeCancellation.install(); state.screenContext.startObserving() }
         state.configureShortcuts = { [weak self] bindings in
             guard let self, !isolatedPreview else { return }
             let previous = self.state.device.features.shortcuts
@@ -155,6 +155,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         record.target = self; menu.addItem(record)
         let reinsert = NSMenuItem(title: L("Insert last result"), action: #selector(insertLastResult), keyEquivalent: "")
         reinsert.target = self; menu.addItem(reinsert)
+        let extract = NSMenuItem(title: D("Extract words from this screen…"), action: #selector(extractFromScreen), keyEquivalent: "")
+        extract.target = self; menu.addItem(extract)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: L("Quit VoiceDraft"), action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit); statusItem.menu = menu
@@ -240,7 +242,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
-                print("Rendered three pages and six settings tabs without accessing persisted data or Keychain.")
+                // The On-screen context section sits below the fold of the General tab; render it alone too.
+                let section = NSHostingView(rootView: ScreenContextPreferences(state: state, screenRecordingAllowed: true)
+                    .padding(30).frame(width: 900).background(VD.Palette.canvas))
+                section.setFrameSize(section.fittingSize)
+                section.layoutSubtreeIfNeeded()
+                if let bitmap = section.bitmapImageRepForCachingDisplay(in: section.bounds) {
+                    section.cacheDisplay(in: section.bounds, to: bitmap)
+                    try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("settings-screen-context.png"))
+                }
+                print("Rendered three pages, six settings tabs and the On-screen context section without accessing persisted data or Keychain.")
             } catch { fputs("Preview capture failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }
@@ -259,7 +270,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for name in ["recording", "locked", "starting", "live", "processing", "result", "long-result", "failure", "notice"] {
+                for name in ["recording", "locked", "starting", "live", "processing", "result", "long-result", "failure", "notice",
+                             "screen-context", "screen-context-compact"] {
                     state.prepareHUDPreview(name); showHUD()
                     try await Task.sleep(nanoseconds: 300_000_000)
                     guard let view = hud.contentView else { continue }
@@ -269,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
-                print("Rendered nine synthetic HUD states without microphone, model, Keychain, or persisted data access.")
+                print("Rendered eleven synthetic HUD states without microphone, model, Keychain, screen, or persisted data access.")
             } catch { fputs("HUD preview failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }
@@ -338,10 +350,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // so focus capture sees the previously frontmost app's input.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.state.insertLastResult() }
     }
+    @objc private func extractFromScreen() {
+        guard !state.busy else { return }
+        // Like Insert last result: let the menu close, then read the still-frontmost app.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.state.extractFromScreen() }
+    }
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action == #selector(extractFromScreen) ? !state.busy : true
+    }
     @objc private func quitApp() { state.cancel(); NSApp.terminate(nil) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
-    func applicationWillTerminate(_ notification: Notification) { escapeCancellation.uninstall(); shortcuts.uninstall(); state.cancel() }
+    func applicationWillTerminate(_ notification: Notification) {
+        escapeCancellation.uninstall(); shortcuts.uninstall(); state.cancel()
+        state.screenContext.stopObserving(); state.screenContext.clearCache()
+    }
 }
 
 // The recording/result controls must never replace the original editor's keyboard focus.

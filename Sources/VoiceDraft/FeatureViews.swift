@@ -250,6 +250,96 @@ struct RecordingPreferences: View {
     private func setRetention(_ days: Int) { var options = state.device.features; options.retentionDays = days; state.saveFeatures(options) }
 }
 
+/// The On-screen context section of the General settings tab. Everything is
+/// device-local and off by default; the consumers and OCR need the master switch.
+struct ScreenContextPreferences: View {
+    @ObservedObject var state: AppState
+    /// Refreshed by the settings overlay's polling task; nil until the first read.
+    var screenRecordingAllowed: Bool?
+    @State private var appID = ""
+    private var options: DesktopOptions { state.device.features }
+    private func option(_ key: WritableKeyPath<DesktopOptions, Bool>, after: ((Bool) -> Void)? = nil) -> Binding<Bool> {
+        Binding(get: { state.device.features[keyPath: key] }, set: { value in
+            var options = state.device.features; options[keyPath: key] = value; state.saveFeatures(options)
+            after?(value)
+        })
+    }
+    private var pendingID: String? {
+        let id = ScreenContextPolicy.sanitizedExclusions([appID]).first
+        guard let id, !(ScreenContextPolicy.builtInExcludedBundleIDs + options.screenContextExcludedApps).contains(where: { $0.lowercased() == id.lowercased() }) else { return nil }
+        return id
+    }
+    var body: some View {
+        let master = options.screenContext
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            VDSectionHeader(icon: "text.viewfinder", title: D("On-screen context"))
+            VDSwitchRow(title: D("Use on-screen text as context"),
+                        detail: D("When you dictate into another app, VoiceDraft reads the text visible in that app's front window. Names and terms help recognition, and a short excerpt near your cursor helps the writing model. Nothing is saved or synced."),
+                        isOn: option(\.screenContext))
+            VDSwitchRow(title: D("Recognition hints"),
+                        detail: D("Sends up to 300 names and terms from the screen to your speech model. The full text is never sent to speech recognition."),
+                        isOn: option(\.screenContextASR)).disabled(!master)
+            VDSwitchRow(title: D("Writing reference"),
+                        detail: D("Sends up to 1,500 characters near your cursor to your writing model so it can match names, terms and tone. It never adds this text to your result."),
+                        isOn: option(\.screenContextWriting)).disabled(!master)
+            // Turning OCR on is an explicit request point for Screen Recording; takes only preflight.
+            VDSwitchRow(title: D("Read the window with OCR when an app exposes no text"),
+                        detail: D("Some apps hide their text from Accessibility. VoiceDraft can capture only that window and recognize its text on this Mac. Requires Screen Recording. The image is never saved, and macOS may ask you to confirm this permission again from time to time."),
+                        isOn: option(\.screenContextOCR) { on in if on && !state.preview { ScreenRecordingPermission.request() } }).disabled(!master)
+            if master && options.screenContextOCR {
+                let allowed = screenRecordingAllowed ?? state.preview
+                VDSettingRow(title: D("Screen Recording"),
+                             detail: allowed ? D("Only the front window is captured, and only when an app exposes no text.")
+                                             : D("OCR is skipped until you allow it. Text from Accessibility still works. If you just allowed it, quit and reopen VoiceDraft.")) {
+                    if allowed {
+                        VDBadge(text: D("Allowed"), tint: VD.Palette.success)
+                    } else {
+                        Button(D("Allow")) { if !state.preview { ScreenRecordingPermission.request() } }
+                            .accessibilityLabel(D("Allow Screen Recording"))
+                    }
+                }
+            }
+            VDLabeledField(title: D("Never read these apps"), detail: D("Password managers and VoiceDraft are always skipped.")) {
+                VDSurface(padding: 0, spacing: 0) {
+                    let rows = ScreenContextPolicy.builtInExcludedBundleIDs.map { ($0, true) } + options.screenContextExcludedApps.map { ($0, false) }
+                    ForEach(Array(rows.enumerated()), id: \.element.0) { index, row in
+                        if index > 0 { Divider().padding(.horizontal, VD.Space.l) }
+                        HStack(spacing: VD.Space.s) {
+                            Text(row.0).font(VD.Font.mono).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                            Spacer()
+                            if row.1 {
+                                VDBadge(text: D("Built in"), tint: .secondary)
+                            } else {
+                                VDIconButton(systemName: "trash", label: L("Delete")) {
+                                    var updated = options; updated.screenContextExcludedApps.removeAll { $0 == row.0 }; state.saveFeatures(updated)
+                                }
+                            }
+                        }.frame(minHeight: 28).padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.s)
+                    }
+                }
+                HStack(spacing: VD.Space.s) {
+                    SingleLineField(D("App bundle ID, e.g. com.apple.mail"), text: $appID).frame(minWidth: 200)
+                    Menu(D("Running apps")) {
+                        ForEach(NSWorkspace.shared.runningApplications.filter {
+                            $0.activationPolicy == .regular && $0.bundleIdentifier != nil && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+                        }, id: \.processIdentifier) { app in
+                            Button(app.localizedName ?? app.bundleIdentifier!) { appID = app.bundleIdentifier! }
+                        }
+                    }.fixedSize()
+                    Button(D("Exclude")) {
+                        guard let id = pendingID else { return }
+                        var updated = options
+                        updated.screenContextExcludedApps = ScreenContextPolicy.sanitizedExclusions(updated.screenContextExcludedApps + [id])
+                        state.saveFeatures(updated); appID = ""
+                    }.disabled(pendingID == nil)
+                }
+            }.padding(.top, VD.Space.xs)
+            Text(D("On-screen text stays in memory for at most 60 seconds. It is never written to history, saved to disk or synced. Visible text can include other people's messages, so exclude apps you do not want read."))
+                .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }.disabled(state.busy)
+    }
+}
+
 /// Launch-at-login and first-use guide rows for the General section of the settings tab.
 struct LaunchPreferences: View {
     @ObservedObject var state: AppState
@@ -399,11 +489,17 @@ private struct StyleEditor: View {
 }
 
 struct VocabularyFileControls: View {
+    /// What the review sheet extracts from; nil is a file import.
+    enum ContextKind { case agent, screen }
     @ObservedObject var state: AppState
     @State private var candidates: [VocabularyEntry] = []
     @State private var selected: Set<UUID> = []
     @State private var showPreview = false
-    @State private var contextMode = false
+    @State private var context: ContextKind?
+    @State private var screenApp: ScreenContextApplication?
+    @State private var screenScan: ScreenContextScan?
+    /// The screen target is excluded: nothing was read and there is nothing to retry.
+    @State private var blocked = false
     @State private var scanning = false
     @State private var scan: AgentContextScan?
     @State private var sources: [String: String] = [:]
@@ -417,26 +513,29 @@ struct VocabularyFileControls: View {
         HStack {
             Button(F("Import vocabulary", "导入词库")) { importFile() }
             Button(F("Export vocabulary", "导出词库")) { exportFile() }
-            Button(F("Extract from Codex / Claude context", "从 Codex / Claude 上下文提取")) {
-                contextMode = true; scanning = true; scan = nil; scanError = ""
-                filtering = false; filterSummary = ""; rawCandidates = []; scanAttempt = UUID()
-                candidates = []; selected = []; sources = [:]; showPreview = true
-            }
-        }.sheet(isPresented: $showPreview) {
+            Button(F("Extract from Codex / Claude context", "从 Codex / Claude 上下文提取")) { start(.agent) }
+            screenButton
+        }
+        .onAppear { consume(state.screenExtractionRequest) }
+        .onChange(of: state.screenExtractionRequest) { consume($0) }
+        .sheet(isPresented: $showPreview) {
             VStack(alignment: .leading, spacing: VD.Space.l) {
                 VStack(alignment: .leading, spacing: VD.Space.s) {
                     Text(F("Review words to import", "选择要导入的词条")).font(VD.Font.sheetTitle)
-                    Text(contextMode
+                    Text(context == .agent
                          ? F("Finds local Codex and Claude context automatically, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing.", "自动查找本机 Codex 和 Claude 上下文，再将候选词交给你的写作模型筛除通用词。只发送候选词列表，最后由你勾选导入。")
+                         : context == .screen
+                         ? String(format: D("Reads the text visible in %@ on this Mac, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing."), screenApp?.name ?? "")
                          : F("Review the vocabulary before importing. Only selected terms are added.", "检查词库内容，只添加勾选的词条。"))
                         .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
                 }
                 if scanning {
                     HStack(spacing: VD.Space.s) {
                         ProgressView().controlSize(.small)
-                        Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…") : F("Finding local context…", "正在查找本机上下文…")).font(VD.Font.detail)
+                        Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…")
+                             : context == .screen ? D("Reading the screen…") : F("Finding local context…", "正在查找本机上下文…")).font(VD.Font.detail)
                     }
-                } else if let scan {
+                } else if context == .agent, let scan {
                     VStack(alignment: .leading, spacing: VD.Space.xs) {
                         Text(F("Context files read", "已读取上下文文件") + ": \(scan.filesRead) · " + (scan.sources.isEmpty ? "Codex / Claude" : scan.sources.map(\.rawValue).joined(separator: " / ")))
                         if scan.limited { Text(F("Recent context was prioritized to keep the scan quick.", "已优先提取近期上下文，避免扫描时间过长。")) }
@@ -444,7 +543,7 @@ struct VocabularyFileControls: View {
                     }.font(VD.Font.detail).foregroundStyle(.secondary)
                 }
                 if !filterSummary.isEmpty { Text(filterSummary).font(VD.Font.detail).foregroundStyle(.secondary) }
-                if !scanError.isEmpty {
+                if !scanError.isEmpty, !blocked {
                     VDInlineNotice(kind: .error, text: scanError)
                     HStack {
                         Button(F("Retry filtering", "重新筛选")) { scanning = true; scanError = ""; filterSummary = ""; candidates = []; selected = []; scanAttempt = UUID() }
@@ -463,10 +562,15 @@ struct VocabularyFileControls: View {
                     Text("\(selected.count) / \(candidates.count)").font(VD.Font.detail).foregroundStyle(.secondary).monospacedDigit()
                 }.buttonStyle(.bordered).disabled(scanning || candidates.isEmpty)
                 if candidates.isEmpty {
-                    VDEmptyState(icon: scanning ? "hourglass" : !scanError.isEmpty ? "exclamationmark.triangle" : "text.magnifyingglass",
-                                 title: scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…") : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
+                    VDEmptyState(icon: scanning ? "hourglass" : blocked ? "hand.raised" : !scanError.isEmpty ? "exclamationmark.triangle" : "text.magnifyingglass",
+                                 title: scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…")
+                                                   : context == .screen ? D("Reading the screen…") : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
+                         : blocked ? scanError
                          : !scanError.isEmpty ? F("Filtering did not finish. Retry or review the unfiltered list.", "筛选未完成，可以重试或查看未筛选的词条。")
                          : !filterSummary.isEmpty ? F("The model found no terms worth adding this time.", "这次没有筛选出值得加入词库的词条。")
+                         : context == .screen
+                         ? (screenScan?.charactersRead ?? 0) == 0 ? D("No readable text was found in this window.")
+                           : D("No new candidate terms were found on this screen. Existing vocabulary words are excluded.")
                          : scan?.filesRead == 0
                          ? F("No readable Codex or Claude context was found in this account's home folder.", "在当前账户的用户目录中，没有找到可读取的 Codex 或 Claude 上下文。")
                          : F("No new candidate terms were found. Existing vocabulary words are excluded.", "没有找到新的候选词，词库中已有的词条已排除。"))
@@ -499,14 +603,51 @@ struct VocabularyFileControls: View {
                 .task(id: scanAttempt) { await findAndFilter() }
         }
     }
+    /// Vocabulary's screen button reads the last external app; disabled with a reason when none or excluded.
+    private var screenButton: some View {
+        let app = state.screenContextApplication
+        let excluded = app.map { !ScreenContextPolicy.allows(bundleID: $0.bundleID, options: state.device.features, ownBundleID: Bundle.main.bundleIdentifier) } ?? false
+        return Button(app.map { String(format: D("Extract from %@"), $0.name) } ?? D("Extract from screen")) {
+            if let app { start(.screen, app: app) }
+        }
+        .disabled(app == nil || excluded)
+        .help(app == nil ? D("Switch to the app you want to read, then choose Extract words from this screen in the menu bar.")
+              : excluded ? String(format: D("%@ is excluded from on-screen context."), app?.name ?? "") : "")
+    }
+    private func start(_ kind: ContextKind, app: ScreenContextApplication? = nil) {
+        context = kind; screenApp = app; screenScan = nil; blocked = false
+        scanning = true; scan = nil; scanError = ""
+        filtering = false; filterSummary = ""; rawCandidates = []; scanAttempt = UUID()
+        candidates = []; selected = []; sources = [:]; showPreview = true
+    }
+    /// A status-menu request opens the sheet in screen mode for the app it captured.
+    private func consume(_ request: ScreenExtractionRequest?) {
+        guard let request else { return }
+        state.screenExtractionRequest = nil
+        start(.screen, app: request.app)
+    }
     private func findAndFilter() async {
-        guard contextMode else { return }
+        guard let context else { return }
         do {
-            let result = try await state.scanAgentContext()
-            try Task.checkCancellation()
-            scan = result
+            let found: [AgentContextCandidate]
+            switch context {
+            case .agent:
+                let result = try await state.scanAgentContext()
+                try Task.checkCancellation()
+                scan = result; found = result.candidates
+            case .screen:
+                guard let app = screenApp else { return }
+                let result = try await state.scanScreenContext(app: app)
+                try Task.checkCancellation()
+                screenScan = result
+                if result.excluded {
+                    scanError = String(format: D("%@ is excluded from on-screen context."), app.name)
+                    blocked = true; scanning = false; return
+                }
+                found = result.candidates
+            }
             let known = Set(state.settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
-            let fresh = result.candidates.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
+            let fresh = found.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
             rawCandidates = fresh
             if !fresh.isEmpty {
                 filtering = true
@@ -527,8 +668,10 @@ struct VocabularyFileControls: View {
         let known = Set(state.settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
         let fresh = items.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
         candidates = fresh.map { VocabularyEntry(text: $0.text) }; selected = []
+        let screenLabel = screenScan?.source == .ocr ? D("Screen · OCR") : D("Screen · Accessibility")
         sources = Dictionary(uniqueKeysWithValues: fresh.map {
-            ($0.text, ($0.isProject ? F("Project", "项目") + " · " : "") + $0.sources.map(\.rawValue).joined(separator: " / "))
+            ($0.text, context == .screen ? screenLabel
+                : ($0.isProject ? F("Project", "项目") + " · " : "") + $0.sources.map(\.rawValue).joined(separator: " / "))
         })
     }
     private func importFile() {
@@ -538,7 +681,8 @@ struct VocabularyFileControls: View {
             let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
             guard size <= 20_000_000 else { throw FeatureError("The selected file is too large.") }
             candidates = try VocabularyFile.entries(Data(contentsOf: url))
-            contextMode = false; scanning = false; filtering = false; filterSummary = ""; scan = nil; scanError = ""; sources = [:]
+            context = nil; screenApp = nil; screenScan = nil; blocked = false
+            scanning = false; filtering = false; filterSummary = ""; scan = nil; scanError = ""; sources = [:]
             selected = Set(candidates.map(\.id)); showPreview = true
         } catch { state.error = .init(error: error) }
     }
@@ -557,6 +701,7 @@ struct OnboardingView: View {
     @State private var saveFailed = false
     @State private var mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var accessibilityAllowed = false
+    @State private var screenRecordingAllowed = false
 
     init(state: AppState, initialStep: Int = 0, initialDomains: Set<VocabularyDomain> = []) {
         self.state = state
@@ -610,6 +755,7 @@ struct OnboardingView: View {
             repeat {
                 mic = state.preview || AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
                 accessibilityAllowed = state.insertionAuthorized
+                screenRecordingAllowed = state.preview || ScreenRecordingPermission.granted
                 do { try await Task.sleep(nanoseconds: 500_000_000) }
                 catch { return }
             } while !Task.isCancelled
@@ -718,6 +864,15 @@ struct OnboardingView: View {
                                   granted: accessibilityAllowed, allowLabel: L("Allow Accessibility")) {
                         if !state.preview { TextInsertion.requestAccess() }
                         accessibilityAllowed = state.insertionAuthorized
+                    }
+                    Divider()
+                    // Optional; this step never turns on any on-screen context option.
+                    permissionRow(icon: "rectangle.dashed.badge.record", title: D("Screen Recording (optional)"),
+                                  detail: D("Only needed if you turn on reading windows with OCR in Settings."),
+                                  granted: screenRecordingAllowed, allowLabel: D("Allow Screen Recording")) {
+                        guard !state.preview else { return }
+                        ScreenRecordingPermission.request()
+                        screenRecordingAllowed = ScreenRecordingPermission.granted
                     }
                 }
                 Text(F("Accessibility enables shortcuts and insertion into other apps. You can also use VoiceDraft's editor without insertion permission.", "辅助功能权限用于全局快捷键和向其他应用插入文字。也可以先在 VoiceDraft 编辑器中使用。"))

@@ -198,9 +198,16 @@ public struct VocabularyProjection: Equatable {
     public var shadowedAutomatic = 0
     public var downgradedPriority = 0
     public var hasUnsupportedMetadata = false
+    /// Temporary on-screen terms actually included, after all vocabulary.
+    public var screenTerms: [String] = []
+    /// On-screen terms that did not fit the leftover budget or capability.
+    public var screenOmitted = 0
     public var context: String { terms.joined(separator: ", ") }
 
-    public static func make(_ source: AppVocabulary, for capability: VocabularyCapability) -> Self {
+    /// Vocabulary first, unchanged. `screenTerms` only use the leftover budget,
+    /// at weight 1 for weighted capabilities, and never affect `omitted`,
+    /// `shadowedAutomatic` or `downgradedPriority`.
+    public static func make(_ source: AppVocabulary, for capability: VocabularyCapability, screenTerms: [String] = []) -> Self {
         guard source.enabled else { return Self() }
         var result = Self()
         let sorted = source.inferenceEntries
@@ -234,6 +241,22 @@ public struct VocabularyProjection: Equatable {
                     else { weight = 5; result.downgradedPriority += 1 }
                 }
                 result.weighted[text] = weight; result.terms.append(text)
+            }
+        }
+        var folded = Set(seen.map { $0.lowercased() })
+        for raw in screenTerms {
+            let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, !text.contains(where: \.isNewline), folded.insert(text.lowercased()).inserted else { continue }
+            switch capability {
+            case .none: result.screenOmitted += 1
+            case .context:
+                guard result.terms.count < 300, contextSize + text.utf8.count + 2 <= 6000 else { result.screenOmitted += 1; continue }
+                result.terms.append(text); result.screenTerms.append(text); contextSize += text.utf8.count + 2
+            case .weighted:
+                let ascii = text.unicodeScalars.allSatisfy(\.isASCII)
+                let validLength = ascii ? text.split(whereSeparator: \.isWhitespace).count <= 7 : text.unicodeScalars.count <= 15
+                guard validLength, result.weighted.count < 2000 else { result.screenOmitted += 1; continue }
+                result.weighted[text] = 1; result.terms.append(text); result.screenTerms.append(text)
             }
         }
         return result

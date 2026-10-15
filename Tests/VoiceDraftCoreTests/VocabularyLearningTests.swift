@@ -155,3 +155,20 @@ final class VocabularyLearningTests: XCTestCase {
         XCTAssertTrue(vocabulary.writingContext.contains("herdr"))
     }
 }
+
+// On-screen terms are never promoted by discovery and never counted as usage.
+extension VocabularyLearningTests {
+    func testExcludedScreenTermsAreNeverPromotedAcrossTakes() {
+        var tracker = VocabularyDiscoveryTracker()
+        let screen = ScreenContextPolicy.keys(of: ["ScreenKit"])
+        XCTAssertEqual(tracker.confirmed(["ScreenKit", "OtherKit"], takeID: UUID(), excluding: screen), [])
+        XCTAssertEqual(tracker.confirmed(["ScreenKit", "OtherKit"], takeID: UUID(), excluding: screen), ["OtherKit"])
+        XCTAssertEqual(tracker.confirmed(["ScreenKit"], takeID: UUID()), [], "an unexcluded take only records a first observation")
+    }
+
+    func testUsageCountingIgnoresTermsThatAreNotStoredEntries() {
+        var vocabulary = AppVocabulary(words: "VoiceDraft")
+        XCTAssertFalse(vocabulary.recordUsage(in: "ScreenKit and Doubao appeared on screen"))
+        XCTAssertEqual(vocabulary.entries.map(\.text), ["VoiceDraft"]); XCTAssertEqual(vocabulary.entries[0].useCount, 0)
+    }
+}

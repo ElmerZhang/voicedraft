@@ -32,3 +32,18 @@ final class DoubaoTests: XCTestCase {
         XCTAssertNotNil((root["request"] as? [String: Any])?["corpus"])
     }
 }
+
+extension DoubaoTests {
+    func testHotwordsHoldVocabularyFirstThenScreenTermsUpTo100() throws {
+        let profile = ModelProfile(name: "Doubao", role: .speech, endpoint: "wss://fixture.invalid/api/v3/sauc/bigmodel", model: "bigmodel", adapter: .doubao)
+        let words = (0..<98).map { "Vocab\($0)" }
+        let frame = try DoubaoWire.start(profile: profile, vocabulary: AppVocabulary(words: words.joined(separator: "\n")),
+                                         screenTerms: ["ScreenA", "vocab1", "ScreenB", "ScreenC"])
+        let root = try JSONSerialization.jsonObject(with: frame.dropFirst(8)) as! [String: Any]
+        let context = ((root["request"] as? [String: Any])?["corpus"] as? [String: Any])?["context"] as! String
+        let hotwords = (try JSONSerialization.jsonObject(with: Data(context.utf8)) as! [String: Any])["hotwords"] as! [[String: String]]
+        XCTAssertEqual(hotwords.map { $0["word"]! }, words + ["ScreenA", "ScreenB"])
+        let screenOnly = try DoubaoWire.start(profile: profile, vocabulary: AppVocabulary(), screenTerms: ["ScreenA"])
+        XCTAssertTrue(String(decoding: screenOnly, as: UTF8.self).contains("ScreenA"))
+    }
+}

@@ -63,16 +63,24 @@ public final class LiveAudioFeed: @unchecked Sendable {
 extension SpeechClient {
     public static func transcribeLive(profile: ModelProfile, key: String, audio: AsyncThrowingStream<Data, Error>,
                                       vocabulary: AppVocabulary,
+                                      screenTerms: @escaping @Sendable () async -> [String] = { [] },
                                       onReady: @escaping @Sendable () async throws -> Void,
                                       onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
         if profile.adapter == .doubao {
-            return try await DoubaoSpeech.live(profile: profile, key: key, audio: audio, vocabulary: vocabulary, onReady: onReady, onUpdate: onUpdate)
+            return try await DoubaoSpeech.live(profile: profile, key: key, audio: audio, vocabulary: vocabulary,
+                                               screenTerms: screenTerms, onReady: onReady, onUpdate: onUpdate)
         }
         let request = try MessageASRRequests.connection(profile: profile, key: key)
         let taskID = UUID().uuidString
-        let start = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, live: true)
-        return try await MessageASRSession.transcribeLive(socket: NativeASRWebSocket(request: request), start: start,
-            audio: audio, taskID: taskID, onReady: onReady, onUpdate: onUpdate)
+        // Configuration errors still throw before any socket opens.
+        _ = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, live: true)
+        // The socket handshake starts now; the terms provider (gated by the app)
+        // overlaps it and is awaited immediately before the start frame is sent.
+        let socket = NativeASRWebSocket(request: request)
+        return try await MessageASRSession.transcribeLive(socket: socket, start: {
+            let terms = await screenTerms()
+            return try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, live: true, screenTerms: terms)
+        }, audio: audio, taskID: taskID, onReady: onReady, onUpdate: onUpdate)
     }
 }
 
@@ -85,6 +93,18 @@ private final class LiveUploadFence: @unchecked Sendable {
 
 extension MessageASRSession {
     static func transcribeLive(socket: any ASRWebSocket, start: String, audio: AsyncThrowingStream<Data, Error>, taskID: String,
+                               startTimeout: UInt64 = 15_000_000_000, finishTimeout: UInt64 = 30_000_000_000,
+                               totalTimeout: UInt64 = 660_000_000_000,
+                               onReady: @escaping @Sendable () async throws -> Void = {},
+                               onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+        try await transcribeLive(socket: socket, start: { start }, audio: audio, taskID: taskID, startTimeout: startTimeout,
+                                 finishTimeout: finishTimeout, totalTimeout: totalTimeout, onReady: onReady, onUpdate: onUpdate)
+    }
+
+    /// `start` builds the run-task frame; it is awaited immediately before it is sent,
+    /// inside the start deadline, so `onReady` still follows `task-started`.
+    static func transcribeLive(socket: any ASRWebSocket, start: @escaping @Sendable () async throws -> String,
+                               audio: AsyncThrowingStream<Data, Error>, taskID: String,
                                startTimeout: UInt64 = 15_000_000_000, finishTimeout: UInt64 = 30_000_000_000,
                                totalTimeout: UInt64 = 660_000_000_000,
                                onReady: @escaping @Sendable () async throws -> Void = {},
@@ -106,13 +126,19 @@ extension MessageASRSession {
         } onCancel: { socket.cancel() }
     }
 
-    private static func liveExchange(socket: any ASRWebSocket, start: String, audio: AsyncThrowingStream<Data, Error>, taskID: String,
+    private static func liveExchange(socket: any ASRWebSocket, start: @escaping @Sendable () async throws -> String, audio: AsyncThrowingStream<Data, Error>, taskID: String,
                                      startTimeout: UInt64, finishTimeout: UInt64,
                                      onReady: @escaping @Sendable () async throws -> Void,
                                      onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
         var results = MessageASRResults(taskID: taskID)
         let acknowledgement = try await withThrowingTaskGroup(of: String.self) { group in
-            group.addTask { try Task.checkCancellation(); try await socket.sendText(start); return try await socket.receive() }
+            group.addTask {
+                try Task.checkCancellation()
+                let frame = try await start()
+                try Task.checkCancellation()
+                try await socket.sendText(frame)
+                return try await socket.receive()
+            }
             group.addTask {
                 try await Task.sleep(nanoseconds: startTimeout)
                 throw VoiceDraftError.message("Speech recognition timed out. Try a shorter recording.")

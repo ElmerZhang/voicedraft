@@ -110,3 +110,44 @@ final class VocabularyRecognitionTests: XCTestCase {
         XCTAssertNil((disabled["parameters"] as? [String: Any])?["vocabulary"])
     }
 }
+
+// On-screen terms for the Whisper, Google, Qwen chat and Qwen Audio HTTP adapters.
+extension VocabularyRecognitionTests {
+    func testWhisperPromptAppendsScreenTermsAndCutsOnlyAtWholeTerms() throws {
+        let wav = WaveAudio.encode(Data(repeating: 0, count: 3200))
+        let whisper = ModelProfile(name: "Fixture", role: .speech, endpoint: "https://fixture.invalid/v1/audio/transcriptions", model: "custom-whisper", adapter: .whisper)
+        func prompt(_ vocabulary: AppVocabulary, _ screen: [String]) throws -> String {
+            let body = String(decoding: try XCTUnwrap(WhisperRequests.speech(profile: whisper, key: "synthetic-key", wav: wav, vocabulary: vocabulary,
+                                                                             boundary: "fixture", screenTerms: screen).httpBody), as: UTF8.self)
+            guard let start = body.range(of: "name=\"prompt\"\r\n\r\n") else { return "" }
+            return String(body[start.upperBound...].prefix { $0 != "\r\n" })
+        }
+        XCTAssertEqual(try prompt(AppVocabulary(words: "VoiceDraft"), ["ScreenKit"]), "VoiceDraft, ScreenKit")
+        let terms = (0..<20).map { "Term\($0)" + String(repeating: "x", count: 95) }
+        let cut = try prompt(AppVocabulary(words: terms.joined(separator: "\n")), ["ScreenKit"])
+        XCTAssertLessThanOrEqual(cut.count, 1_800)
+        XCTAssertTrue(cut.components(separatedBy: ", ").allSatisfy(terms.contains), "no partial term")
+        XCTAssertEqual(WhisperRequests.promptTerms(["abc", "defg"], limit: 8), "abc")
+    }
+
+    func testGoogleQwenChatAndAudioHTTPReceiveScreenTermsAfterVocabulary() throws {
+        let google = ModelProfile(name: "Google", role: .speech, endpoint: "https://speech.googleapis.com/v2/projects/test/locations/global/recognizers/_:recognize", model: "chirp_3", extraJSON: #"{"languageCodes":["en-US"]}"#, adapter: .googleSpeech)
+        let request = try GoogleSpeech.request(profile: google, token: "synthetic-token", pcm: Data(repeating: 0, count: 3200),
+                                               vocabulary: AppVocabulary(words: "VoiceDraft"), screenTerms: ["ScreenKit"])
+        let root = try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as! [String: Any]
+        let phrases = (((root["config"] as? [String: Any])?["adaptation"] as? [String: Any])?["phraseSets"] as? [[String: Any]])?
+            .first.flatMap { ($0["inlinePhraseSet"] as? [String: Any])?["phrases"] as? [[String: String]] }
+        XCTAssertEqual(phrases?.map { $0["value"]! }, ["VoiceDraft", "ScreenKit"])
+
+        let wav = WaveAudio.encode(Data(repeating: 0, count: 3200))
+        var chat = ModelProfile.qwen(.speech); chat.selectModel("qwen3-asr-flash")
+        let chatRequest = try QwenRequests.speech(profile: chat, key: "synthetic-key", wav: wav, vocabulary: AppVocabulary(words: "VoiceDraft"), screenTerms: ["ScreenKit"])
+        let chatBody = try JSONSerialization.jsonObject(with: XCTUnwrap(chatRequest.httpBody)) as! [String: Any]
+        XCTAssertEqual((chatBody["messages"] as? [[String: Any]])?.first?["content"] as? String, "VoiceDraft, ScreenKit")
+
+        var audio = ModelProfile.qwen(.speech); audio.selectModel("qwen-audio-3.1-asr-flash")
+        let audioRequest = try AudioHTTPRequests.speech(profile: audio, key: "synthetic-key", wav: wav, vocabulary: AppVocabulary(words: "VoiceDraft"), screenTerms: ["ScreenKit"])
+        let audioBody = try JSONSerialization.jsonObject(with: XCTUnwrap(audioRequest.httpBody)) as! [String: Any]
+        XCTAssertEqual((audioBody["parameters"] as? [String: Any])?["vocabulary"] as? [String: Int], ["VoiceDraft": 3, "ScreenKit": 1])
+    }
+}

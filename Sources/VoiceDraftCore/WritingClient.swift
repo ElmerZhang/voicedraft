@@ -2,11 +2,19 @@ import Foundation
 
 public enum WritingClient {
     /// Convert the common prompt (also used by vocabulary learning) into the selected wire protocol.
-    public static func adapt(_ original: URLRequest, profile: ModelProfile, key: String, stream: Bool) throws -> URLRequest {
+    /// Streaming Chat Completions requests ask for a final usage chunk unless `extraJSON` sets `stream_options`.
+    public static func adapt(_ original: URLRequest, profile: ModelProfile, key: String, stream: Bool,
+                             includeUsage: Bool = true) throws -> URLRequest {
+        try adapted(original, profile: profile, key: key, stream: stream, includeUsage: includeUsage).request
+    }
+
+    static func adapted(_ original: URLRequest, profile: ModelProfile, key: String, stream: Bool,
+                        includeUsage: Bool) throws -> (request: URLRequest, addedStreamUsage: Bool) {
         var request = original
         guard var body = try JSONSerialization.jsonObject(with: original.httpBody ?? Data()) as? [String: Any],
               let messages = body["messages"] as? [[String: Any]] else { throw FeatureError("Invalid writing request.") }
         body["stream"] = stream
+        var addedStreamUsage = false
         switch profile.adapter {
         case .anthropic:
             body.removeValue(forKey: "messages")
@@ -22,27 +30,38 @@ public enum WritingClient {
                 ["role": message["role"] as? String ?? "user", "content": message["content"] as? String ?? ""]
             }
             body["store"] = false
-        case .qwenChatWriting, .chatCompletions: break
+        case .qwenChatWriting, .chatCompletions:
+            if stream, includeUsage, body["stream_options"] == nil,
+               (try? QwenRequests.extras(profile.extraJSON))?["stream_options"] == nil {
+                body["stream_options"] = ["include_usage": true]
+                addedStreamUsage = true
+            }
         default: throw FeatureError("Choose a writing protocol.")
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         request.setValue(stream ? "text/event-stream" : "application/json", forHTTPHeaderField: "Accept")
-        return request
+        return (request, addedStreamUsage)
     }
 
+    /// `usage` receives the provider's reported token counts once, when the response carries them.
     public static func complete(_ original: URLRequest, profile: ModelProfile, key: String,
-                                onUpdate: (@Sendable (String) async -> Void)? = nil) async throws -> String {
-        let request = try adapt(original, profile: profile, key: key, stream: onUpdate != nil)
+                                onUpdate: (@Sendable (String) async -> Void)? = nil,
+                                usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> String {
         if let onUpdate {
+            let first = try adapted(original, profile: profile, key: key, stream: true, includeUsage: true)
             return try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await stream(request, adapter: profile.adapter, onUpdate: onUpdate) }
+                group.addTask {
+                    try await streamWithUsageFallback(first, original: original, profile: profile, key: key, onUpdate: onUpdate, usage: usage)
+                }
                 group.addTask { try await Task.sleep(nanoseconds: 180_000_000_000); throw FeatureError("The writing request timed out.") }
                 defer { group.cancelAll() }
                 return try await group.next()!
             }
         }
+        let request = try adapt(original, profile: profile, key: key, stream: false)
         let (data, response) = try await HTTPTransport().send(request)
         try ProviderFailure.check(data, response: response)
+        if let usage, let reported = ProviderUsage.parse(writing: data, adapter: profile.adapter) { usage(reported) }
         return try parse(data, adapter: profile.adapter)
     }
 
@@ -60,36 +79,90 @@ public enum WritingClient {
             .filter { $0["type"] as? String == "output_text" }.compactMap { $0["text"] as? String }.joined())
     }
 
+    /// A compatible service that rejects `stream_options` gets one retry without it (and reports no usage).
+    static func streamWithUsageFallback(_ first: (request: URLRequest, addedStreamUsage: Bool), original: URLRequest,
+                                        profile: ModelProfile, key: String, onUpdate: @Sendable (String) async -> Void,
+                                        usage: (@Sendable (ProviderUsage) -> Void)?,
+                                        configuration: @autoclosure () -> URLSessionConfiguration = .ephemeral) async throws -> String {
+        do {
+            return try await stream(first.request, adapter: profile.adapter, onUpdate: onUpdate, usage: usage,
+                                    retryStreamOptions: first.addedStreamUsage, configuration: configuration())
+        } catch is StreamOptionsRejected {
+            let retry = try adapt(original, profile: profile, key: key, stream: true, includeUsage: false)
+            return try await stream(retry, adapter: profile.adapter, onUpdate: onUpdate, usage: usage, configuration: configuration())
+        }
+    }
+
+    /// Thrown only for HTTP 400 naming `stream_options` on a request where VoiceDraft added it.
+    struct StreamOptionsRejected: Error {}
+
+    static func requestsStreamUsage(_ request: URLRequest) -> Bool {
+        guard let body = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data())) as? [String: Any],
+              let options = body["stream_options"] as? [String: Any] else { return false }
+        return options["include_usage"] as? Bool == true
+    }
+
     static func stream(_ request: URLRequest, adapter: ModelAdapter,
-                               onUpdate: @Sendable (String) async -> Void, configuration: URLSessionConfiguration = .ephemeral) async throws -> String {
+                       onUpdate: @Sendable (String) async -> Void,
+                       usage: (@Sendable (ProviderUsage) -> Void)? = nil, retryStreamOptions: Bool = false,
+                       configuration: URLSessionConfiguration = .ephemeral,
+                       usageGraceNanoseconds: UInt64 = 5_000_000_000) async throws -> String {
         let config = configuration
         config.urlCache = nil; config.httpCookieStorage = nil; config.timeoutIntervalForResource = 180
         let delegate = HTTPTransport()
         let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         let (bytes, response) = try await session.bytes(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw FeatureError("Writing service returned HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0). Check the model and credentials.")
+        guard let http = response as? HTTPURLResponse else { throw FeatureError("Invalid HTTP response.") }
+        guard (200..<300).contains(http.statusCode) else {
+            // Bounded error body: provider codes only; the message itself is never shown or logged.
+            var data = Data()
+            for try await byte in bytes { guard data.count < 64_000 else { break }; data.append(byte) }
+            if retryStreamOptions, http.statusCode == 400, String(decoding: data, as: UTF8.self).contains("stream_options") {
+                throw StreamOptionsRejected()
+            }
+            try ProviderFailure.check(data, response: http)
+            throw ProviderFailure.http(status: http.statusCode)
         }
         // A gateway may ignore stream=true. Parse its bounded JSON response instead.
         guard http.value(forHTTPHeaderField: "Content-Type")?.lowercased().contains("text/event-stream") == true else {
             var data = Data()
             for try await byte in bytes { guard data.count < 2_000_000 else { throw FeatureError("Writing response too large.") }; data.append(byte) }
+            if let usage, let reported = ProviderUsage.parse(writing: data, adapter: adapter) { usage(reported) }
             let text = try parse(data, adapter: adapter); await onUpdate(text); return text
         }
         var parser = WritingStream(adapter: adapter), framer = SSEFramer(), size = 0
         var lastUpdate = Date.distantPast
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            size += 1
-            guard size <= 4_000_000 else { throw FeatureError("Writing stream too large.") }
-            if let frame = try framer.append(byte) {
-                try parser.consume(event: frame.event, data: frame.data)
-                if Date().timeIntervalSince(lastUpdate) > 0.04 { await onUpdate(parser.text); lastUpdate = Date() }
-                if parser.complete { break }
+        // With include_usage, the usage chunk follows the finish event; wait briefly for it
+        // (or [DONE]/EOF) so a server that keeps the connection open cannot stall the take.
+        let waitsForUsage = (adapter == .chatCompletions || adapter == .qwenChatWriting) && requestsStreamUsage(request)
+        var grace: Task<Void, Never>?
+        defer { grace?.cancel() }
+        do {
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                size += 1
+                guard size <= 4_000_000 else { throw FeatureError("Writing stream too large.") }
+                if let frame = try framer.append(byte) {
+                    try parser.consume(event: frame.event, data: frame.data)
+                    if Date().timeIntervalSince(lastUpdate) > 0.04 { await onUpdate(parser.text); lastUpdate = Date() }
+                    if parser.complete {
+                        if !waitsForUsage || parser.usage != nil || parser.ended { break }
+                        if grace == nil {
+                            grace = Task { [session] in
+                                try? await Task.sleep(nanoseconds: usageGraceNanoseconds)
+                                if !Task.isCancelled { session.invalidateAndCancel() }
+                            }
+                        }
+                    }
+                }
             }
+        } catch {
+            // A complete response stays valid when the connection ends while waiting for usage.
+            guard parser.complete, !(error is CancellationError), !Task.isCancelled else { throw error }
         }
         if !parser.complete, let frame = try framer.finish() { try parser.consume(event: frame.event, data: frame.data) }
+        if let usage, let reported = parser.usage { usage(reported) }
         let result = try parser.finalText(); await onUpdate(result); return result
     }
 }
@@ -99,17 +172,26 @@ public struct WritingStream {
     public let adapter: ModelAdapter
     public private(set) var text = ""
     public private(set) var complete = false
+    /// Chat Completions `[DONE]` was received.
+    public private(set) var ended = false
+    /// Token counts from the stream's usage events, when the provider sent them.
+    public private(set) var usage: ProviderUsage?
     private var validFinish = false
     public init(adapter: ModelAdapter) { self.adapter = adapter }
     public mutating func consume(event: String, data: String) throws {
         if data == "[DONE]" {
             guard validFinish else { throw FeatureError("Writing stream ended without a complete response.") }
-            complete = true; return
+            complete = true; ended = true; return
         }
         guard let root = try JSONSerialization.jsonObject(with: Data(data.utf8)) as? [String: Any] else { throw FeatureError("Invalid stream event.") }
         if root["error"] != nil || event == "error" { throw FeatureError("The writing service interrupted its response.") }
         switch adapter {
         case .anthropic:
+            switch root["type"] as? String ?? event {
+            case "message_start": usage = ProviderUsage.parse(anthropicMessageStart: root) ?? usage
+            case "message_delta": usage = ProviderUsage.merge(usage, anthropicMessageDelta: root)
+            default: break
+            }
             if let delta = root["delta"] as? [String: Any] {
                 if delta["type"] as? String == "text_delta" { text += delta["text"] as? String ?? "" }
                 if let reason = delta["stop_reason"] as? String {
@@ -123,10 +205,12 @@ public struct WritingStream {
             if type == "response.output_text.delta" { text += root["delta"] as? String ?? "" }
             if ["response.failed", "response.incomplete", "response.refusal.delta"].contains(type) { throw FeatureError("The writing response is incomplete or refused.") }
             if type == "response.completed", let response = root["response"] as? [String: Any] {
+                usage = ProviderUsage.parse(responsesCompleted: root)
                 let final = try WritingClient.parse(JSONSerialization.data(withJSONObject: response), adapter: .responses)
                 text = final; complete = true
             }
         default:
+            if let reported = ProviderUsage.parse(chatCompletions: root) { usage = reported }
             if let choice = (root["choices"] as? [[String: Any]])?.first {
                 if let delta = choice["delta"] as? [String: Any] { text += delta["content"] as? String ?? "" }
                 if let reason = choice["finish_reason"] as? String {

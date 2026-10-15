@@ -45,6 +45,8 @@ final class AppState: ObservableObject {
     private var resultBeforeCorrection: String?
     private var vocabularyDiscoveries = VocabularyDiscoveryTracker()
     private var store: LocalStore?
+    /// Device-local model usage log; writes nothing in preview mode.
+    private(set) var usageLog = UsageLog(directory: nil)
     let updater = UpdateController()
     let preview: Bool
     private let recorder = AudioRecorder()
@@ -126,12 +128,15 @@ final class AppState: ObservableObject {
         }
     }
 
-    func filterAgentContext(_ candidates: [AgentContextCandidate]) async throws -> (terms: [String], model: String) {
+    /// `source` tells agent-context discovery from on-screen extraction in the usage log.
+    func filterAgentContext(_ candidates: [AgentContextCandidate], source: ModelUsageSource) async throws -> (terms: [String], model: String) {
         guard !preview else { return ([], "Preview") }
         guard let profile = settings.writing else { throw FeatureError("Choose a writing model in Models to filter vocabulary.") }
         let credential = try key(for: profile)
-        let terms = try await ContextVocabularyFilter.filter(candidates: candidates.map(\.text), profile: profile, key: credential,
-            projectNames: Set(candidates.filter(\.isProject).map(\.text)))
+        let terms = try await metered(.vocabularyFilter, source: source, profile: profile) { usage in
+            try await ContextVocabularyFilter.filter(candidates: candidates.map(\.text), profile: profile, key: credential,
+                projectNames: Set(candidates.filter(\.isProject).map(\.text)), usage: usage)
+        }
         try Task.checkCancellation()
         return (terms, profile.name)
     }
@@ -191,6 +196,7 @@ final class AppState: ObservableObject {
         }
         do {
             let store = try LocalStore(); self.store = store
+            usageLog = UsageLog(store: store)
             settings = try store.read("settings", fallback: SharedSettings())
             try settings.validate()
             device = try store.read("device", fallback: DeviceSettings())
@@ -381,21 +387,24 @@ final class AppState: ObservableObject {
             liveFeed = feed
             task = Task { [self] in
                 do {
-                    let raw = try await SpeechClient.transcribeLive(profile: speech, key: speechKey, audio: feed.stream, vocabulary: vocabulary,
-                        // Overlaps the socket handshake; never waits past t0 + 250 ms.
-                        screenTerms: { await coordinator.asrTerms(take: id, until: screenGate) },
-                        onReady: { [weak self] in
-                            guard let self else { throw CancellationError() }
-                            try await self.beginLiveCapture(id: id, inputID: inputDeviceID, feed: feed)
-                        }, onUpdate: { [weak self] text in
-                            await self?.updateLiveTranscript(text, id: id)
-                        })
+                    // The recording duration is final by the time the live call returns.
+                    let raw = try await metered(.speech, source: .dictationLiveSpeech, profile: speech, streamed: true, takeID: id, audioSeconds: elapsed) { usage in
+                        try await SpeechClient.transcribeLive(profile: speech, key: speechKey, audio: feed.stream, vocabulary: vocabulary,
+                            // Overlaps the socket handshake; never waits past t0 + 250 ms.
+                            screenTerms: { await coordinator.asrTerms(take: id, until: screenGate) },
+                            onReady: { [weak self] in
+                                guard let self else { throw CancellationError() }
+                                try await self.beginLiveCapture(id: id, inputID: inputDeviceID, feed: feed)
+                            }, onUpdate: { [weak self] text in
+                                await self?.updateLiveTranscript(text, id: id)
+                            }, usage: usage)
+                    }
                     try Task.checkCancellation(); guard generation == id else { return }
                     guard phase == "processing", elapsed >= 0.25 else {
                         throw VoiceDraftError.message("The recording was too short. Try again.")
                     }
                     runAudio = feed.archivedWAV
-                    try await deliverTranscript(raw, id: id, duration: elapsed)
+                    try await deliverTranscript(raw, id: id, duration: elapsed, source: .dictationWriting)
                 } catch { fail(error, id: id) }
             }
         } else {
@@ -465,15 +474,19 @@ final class AppState: ObservableObject {
                     effects.end(sound: device.features.sounds)
                     if runRetainAudio { runAudio = wav }
                     guard duration >= 0.25 else { throw VoiceDraftError.message("The recording was too short. Try again.") }
-                    let raw = try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary,
-                                                                screenTerms: screenContext.currentASRTerms(take: id))
+                    let screenTerms = screenContext.currentASRTerms(take: id)
+                    let raw = try await metered(.speech, source: .dictationSpeech, profile: speech, takeID: id, audioSeconds: duration) { usage in
+                        try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary,
+                                                          screenTerms: screenTerms, usage: usage)
+                    }
                     try Task.checkCancellation(); guard generation == id else { return }
-                    try await deliverTranscript(raw, id: id, duration: duration)
+                    try await deliverTranscript(raw, id: id, duration: duration, source: .dictationWriting)
                 } catch { fail(error, id: id) }
             }
         }
     }
-    private func deliverTranscript(_ raw: String, id: UUID, duration: Double) async throws {
+    /// `source` names the caller's writing call site in the usage log.
+    private func deliverTranscript(_ raw: String, id: UUID, duration: Double, source: ModelUsageSource) async throws {
         guard generation == id, let configuration = runSettings else { throw CancellationError() }
         // The take's screen text is dropped on every exit; reprocess and style edits have none.
         defer { screenContext.end(take: id) }
@@ -488,8 +501,10 @@ final class AppState: ObservableObject {
             try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
             let request = try QwenRequests.writing(profile: writing, key: writingKey, text: raw, mode: mode,
                 settings: configuration, selection: selected, application: destination?.name ?? "VoiceDraft", screenContext: screen)
-            do { output = try await WritingClient.complete(request, profile: writing, key: writingKey) { [weak self] text in
-                await self?.updateWriting(text, id: id)
+            do { output = try await metered(.writing, source: source, profile: writing, mode: mode, streamed: true, takeID: id) { usage in
+                try await WritingClient.complete(request, profile: writing, key: writingKey, onUpdate: { [weak self] text in
+                    await self?.updateWriting(text, id: id)
+                }, usage: usage)
             } }
             catch {
                 try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
@@ -660,8 +675,11 @@ final class AppState: ObservableObject {
                 else {
                     let request = try QwenRequests.writing(profile: writing, key: key(for: writing), text: raw,
                         mode: mode, settings: configuration, selection: selected)
-                    output = try await WritingClient.complete(request, profile: writing, key: key(for: writing)) { [weak self] text in
-                        await self?.updateWriting(text, id: id)
+                    let writingKey = try key(for: writing)
+                    output = try await metered(.writing, source: .studioWriting, profile: writing, mode: mode, streamed: true, takeID: id) { usage in
+                        try await WritingClient.complete(request, profile: writing, key: writingKey, onUpdate: { [weak self] text in
+                            await self?.updateWriting(text, id: id)
+                        }, usage: usage)
                     }
                 }
                 try Task.checkCancellation(); guard generation == id else { return }
@@ -723,7 +741,10 @@ final class AppState: ObservableObject {
             guard let self else { return }
             do {
                 let request = try QwenRequests.vocabularyLearning(profile: profile, key: self.key(for: profile), sample: sample)
-                let response = try await WritingClient.complete(request, profile: profile, key: self.key(for: profile))
+                let learningKey = try self.key(for: profile)
+                let response = try await self.metered(.learning, source: .vocabularyLearning, profile: profile, takeID: takeID) { usage in
+                    try await WritingClient.complete(request, profile: profile, key: learningKey, usage: usage)
+                }
                 try Task.checkCancellation()
                 guard self.vocabularyLearningID == id, self.settings.writing == profile,
                       self.settings.vocabulary.enabled else { return }
@@ -945,11 +966,15 @@ extension AppState {
                 if transcribeAgain {
                     guard let audioID = entry.audioID, let store, let speech = configuration.speech else { throw FeatureError("No retained recording is available.") }
                     let wav = try Data(contentsOf: store.audioURL(audioID))
-                    raw = try await SpeechClient.transcribe(profile: speech, key: key(for: speech), wav: wav, vocabulary: configuration.vocabulary)
+                    let speechKey = try key(for: speech)
+                    raw = try await metered(.speech, source: .historyTranscribeAgain, profile: speech, takeID: id, audioSeconds: entry.duration) { usage in
+                        try await SpeechClient.transcribe(profile: speech, key: speechKey, wav: wav, vocabulary: configuration.vocabulary, usage: usage)
+                    }
                     if device.features.retainAudio { runAudio = wav }
                 }
                 try Task.checkCancellation(); guard generation == id else { return }
-                try await deliverTranscript(raw, id: id, duration: entry.duration)
+                // Both History actions rewrite through the same writing pass.
+                try await deliverTranscript(raw, id: id, duration: entry.duration, source: .historyRewrite)
             } catch { fail(error, id: id) }
         }
     }
@@ -969,7 +994,7 @@ extension AppState {
             do {
                 guard let writing = configuration.writing else { throw FeatureError("Choose a writing model.") }
                 runWritingKey = try key(for: writing)
-                try await deliverTranscript(destination.selection, id: id, duration: 0)
+                try await deliverTranscript(destination.selection, id: id, duration: 0, source: .styleApplyToSelection)
             } catch { fail(error, id: id) }
         }
     }
@@ -991,5 +1016,25 @@ extension AppState {
                 try self.store?.write(updated, name: "settings"); self.settings = updated; self.device.dirty = true; try self.persistDevice()
             } catch { self.error = .init(error: error) }
         }
+    }
+}
+
+extension AppState {
+    /// Times one inference call and appends its usage record, success or failure.
+    /// The call's result or error passes through unchanged; logging never fails a take.
+    func metered<T>(_ kind: ModelUsageKind, source: ModelUsageSource, profile: ModelProfile, mode: WritingMode? = nil, streamed: Bool = false,
+                    takeID: UUID? = nil, audioSeconds: @autoclosure () -> Double? = nil,
+                    _ call: (@escaping @Sendable (ProviderUsage) -> Void) async throws -> T) async throws -> T {
+        let collector = ProviderUsageCollector(), date = Date(), start = ContinuousClock.now
+        let result: Result<T, Error>
+        do { result = .success(try await call(collector.sink)) } catch { result = .failure(error) }
+        let elapsed = (ContinuousClock.now - start).components
+        let latency = Int(elapsed.seconds) * 1000 + Int(elapsed.attoseconds / 1_000_000_000_000_000)
+        var failure: Error?
+        if case .failure(let error) = result { failure = error }
+        usageLog.record(ModelUsageRecord(date: date, kind: kind, source: source, profile: profile, mode: mode, streamed: streamed,
+                                         audioSeconds: audioSeconds(), latencyMs: latency, failure: failure,
+                                         takeID: takeID, usage: collector.usage))
+        return try result.get()
     }
 }

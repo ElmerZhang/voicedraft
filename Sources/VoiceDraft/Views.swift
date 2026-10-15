@@ -371,7 +371,10 @@ struct ProfileEditor: View {
                             do {
                                 let key = try keyDraft.keyForRequest { try state.key(for: profile) }
                                 let request = try QwenRequests.writing(profile: profile, key: key, text: "Reply with OK.", mode: .ask, settings: SharedSettings())
-                                _ = try await WritingClient.complete(request, profile: profile, key: key); problem = L("Connection successful.")
+                                _ = try await state.metered(.connectionTest, source: .modelsConnectionTest, profile: profile, mode: .ask) { usage in
+                                    try await WritingClient.complete(request, profile: profile, key: key, usage: usage)
+                                }
+                                problem = L("Connection successful.")
                             } catch { problem = error.localizedDescription }
                         }
                     }.disabled(testing)

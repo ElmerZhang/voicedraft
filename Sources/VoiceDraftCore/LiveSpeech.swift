@@ -65,7 +65,9 @@ extension SpeechClient {
                                       vocabulary: AppVocabulary,
                                       screenTerms: @escaping @Sendable () async -> [String] = { [] },
                                       onReady: @escaping @Sendable () async throws -> Void,
-                                      onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+                                      onUpdate: @escaping @Sendable (String) async -> Void,
+                                      usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> String {
+        // Doubao reports no usage; the app still logs the recording duration.
         if profile.adapter == .doubao {
             return try await DoubaoSpeech.live(profile: profile, key: key, audio: audio, vocabulary: vocabulary,
                                                screenTerms: screenTerms, onReady: onReady, onUpdate: onUpdate)
@@ -80,7 +82,7 @@ extension SpeechClient {
         return try await MessageASRSession.transcribeLive(socket: socket, start: {
             let terms = await screenTerms()
             return try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, live: true, screenTerms: terms)
-        }, audio: audio, taskID: taskID, onReady: onReady, onUpdate: onUpdate)
+        }, audio: audio, taskID: taskID, onReady: onReady, onUpdate: onUpdate, usage: usage)
     }
 }
 
@@ -96,9 +98,10 @@ extension MessageASRSession {
                                startTimeout: UInt64 = 15_000_000_000, finishTimeout: UInt64 = 30_000_000_000,
                                totalTimeout: UInt64 = 660_000_000_000,
                                onReady: @escaping @Sendable () async throws -> Void = {},
-                               onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+                               onUpdate: @escaping @Sendable (String) async -> Void,
+                               usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> String {
         try await transcribeLive(socket: socket, start: { start }, audio: audio, taskID: taskID, startTimeout: startTimeout,
-                                 finishTimeout: finishTimeout, totalTimeout: totalTimeout, onReady: onReady, onUpdate: onUpdate)
+                                 finishTimeout: finishTimeout, totalTimeout: totalTimeout, onReady: onReady, onUpdate: onUpdate, usage: usage)
     }
 
     /// `start` builds the run-task frame; it is awaited immediately before it is sent,
@@ -108,13 +111,14 @@ extension MessageASRSession {
                                startTimeout: UInt64 = 15_000_000_000, finishTimeout: UInt64 = 30_000_000_000,
                                totalTimeout: UInt64 = 660_000_000_000,
                                onReady: @escaping @Sendable () async throws -> Void = {},
-                               onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+                               onUpdate: @escaping @Sendable (String) async -> Void,
+                               usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> String {
         try await withTaskCancellationHandler {
             defer { socket.cancel() }
             return try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask {
                     try await liveExchange(socket: socket, start: start, audio: audio, taskID: taskID,
-                        startTimeout: startTimeout, finishTimeout: finishTimeout, onReady: onReady, onUpdate: onUpdate)
+                        startTimeout: startTimeout, finishTimeout: finishTimeout, onReady: onReady, onUpdate: onUpdate, usage: usage)
                 }
                 group.addTask {
                     try await Task.sleep(nanoseconds: totalTimeout)
@@ -129,7 +133,8 @@ extension MessageASRSession {
     private static func liveExchange(socket: any ASRWebSocket, start: @escaping @Sendable () async throws -> String, audio: AsyncThrowingStream<Data, Error>, taskID: String,
                                      startTimeout: UInt64, finishTimeout: UInt64,
                                      onReady: @escaping @Sendable () async throws -> Void,
-                                     onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+                                     onUpdate: @escaping @Sendable (String) async -> Void,
+                                     usage: (@Sendable (ProviderUsage) -> Void)?) async throws -> String {
         var results = MessageASRResults(taskID: taskID)
         let acknowledgement = try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
@@ -181,6 +186,7 @@ extension MessageASRSession {
                         await onUpdate(previous)
                     }
                 }
+                if let usage, let reported = received.usage { usage(reported) }
                 return try received.transcript()
             }
             defer { group.cancelAll(); socket.cancel() }

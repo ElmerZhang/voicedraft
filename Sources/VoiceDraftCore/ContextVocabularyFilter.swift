@@ -46,13 +46,15 @@ public enum ContextVocabularyFilter {
         return selection.keep.map { candidates[$0] }
     }
 
-    public static func filter(candidates: [String], profile: ModelProfile, key: String, projectNames: Set<String> = []) async throws -> [String] {
+    public static func filter(candidates: [String], profile: ModelProfile, key: String, projectNames: Set<String> = [],
+                              usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> [String] {
         try Task.checkCancellation()
         guard !candidates.isEmpty else { return [] }
         let request = try request(candidates: candidates, profile: profile, key: key, projectNames: projectNames)
         let (data, response) = try await HTTPTransport().send(request, maxBytes: 64_000)
         try Task.checkCancellation()
         try ProviderFailure.check(data, response: response)
+        if let usage, let reported = ProviderUsage.parse(writing: data, adapter: profile.adapter) { usage(reported) }
         return try selected(from: WritingClient.parse(data, adapter: profile.adapter), candidates: candidates)
     }
 }

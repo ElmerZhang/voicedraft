@@ -200,6 +200,67 @@ OCR never delays ASR start. If AX is late, live ASR proceeds without screen term
 
 History, recordings, microphone settings, paste preferences, and server login details are not part of the shared configuration. Disabling history affects future entries; deletion removes existing entries separately. Before an explicit remote replacement, the previous nonsecret settings are copied to `settings-before-sync.json`. This backup excludes keys; it is not a full encrypted vault backup.
 
+### Model usage log
+
+Every inference call appends one JSON line to `~/Library/Application Support/VoiceDraft/Usage/usage-YYYY-MM.jsonl` (month of the call's start in the local time zone; folder 0700, files 0600). It exists to evaluate cost later. It is always on, device-local and append-only. It is never synced (`SharedSettings` is untouched), never read or shown by the UI, and independent of the History switch, history retention pruning and **Clear history**. Preview mode writes nothing. To clear it, delete the `Usage` folder. Write failures are silent and never interrupt a take.
+
+Covered calls: live and recorded speech recognition, History **Transcribe again**, writing for dictation and Studio, vocabulary learning, agent-context vocabulary filtering, and the profile editor's **Test connection**. Model discovery (`/models`) is not inference and is not logged. `AppState.metered` wraps each call; core clients report provider usage through an optional `@Sendable (ProviderUsage) -> Void` sink and know nothing about the file.
+
+Record schema `v: 1` (`ModelUsageRecord`):
+
+| Field | Meaning |
+| --- | --- |
+| `v`, `id`, `date` | Schema version, record UUID, call start (ISO 8601) |
+| `kind` | `speech`, `writing`, `vocabularyFilter`, `learning` or `connectionTest` |
+| `source` | Exact call site (`ModelUsageSource`, stable raw values; see below) |
+| `adapter`, `model`, `profileID`, `profileName` | `ModelAdapter` raw value, model ID and profile identity |
+| `host` | Endpoint host only; never the path, query or credentials |
+| `mode` | `WritingMode` raw value for writing and connection tests |
+| `streamed` | Streaming writing request or live speech socket |
+| `audioSeconds` | Recording duration for speech calls (live: final take duration; History retry: stored duration) |
+| `latencyMs` | Wall time from call start to result or error |
+| `outcome`, `failure` | `ok` or `failed`; failure is only `http:<status>`, `timeout`, `cancelled`, `network` or `other` |
+| `takeID` | Run generation shared by a take's speech, writing and learning calls |
+| `usage`, `usageAvailable` | `ProviderUsage` when the provider reported counts; failed calls usually have none |
+
+`source` values. Raw values are a log contract: add cases, never rename them.
+
+| Source | Call site |
+| --- | --- |
+| `dictation.liveSpeech` | Live WebSocket recognition during recording (Qwen Message, Doubao) |
+| `dictation.speech` | HTTP recognition after the recording stops |
+| `dictation.writing` | Writing pass of a dictation take |
+| `studio.writing` | Studio **Process** on the editor text |
+| `history.transcribeAgain` | History **Transcribe again** recognition of the retained recording |
+| `history.rewrite` | Writing pass of History **Rewrite transcript**, and of **Transcribe again** after its recognition (both share one path) |
+| `style.applyToSelection` | Applying a writing style to selected text in another app |
+| `vocabulary.learning` | Correction learning and dictation discovery |
+| `vocabulary.agentContextFilter` | Model filtering of agent-context (Codex/Claude) candidates |
+| `vocabulary.screenContextFilter` | Model filtering of **Extract words from this screen** candidates |
+| `models.connectionTest` | Profile editor **Test connection** |
+
+`ProviderUsage` normalizes `inputTokens`, `outputTokens`, `totalTokens` (input + output when not reported), `cachedInputTokens`, `audioTokens` and `reportedAudioSeconds`, and keeps every numeric field of the provider's usage object in `raw` with dot keys (for example `prompt_tokens_details.audio_tokens`, `cache_creation_input_tokens`), bounded to 64 fields. Anthropic `input_tokens` excludes cache reads/writes; see `raw`. A chunked long Qwen HTTP recording sums its chunks. Never written: transcript, result, selection, prompt, screen or vocabulary text, provider error messages, credentials, or full URLs.
+
+| Adapter | Usage source |
+| --- | --- |
+| Chat Completions, Qwen chat writing | Non-streaming `usage`; streaming adds `"stream_options": {"include_usage": true}` and reads the final usage chunk |
+| Anthropic | `message_start.message.usage` merged with cumulative `message_delta.usage`; non-streaming `usage` |
+| Responses | `response.completed` → `response.usage`; non-streaming `usage` |
+| Qwen chat speech (Qwen3-ASR-Flash), Qwen Audio HTTP | Top-level `usage` (tokens, audio details, `seconds` when present) |
+| Whisper-compatible | `usage` when present (`type: duration, seconds` or token counts) |
+| Qwen Message WebSocket | `task-finished` `payload.usage` when sent (for example `duration`) |
+| Doubao, Google Speech | None; only `audioSeconds` and latency |
+
+Streaming Chat Completions requests get `stream_options` unless the profile's additional JSON defines `stream_options` (then it is sent unchanged). If the service answers HTTP 400 and the error body mentions `stream_options`, the request is retried once without it and logged with `usageAvailable: false`. After the finish event the client waits up to five seconds for the usage chunk, `[DONE]` or EOF; a finished response is kept when the connection then closes. Non-2xx streaming responses now go through `ProviderFailure` like non-streaming ones, so the HTTP status and recognized provider codes are shown and logged.
+
+Monthly totals per model:
+
+```sh
+jq -s 'group_by(.adapter + " " + .model) | map({adapter: .[0].adapter, model: .[0].model, calls: length,
+  input: (map(.usage.inputTokens // 0) | add), output: (map(.usage.outputTokens // 0) | add),
+  audioSeconds: (map(.audioSeconds // 0) | add)})' ~/Library/Application\ Support/VoiceDraft/Usage/usage-2026-10.jsonl
+```
+
 ## Device shortcut migration
 
 Shortcut bindings live in per-device `device.json` (`DesktopOptions.shortcuts`), not in the synced `SharedSettings` payload, so the sync protocol and encryption envelope are unaffected. Builds before `insertLast` decode the `shortcuts` array strictly (an unknown action makes the whole device file fail to load) and accept at most five bindings. Newer builds therefore write the five original actions under `shortcuts` and newer actions under a separate `additionalShortcuts` key, which older builds ignore. On decode, both arrays are merged, entries with unknown action names are skipped, and `ShortcutBinding.fillingDefaults` appends any missing action with its default binding, disabled when an enabled binding already uses the same keys. An older build that saves the device file drops `additionalShortcuts`; the next newer launch re-adds the default.

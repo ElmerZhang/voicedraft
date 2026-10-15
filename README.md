@@ -72,6 +72,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 - Insert last result again (Control-Option-V or the menu bar item) pastes the most recent result into the input focused now, for takes that landed in the wrong app. It reuses clipboard-preserving insertion and writes no new History entry.
 - Opt-in on-screen context (off by default): when dictating into another app, names and terms visible in its front window become low-priority recognition hints, and a short excerpt near the cursor helps Polish and Translate match names and tone. Text comes from Accessibility, with optional window-only on-device OCR (Screen Recording). **Extract words from this screen…** in the menu bar adds reviewed terms to Vocabulary. Visible text is sent to your configured speech and writing providers only while the feature is on; it stays in memory, is never saved, written to history or synced, and password managers plus any apps you exclude are never read.
 - A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
+- A local usage log of token counts per model call; no text. It is a monthly JSONL file under `~/Library/Application Support/VoiceDraft/Usage/`, never synced or shown; see [architecture](docs/architecture.md#model-usage-log).
 - A Go sync server with SQLite persistence and a standalone binary; model calls go directly from Mac to the configured endpoint. No external Swift packages.
 
 ## Verification

@@ -72,6 +72,8 @@ final class LocalStore {
 }
 
 extension LocalStore {
+    /// Monthly model usage logs (`usage-YYYY-MM.jsonl`); see UsageLog.
+    var usageDirectory: URL { directory.appendingPathComponent("Usage", isDirectory: true) }
     func audioURL(_ id: UUID) -> URL { directory.appendingPathComponent("Audio", isDirectory: true).appendingPathComponent(id.uuidString + ".wav") }
     func saveAudio(_ data: Data) throws -> UUID {
         _ = try WaveAudio.decode(data)

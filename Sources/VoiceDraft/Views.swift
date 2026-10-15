@@ -7,6 +7,7 @@ struct StudioView: View {
     @Environment(\.locale) private var interfaceLocale
     @ObservedObject var state: AppState
     @State private var accessibilityAllowed: Bool?
+    @State private var screenRecordingAllowed: Bool?
     private var dictateBinding: ShortcutBinding? { state.device.features.shortcuts.first { $0.action == .dictate && $0.enabled } }
     var body: some View {
         let _ = interfaceLocale
@@ -123,6 +124,27 @@ struct StudioView: View {
                     Spacer(minLength: VD.Space.s)
                     if !allowed { Button(L("Allow Accessibility")) { TextInsertion.requestAccess() } }
                 }
+                // Only relevant when window OCR is turned on for on-screen context.
+                if state.device.features.screenContext && state.device.features.screenContextOCR {
+                    let recording = screenRecordingAllowed ?? state.preview
+                    HStack(alignment: .center, spacing: VD.Space.m) {
+                        Image(systemName: recording ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 18)).foregroundStyle(recording ? VD.Palette.success : VD.Palette.warning)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(recording ? D("Screen Recording is allowed") : D("Screen Recording is not allowed")).font(VD.Font.cardTitle)
+                            Text(recording
+                                 ? D("Only the front window is captured, and only when an app exposes no text.")
+                                 : D("OCR is skipped until you allow it. Text from Accessibility still works. If you just allowed it, quit and reopen VoiceDraft."))
+                                .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: VD.Space.s)
+                        if !recording {
+                            Button(D("Allow")) { if !state.preview { ScreenRecordingPermission.request() } }
+                                .accessibilityLabel(D("Allow Screen Recording"))
+                        }
+                    }
+                }
                 Divider()
                 VDSettingRow(title: D("Automatic insertion"), detail: L("Insert into the original app after recording")) {
                     VDSwitch(L("Insert into the original app after recording"), isOn: Binding(get: { state.device.autoPaste }, set: { state.saveDevice(autoPaste: $0, history: state.device.keepHistory) }))
@@ -130,9 +152,10 @@ struct StudioView: View {
             }
         }
         .task {
-            // Accessibility can be granted in System Settings while Home is visible.
+            // Accessibility and Screen Recording can be granted in System Settings while Home is visible.
             repeat {
                 accessibilityAllowed = state.insertionAuthorized
+                screenRecordingAllowed = state.preview || ScreenRecordingPermission.granted
                 do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
             } while !Task.isCancelled
         }

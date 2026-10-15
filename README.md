@@ -42,7 +42,7 @@ The floating recording panel does not take keyboard focus. If the original field
 - **Home**: enabled shortcuts as key caps, local usage counts, and the full recording/text-testing workspace. Transcribe, polish, translate, edit selection, and ask modes are preserved.
 - **History**: records grouped by day, search, dictation/question filters, original transcript details, copy, deletion, and the local-history toggle.
 - **Vocabulary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
-- **Settings** (sidebar or **Command-comma**): an overlay with shortcuts, recording, audio, language, general and update preferences, plus Personalization, Models, Sync, About, and Help tabs. Models and Sync are settings tabs, not pages. Save writing style and translation target in Personalization.
+- **Settings** (sidebar or **Command-comma**): an overlay with shortcuts, recording, on-screen context, audio, language, general and update preferences, plus Personalization, Models, Sync, About, and Help tabs. Models and Sync are settings tabs, not pages. Save writing style and translation target in Personalization.
 
 The interface follows the system light or dark appearance; the recording HUD is always dark. The shared visual language is defined in [docs/design.md](docs/design.md).
 
@@ -70,6 +70,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
 - Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
 - Insert last result again (Control-Option-V or the menu bar item) pastes the most recent result into the input focused now, for takes that landed in the wrong app. It reuses clipboard-preserving insertion and writes no new History entry.
+- Opt-in on-screen context (off by default): when dictating into another app, names and terms visible in its front window become low-priority recognition hints, and a short excerpt near the cursor helps Polish and Translate match names and tone. Text comes from Accessibility, with optional window-only on-device OCR (Screen Recording). **Extract words from this screen…** in the menu bar adds reviewed terms to Vocabulary. Visible text is sent to your configured speech and writing providers only while the feature is on; it stays in memory, is never saved, written to history or synced, and password managers plus any apps you exclude are never read.
 - A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
 - A Go sync server with SQLite persistence and a standalone binary; model calls go directly from Mac to the configured endpoint. No external Swift packages.
 

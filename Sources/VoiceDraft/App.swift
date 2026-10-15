@@ -67,9 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let previewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_PREVIEWS"]
         let onboardingPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_ONBOARDING"]
         let hudPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_HUD_PREVIEWS"]
+        let sheetPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_SHEETS"]
         let hudPreview = ProcessInfo.processInfo.environment["VOICEDRAFT_HUD_PREVIEW"]
         hudPreviewOnly = hudPreview != nil
-        let isolatedPreview = (Bundle.main.object(forInfoDictionaryKey: "VoiceDraftPreviewMode") as? Bool == true) || previewDirectory != nil || onboardingPreviewDirectory != nil || hudPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
+        let isolatedPreview = (Bundle.main.object(forInfoDictionaryKey: "VoiceDraftPreviewMode") as? Bool == true) || previewDirectory != nil || onboardingPreviewDirectory != nil || hudPreviewDirectory != nil || sheetPreviewDirectory != nil || hudPreview != nil || ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW"] == "1"
         state = AppState(preview: isolatedPreview)
         if isolatedPreview, let appearance = ProcessInfo.processInfo.environment["VOICEDRAFT_PREVIEW_APPEARANCE"] {
             // Preview-only override so captures can be rendered in either appearance.
@@ -135,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if let onboardingPreviewDirectory { captureOnboardingPreviews(to: onboardingPreviewDirectory) }
         else if let previewDirectory { capturePreviews(to: previewDirectory) }
         else if let hudPreviewDirectory { captureHUDPreviews(to: hudPreviewDirectory) }
+        else if let sheetPreviewDirectory { captureSheetPreviews(to: sheetPreviewDirectory) }
         else if let hudPreview { state.prepareHUDPreview(hudPreview); showHUD() }
     }
     private func showStyleMenu() {
@@ -290,6 +292,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSApp.terminate(nil)
         }
     }
+    /// Renders every sheet's content alone, in an offscreen borderless window at the sheet's fixed
+    /// `.vdSheet(width:)` width and its fitting height. Synthetic fixtures only: no Keychain, model,
+    /// network, screen or persisted data access, and no scans run.
+    private func captureSheetPreviews(to path: String) {
+        let notes = ScreenContextApplication(pid: 0, bundleID: "com.apple.Notes", name: "Notes")
+        let screenTerms = ["Kubernetes", "OAuth 2.0", "Grafana", "Lin Wei", "PostgreSQL", "VoiceDraft Sync"].map { AgentContextCandidate(text: $0, sources: []) }
+        var agentScan = AgentContextScan()
+        agentScan.sources = [.codex, .claude]; agentScan.filesRead = 42; agentScan.limited = true
+        let agentTerms = [AgentContextCandidate(text: "VoiceDraftCore", sources: [.codex, .claude], isProject: true),
+                          AgentContextCandidate(text: "modernc.org/sqlite", sources: [.codex]),
+                          AgentContextCandidate(text: "ScreenContextReader", sources: [.claude], isProject: true),
+                          AgentContextCandidate(text: "Bailian", sources: [.claude]),
+                          AgentContextCandidate(text: "DashScope", sources: [.codex, .claude])]
+        func review(_ fixture: VocabularyFileControls.ReviewFixture) -> AnyView { AnyView(VocabularyFileControls(state: state, fixture: fixture)) }
+        var term = VocabularyEntry(text: "Kubernetes", boost: 70, priority: true)
+        term.origin = .automatic; term.aliases = ["k8s", "kube"]; term.language = "en-US"
+        let customWriting = ModelProfile(name: "OpenAI-compatible", role: .writing, endpoint: "https://api.example.com/v1/chat/completions",
+                                         model: "example-chat-model", adapter: .chatCompletions)
+        state.addPreviewProfile(customWriting)
+        let sheets: [(name: String, view: AnyView)] = [
+            ("profile-speech", AnyView(ProfileEditor(state: state, profile: state.settings.speech ?? state.settings.profiles[0]))),
+            ("profile-writing", AnyView(ProfileEditor(state: state, profile: customWriting))),
+            ("vocabulary-term", AnyView(VocabularyEntryEditor(entry: term, save: { _ in }))),
+            ("style-editor", AnyView(StyleEditor(style: WritingStyle(name: "Concise email", prompt: "Keep it short and friendly. Use one greeting line, at most three sentences, and end with a clear next step."), save: { _ in true }))),
+            ("bulk-add", AnyView(VocabularyBulkAddSheet(state: state, words: .constant("Kubernetes\nOAuth 2.0\nLin Wei"), isPresented: .constant(true)))),
+            ("review-file", review(.init(context: nil, candidates: agentTerms.map { AgentContextCandidate(text: $0.text, sources: []) }))),
+            ("review-agent", review(.init(context: .agent, scan: agentScan, candidates: agentTerms, filtered: (5, 9, "qwen-plus")))),
+            ("review-agent-scanning", review(.init(context: .agent, scanning: true))),
+            ("review-screen-reading", review(.init(context: .screen, app: notes, scanning: true))),
+            ("review-screen-accessibility", review(.init(context: .screen, app: notes, screenScan: ScreenContextScan(candidates: screenTerms, source: .accessibility, applicationName: "Notes", charactersRead: 1800),
+                                                         candidates: screenTerms, filtered: (6, 11, "qwen-plus")))),
+            ("review-screen-ocr", review(.init(context: .screen, app: notes, screenScan: ScreenContextScan(candidates: screenTerms, source: .ocr, applicationName: "Notes", charactersRead: 950),
+                                               candidates: screenTerms, filtered: (6, 8, "qwen-plus")))),
+            ("review-screen-no-text", review(.init(context: .screen, app: notes, screenScan: ScreenContextScan(source: .ocr, applicationName: "Notes", charactersRead: 0)))),
+            ("review-screen-no-candidates", review(.init(context: .screen, app: notes, screenScan: ScreenContextScan(source: .accessibility, applicationName: "Notes", charactersRead: 640))))
+        ]
+        Task {
+            do {
+                let directory = URL(fileURLWithPath: path, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let sheetWindow = SheetCaptureWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 600, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
+                sheetWindow.isReleasedWhenClosed = false
+                // Key and active, so native controls (the prominent default button) draw in their active state.
+                NSApp.activate(ignoringOtherApps: true)
+                sheetWindow.makeKeyAndOrderFront(nil)
+                try await Task.sleep(nanoseconds: 800_000_000)
+                for (name, sheet) in sheets {
+                    let view = NSHostingView(rootView: sheet)
+                    sheetWindow.contentView = view
+                    sheetWindow.setContentSize(view.fittingSize)
+                    NSApp.activate(ignoringOtherApps: true)
+                    sheetWindow.makeKeyAndOrderFront(nil)
+                    try await Task.sleep(nanoseconds: 500_000_000)
+                    sheetWindow.setContentSize(view.fittingSize)
+                    view.layoutSubtreeIfNeeded()
+                    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
+                    try data.write(to: directory.appendingPathComponent("sheet-\(name).png"))
+                }
+                sheetWindow.orderOut(nil)
+                // History's Clear history is a SwiftUI confirmationDialog, which macOS presents as an
+                // alert; render the equivalent NSAlert (same message and buttons) as a stand-in.
+                let alert = NSAlert()
+                alert.messageText = L("Delete all local history?")
+                alert.addButton(withTitle: L("Delete history")).hasDestructiveAction = true
+                alert.addButton(withTitle: L("Cancel"))
+                alert.layout()
+                // View caching skips the alert's vibrant material, so draw its content over the
+                // window background color of the alert's appearance.
+                if let content = alert.window.contentView,
+                   let foreground = content.bitmapImageRepForCachingDisplay(in: content.bounds),
+                   let output = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
+                    content.cacheDisplay(in: content.bounds, to: foreground)
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: output)
+                    alert.window.effectiveAppearance.performAsCurrentDrawingAppearance {
+                        NSColor.windowBackgroundColor.setFill(); content.bounds.fill()
+                    }
+                    foreground.draw(in: content.bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                    NSGraphicsContext.restoreGraphicsState()
+                    try output.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("sheet-history-clear.png"))
+                }
+                print("Rendered \(sheets.count) synthetic sheets and the Clear history confirmation without Keychain, model, network, screen or persisted data access.")
+            } catch { fputs("Sheet preview failed: \(error.localizedDescription)\n", stderr) }
+            NSApp.terminate(nil)
+        }
+    }
     private func showHUD() {
         hudTransition += 1
         if !hud.isVisible {
@@ -376,4 +466,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 private final class DictationPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+}
+
+/// Offscreen, borderless host for sheet captures; it becomes key so controls render active.
+private final class SheetCaptureWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }

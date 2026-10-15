@@ -228,6 +228,11 @@ final class AppState: ObservableObject {
     func hasKey(for profile: ModelProfile) throws -> Bool { preview ? false : try KeychainStore.contains(profile.id.uuidString) }
     func syncToken() throws -> String { preview ? "" : try KeychainStore.read("sync-token") }
     func syncPassphrase() throws -> String { preview ? "" : try KeychainStore.read("sync-passphrase") }
+    /// Preview-only, in memory: lets sheet captures show an inactive (deletable) profile.
+    func addPreviewProfile(_ profile: ModelProfile) {
+        guard preview else { return }
+        settings.profiles.append(profile)
+    }
     private func persistDevice() throws { try store?.write(device, name: "device") }
 
     func save(_ settings: SharedSettings, credential: (UUID, String)? = nil) {

@@ -52,7 +52,7 @@ Secondary text uses `.secondary`; tertiary hints use `.tertiary`. Error text use
 | `.vdEditorBox()` | Every `TextEditor`, so inputs look like inputs. |
 | `.vdSheet(width:)` | Every sheet: padding 24, fixed width, canvas background, accent tint. |
 
-Sheet layout: `sheetTitle`, optional detail, content, then a footer `HStack` ordered destructive action · `Spacer` · secondary actions · Cancel · confirming `.borderedProminent` action. Escape cancels (`.cancelAction`) and Return confirms (`.defaultAction`). Return inside a `TextEditor` still inserts a newline.
+Sheet layout: `sheetTitle`, optional detail, content, then a footer `HStack` ordered destructive action (`.tint(VD.Palette.danger)`; the sheet's accent tint would otherwise color it like Cancel) · `Spacer` · secondary actions · Cancel · confirming `.borderedProminent` action. Escape cancels (`.cancelAction`) and Return confirms (`.defaultAction`). Return inside a `TextEditor` still inserts a newline.
 
 ## Hit targets
 
@@ -93,4 +93,4 @@ New copy goes into `Desktop.strings` through `D("…")` in all eight catalogs (`
 
 ## Verification
 
-`VOICEDRAFT_CAPTURE_PREVIEWS`, `VOICEDRAFT_CAPTURE_ONBOARDING` and `VOICEDRAFT_CAPTURE_HUD_PREVIEWS` render every surface in isolated preview mode. `VOICEDRAFT_PREVIEW_APPEARANCE=dark` renders the same captures in dark mode. Inspect both before shipping a visual change and keep the captures under `dist/`.
+`VOICEDRAFT_CAPTURE_PREVIEWS`, `VOICEDRAFT_CAPTURE_ONBOARDING`, `VOICEDRAFT_CAPTURE_HUD_PREVIEWS` and `VOICEDRAFT_CAPTURE_SHEETS` render every surface in isolated preview mode. `VOICEDRAFT_PREVIEW_APPEARANCE=dark` renders the same captures in dark mode. Inspect both before shipping a visual change and keep the captures under `dist/`.

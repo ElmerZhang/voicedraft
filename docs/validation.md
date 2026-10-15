@@ -38,6 +38,12 @@
   - Relaunching with OCR on shows a due alert at launch.
   - A Slack take shows many terms in the HUD, and the diagnostics line lists the senders.
   - The first take after a fresh Slack launch still meets the cold tree (about 2.2 s). The walk ends early with a small tree, and the second take uses the warm tree.
+## 2026-10-15 · Sheet captures and zh-Hans dark review
+
+- New `VOICEDRAFT_CAPTURE_SHEETS=<dir>` renders 13 sheet states plus the Clear history confirmation (`sheet-*.png`, see architecture.md) from preview `AppState` and synthetic fixtures; no Keychain, model, network, screen or persisted data access. The sheet window is made key and the app active before each capture so default and tinted buttons render in their active state; the confirmation is an `NSAlert` stand-in drawn over the appearance's window background, because view caching skips the alert material.
+- Reviewed every sheet in en and zh-Hans, light and dark, plus all pages, the On-screen context section, onboarding and the HUD in zh-Hans dark (`VOICEDRAFT_PREVIEW_FIXTURES=1`). Fixed: the profile editor's Delete profile button took the sheet's accent tint and looked like Cancel (now `danger`-tinted); the screen review sheet showed "Reading the screen…" twice while scanning (the empty state now reads "Extracting candidate terms locally…" under the progress row); the speech profile's vocabulary projection used `.caption` (10pt, below the 11pt minimum) and a secondary `.headline`; it now uses `detail` text and a primary semibold heading like "Advanced model parameters". No strings changed.
+- Confirmed: footer order destructive · Spacer · secondary · Cancel · prominent in every sheet; all fields labelled; accent tint in dark; source labels "Screen · Accessibility", "Screen · OCR", "Project · Codex / Claude"; Vocabulary's "Extract from Notes" button and import/export section; 28pt History/Vocabulary overflow triggers; the deliberate trade-offs (no Home use-case cards, keep-history toggle in the overflow menu, system appearance, first settings tab named 设置) render cleanly in zh dark. Noted, not changed: white text on the dark `accent` (#6B91FF) prominent buttons is about 3:1.
+- `swift build --disable-sandbox` had zero warnings; `swift test --disable-sandbox` passed 259 tests, 4 skipped; both localization checks and `./scripts/build-app.sh` passed.
 
 ## 2026-10-15 · Local model usage log
 

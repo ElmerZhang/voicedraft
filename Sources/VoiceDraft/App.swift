@@ -150,6 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open.target = self; menu.addItem(open)
         let record = NSMenuItem(title: L("Start / stop dictation"), action: #selector(toggleRecording), keyEquivalent: "")
         record.target = self; menu.addItem(record)
+        let reinsert = NSMenuItem(title: L("Insert last result"), action: #selector(insertLastResult), keyEquivalent: "")
+        reinsert.target = self; menu.addItem(reinsert)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: L("Quit VoiceDraft"), action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit); statusItem.menu = menu
@@ -328,6 +330,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     @objc private func toggleRecording() { state.toggle(external: true) }
+    @objc private func insertLastResult() {
+        // The status menu does not activate VoiceDraft, but let it finish closing
+        // so focus capture sees the previously frontmost app's input.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.state.insertLastResult() }
+    }
     @objc private func quitApp() { state.cancel(); NSApp.terminate(nil) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }

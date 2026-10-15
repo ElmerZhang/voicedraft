@@ -279,3 +279,7 @@
 "Paste sent · check the input field" = "붙여넣기를 전송했습니다. 입력란을 확인하세요";
 "Delete" = "삭제";
 "Save" = "저장";
+"Insert last result" = "마지막 결과 다시 삽입";
+"Nothing to insert yet. Dictate first." = "아직 삽입할 결과가 없습니다. 먼저 받아쓰기를 하세요.";
+"Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "단축키가 아직 눌려 있어 붙여넣지 않았습니다. 대신 결과를 복사하세요.";
+"No text field is focused. Copy the result instead." = "포커스된 입력란이 없습니다. 대신 결과를 복사하세요.";

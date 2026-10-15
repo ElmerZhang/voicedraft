@@ -279,3 +279,7 @@
 "Paste sent · check the input field" = "Einfügen gesendet · Eingabefeld prüfen";
 "Delete" = "Löschen";
 "Save" = "Speichern";
+"Insert last result" = "Letztes Ergebnis erneut einfügen";
+"Nothing to insert yet. Dictate first." = "Noch nichts zum Einfügen. Diktiere zuerst.";
+"Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Die Kurzbefehltasten waren noch gedrückt, daher wurde nichts eingefügt. Kopiere stattdessen das Ergebnis.";
+"No text field is focused. Copy the result instead." = "Kein Textfeld ist ausgewählt. Kopiere stattdessen das Ergebnis.";

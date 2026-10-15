@@ -279,3 +279,7 @@
 "Paste sent · check the input field" = "Paste sent · check the input field";
 "Delete" = "Delete";
 "Save" = "Save";
+"Insert last result" = "Insert last result";
+"Nothing to insert yet. Dictate first." = "Nothing to insert yet. Dictate first.";
+"Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Shortcut keys were still held, so nothing was pasted. Copy the result instead.";
+"No text field is focused. Copy the result instead." = "No text field is focused. Copy the result instead.";

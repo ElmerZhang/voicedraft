@@ -702,6 +702,11 @@ extension AppState {
         showingOnboarding = false
     }
     func shortcutEvent(_ action: ShortcutAction, down: Bool) {
+        if action == .insertLast {
+            // Act on release; the modifiers are then awaited separately before pasting.
+            if !down { insertLastResult() }
+            return
+        }
         if action == .styleSelection {
             if down && !busy { chooseSelectionStyle?() }
             return
@@ -725,6 +730,73 @@ extension AppState {
         case .finish:
             if phase == "starting" { finishWhenReady = true } else { finish() }
         }
+    }
+    /// Inserts the last result (`result`, from a recording or Studio) again into
+    /// whichever input is focused now, through the normal insertion pipeline.
+    /// This is not a new take: no history entry, recent context, vocabulary
+    /// learning or correction observation. It never starts a recording.
+    func insertLastResult() {
+        guard !busy else { return }
+        let text = result
+        notice = ""; hudCopied = false
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            error = .init(error: VoiceDraftError.message("Nothing to insert yet. Dictate first."))
+            hudText = ""; hudKind = .failure; showHUD?()
+            return
+        }
+        error = ""
+        generation = UUID(); let id = generation
+        phase = "processing"; status = "Inserting text…"
+        task = Task { [self] in
+            // The hotkey's Control/Option (or any modifier) can still be held after
+            // its key is released; a paste sent now could arrive as ⌃⌥⌘V.
+            let released = await Self.waitForModifierRelease()
+            guard generation == id, !Task.isCancelled else { return }
+            guard released else {
+                reinsertFallback(text, id: id, error: VoiceDraftError.message("Shortcut keys were still held, so nothing was pasted. Copy the result instead."))
+                return
+            }
+            guard !preview, insertionAuthorized else {
+                reinsertFallback(text, id: id, error: VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here."))
+                return
+            }
+            let destination = TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true)
+            defer { destination?.focusGuard?.stop() }
+            guard let destination, destination.editable else {
+                reinsertFallback(text, id: id, error: VoiceDraftError.message("No text field is focused. Copy the result instead."))
+                return
+            }
+            do {
+                let outcome = try await TextInsertion.insert(text, into: destination) { [weak self] in
+                    guard let self, self.generation == id else { return }
+                    self.hideHUD?()
+                }
+                try Task.checkCancellation(); guard generation == id else { return }
+                switch outcome {
+                case .confirmed: status = "Text inserted"
+                case .sentToTerminal: status = "Paste sent to terminal"
+                case .sentWithoutConfirmation: status = "Paste sent · check the input field"
+                }
+                phase = "idle"; hudKind = .compact
+            } catch {
+                guard !(error is CancellationError) else { return }
+                reinsertFallback(text, id: id, error: error)
+            }
+        }
+    }
+    private func reinsertFallback(_ text: String, id: UUID, error: Error) {
+        guard generation == id else { return }
+        phase = "idle"; self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
+        hudText = text; hudCopied = false; hudKind = .result; showHUD?()
+    }
+    /// Polls for up to about one second until Shift, Control, Option and Command are all up.
+    private static func waitForModifierRelease() async -> Bool {
+        let held: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand]
+        for _ in 0..<50 {
+            if CGEventSource.flagsState(.combinedSessionState).intersection(held).isEmpty { return true }
+            do { try await Task.sleep(nanoseconds: 20_000_000) } catch { return false }
+        }
+        return CGEventSource.flagsState(.combinedSessionState).intersection(held).isEmpty
     }
     /// Opens the in-window settings overlay on a tab ("Settings", "Personalization", "Models", "Sync", "About", "Help").
     func openSettings(_ tab: String = "Settings") {

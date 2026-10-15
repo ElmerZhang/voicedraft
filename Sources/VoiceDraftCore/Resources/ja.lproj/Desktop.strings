@@ -113,3 +113,5 @@
 "Runs shortcuts in any app and inserts text where you type." = "どのアプリでもショートカットを使い、入力中の位置にテキストを挿入します。";
 "Not allowed" = "未許可";
 "Allow" = "許可";
+"Insert last result" = "前回の結果を再挿入";
+"Paste the last result again, wherever the cursor is now." = "前回の結果を、今カーソルがある場所にもう一度貼り付けます。";

@@ -279,3 +279,7 @@
 "Paste sent · check the input field" = "已发送粘贴，请查看输入框";
 "Delete" = "删除";
 "Save" = "保存";
+"Insert last result" = "重新插入上一段";
+"Nothing to insert yet. Dictate first." = "还没有可插入的内容，请先听写。";
+"Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "快捷键仍被按住，没有粘贴。请改为复制结果。";
+"No text field is focused. Copy the result instead." = "当前没有聚焦的输入框。请改为复制结果。";

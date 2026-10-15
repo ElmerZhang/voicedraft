@@ -131,12 +131,12 @@ extension Notification.Name {
     static let voiceDraftOpenSettings = Notification.Name("VoiceDraft.openSettings")
 }
 
-/// Informational list of the enabled dictate / translate / edit / ask shortcuts, shown as key caps.
+/// Informational list of the enabled dictate / translate / edit / ask / insert-last shortcuts, shown as key caps.
 private struct ShortcutSummaryList: View {
     @ObservedObject var state: AppState
     var rowPadding: CGFloat = 20
     private var bindings: [ShortcutBinding] {
-        [ShortcutAction.dictate, .translate, .edit, .ask].compactMap { action in
+        [ShortcutAction.dictate, .translate, .edit, .ask, .insertLast].compactMap { action in
             state.device.features.shortcuts.first { $0.action == action && $0.enabled }
         }
     }
@@ -175,6 +175,7 @@ private struct ShortcutSummaryList: View {
         case .translate: return D("Your voice, in another language")
         case .edit: return D("Speak an instruction for selected text.")
         case .ask: return D("Speak a question. Make room for an idea.")
+        case .insertLast: return action.detail ?? ""
         default: return D("Messy thoughts → clear writing")
         }
     }

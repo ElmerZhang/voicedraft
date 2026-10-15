@@ -67,6 +67,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 - One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Vocabulary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
 - Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
+- Insert last result again (Control-Option-V or the menu bar item) pastes the most recent result into the input focused now, for takes that landed in the wrong app. It reuses clipboard-preserving insertion and writes no new History entry.
 - A menu bar entry, recording HUD with the bound input device, cancellation, clipboard preservation, searchable local history, and history deletion/opt-out.
 - A Go sync server with SQLite persistence and a standalone binary; model calls go directly from Mac to the configured endpoint. No external Swift packages.
 

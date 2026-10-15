@@ -113,3 +113,5 @@
 "Runs shortcuts in any app and inserts text where you type." = "Active les raccourcis dans toutes les apps et insère le texte là où vous tapez.";
 "Not allowed" = "Non autorisé";
 "Allow" = "Autoriser";
+"Insert last result" = "Réinsérer le dernier résultat";
+"Paste the last result again, wherever the cursor is now." = "Colle à nouveau le dernier résultat là où se trouve le curseur.";

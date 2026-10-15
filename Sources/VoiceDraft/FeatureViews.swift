@@ -19,7 +19,12 @@ extension ShortcutAction {
         case .edit: return L("Edit selection")
         case .ask: return L("Ask")
         case .styleSelection: return F("Apply style to selection", "为选中文字应用风格")
+        case .insertLast: return D("Insert last result")
         }
+    }
+    /// One-line explanation for actions whose title alone is not self-explanatory.
+    var detail: String? {
+        self == .insertLast ? D("Paste the last result again, wherever the cursor is now.") : nil
     }
 }
 
@@ -77,7 +82,7 @@ struct ShortcutPreferences: View {
             Text(F("Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish.", "按住说话，松开结束；轻按后锁定录音，再按一次结束。启动麦克风时松开也会保留你的操作。"))
                 .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach(state.device.features.shortcuts) { binding in
-                VDSettingRow(title: binding.action.title) {
+                VDSettingRow(title: binding.action.title, detail: binding.action.detail) {
                     HStack(spacing: VD.Space.s) {
                         if capturing == binding.action {
                             Text(F("Press shortcut… (Esc cancels)", "按下快捷键…（Esc 取消）")).font(VD.Font.detail.weight(.medium)).foregroundStyle(VD.Palette.accent)

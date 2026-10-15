@@ -113,3 +113,5 @@
 "Runs shortcuts in any app and inserts text where you type." = "在任意应用中使用快捷键，并在你输入的位置插入文字。";
 "Not allowed" = "未允许";
 "Allow" = "允许";
+"Insert last result" = "重新插入上一段";
+"Paste the last result again, wherever the cursor is now." = "把上一次的结果再插入到当前光标处。";

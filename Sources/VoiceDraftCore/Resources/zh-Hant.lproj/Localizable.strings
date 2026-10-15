@@ -192,6 +192,7 @@
 "Test connection" = "測試連接";
 "Testing…" = "正在測試…";
 "Text inserted" = "文字已插入";
+"Still finishing the previous take…" = "上一則還在處理中…";
 "The app vocabulary contains too many entries or duplicate entry IDs." = "App 詞庫條目過多，或存在重復的詞條 ID。";
 "The configuration is too large to sync. Reduce vocabulary or advanced parameter data before syncing." = "配置過大，無法同步。請減少詞庫或高級參數的數據量後再試。";
 "The input focus or selection changed. Copy the result when ready." = "輸入焦點或選區已改變，請手動複製結果。";

@@ -192,6 +192,7 @@
 "Test connection" = "Probar conexión";
 "Testing…" = "Probando…";
 "Text inserted" = "Texto insertado";
+"Still finishing the previous take…" = "Todavía se está terminando la toma anterior…";
 "The app vocabulary contains too many entries or duplicate entry IDs." = "El vocabulario contiene demasiadas entradas o ID duplicados.";
 "The configuration is too large to sync. Reduce vocabulary or advanced parameter data before syncing." = "La configuración es demasiado grande para sincronizar. Reduce el vocabulario o los parámetros avanzados.";
 "The input focus or selection changed. Copy the result when ready." = "El foco de entrada o la selección cambió. Copia el resultado manualmente.";

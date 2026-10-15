@@ -175,7 +175,18 @@ struct ShortcutPreferences: View {
 
     private func apply(_ action: ShortcutAction, update: (inout ShortcutBinding) -> Void) {
         end()
-        if let options = candidate(action, update: update) { state.saveFeatures(options) }
+        if let options = candidate(action, update: update) { save(options, for: action) }
+    }
+
+    /// Saves and reinstalls the global shortcuts. The settings overlay hides
+    /// `state.error`, so a failed save (for example no event tap for Fn
+    /// without Accessibility) is shown under the row instead.
+    private func save(_ options: DesktopOptions, for action: ShortcutAction) {
+        state.error = ""
+        state.saveFeatures(options)
+        if !state.error.isEmpty && state.device.features.shortcuts != options.shortcuts {
+            problems[action] = L(state.error); state.error = ""
+        }
     }
 
     private static func modifierBits(_ flags: NSEvent.ModifierFlags) -> UInt32 {
@@ -191,18 +202,21 @@ struct ShortcutPreferences: View {
         capturing = action; problems[action] = nil
         liveModifiers = Self.modifierBits(NSEvent.modifierFlags)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-            if event.type == .keyDown && event.keyCode == 53 { end(); return nil }
-            let modifiers = Self.modifierBits(event.modifierFlags)
-            if event.type == .flagsChanged && UInt32(event.keyCode) != ShortcutBinding.fnKeyCode {
-                liveModifiers = modifiers; return event
+            let keyDown = event.type == .keyDown
+            // isARepeat raises an AppKit exception on flagsChanged (Fn and other
+            // modifiers), so read it from key-downs only.
+            switch ShortcutRecorder.decide(eventType: keyDown ? .keyDown : .flagsChanged, keyCode: UInt32(event.keyCode),
+                                           modifiers: Self.modifierBits(event.modifierFlags),
+                                           fnHeld: event.modifierFlags.contains(.function), isRepeat: keyDown && event.isARepeat) {
+            case .cancel: end(); return nil
+            case .updateLiveModifiers(let held): liveModifiers = held; return event
+            case .ignore: return nil
+            case .record(let keyCode, let modifiers):
+                // A rejected combination keeps recording so the user can try another.
+                guard let options = candidate(action, update: { $0.keyCode = keyCode; $0.modifiers = modifiers; $0.enabled = true }) else { return nil }
+                end(); save(options, for: action)
+                return nil
             }
-            // Fn's release edge, or a key repeat: nothing to record.
-            guard event.type == .keyDown || event.modifierFlags.contains(.function), !event.isARepeat else { return nil }
-            let keyCode = UInt32(event.keyCode)
-            // A rejected combination keeps recording so the user can try another.
-            guard let options = candidate(action, update: { $0.keyCode = keyCode; $0.modifiers = modifiers; $0.enabled = true }) else { return nil }
-            end(); state.saveFeatures(options)
-            return nil
         }
     }
     /// Stops recording and reinstalls the saved bindings as global shortcuts.

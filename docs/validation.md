@@ -338,6 +338,14 @@ Every `Button`, `Menu`, `Toggle`, `Picker`, `onTapGesture`, overlay and `NSStatu
 - Not captured: the recording field, inline rejection messages and the overflow menu contents, because preview capture has no interaction. Preview data uses the default bindings, so a ⇧Fn label was not rendered in a capture; `VDKeyCaps(label:)` splits it into ⇧ and Fn like any other modifier prefix.
 - Acceptance check by hand, with **Press Fn (🌐) key to** set to Do Nothing: bind Translate to Fn-Shift by holding Shift and pressing Fn in Settings, then hold Shift, press Fn and speak into TextEdit. Repeat pressing Fn first, then Shift, with and without Dictate on Fn alone. Release Shift while still holding Fn and confirm Dictate does not start. Confirm that recording Shift-A shows the inline message and keeps the old binding.
 
+### Fn chord recording fix — 2026-10-15
+
+- Symptom: in Settings → Shortcuts, holding Shift showed ⇧ but pressing Fn recorded nothing, so Shift-Fn could not be bound. A system event probe showed macOS delivered Shift (key code 56), then Fn (63) with the Fn and Shift flags.
+- Root cause: the recorder's local monitor read `NSEvent.isARepeat` on Fn's `flagsChanged` event. AppKit raises `NSInternalInconsistencyException` ("Invalid message sent to event") for that property on non-key events, so the handler aborted before validating or saving. Shift edges returned earlier, which is why ⇧ still appeared. A standalone probe sending `isARepeat` to a synthetic Fn `flagsChanged` event reproduced the exception; the same call on a key-down returned normally.
+- Fix: the decision moved to `ShortcutRecorder.decide` in VoiceDraftCore, and the view reads the repeat flag from key-downs only. A save failure while recording, such as a missing event tap, now appears under the row, because the settings overlay hides the global error.
+- `ShortcutRecorderTests` replays the probe sequence (Shift down, Fn down, Fn up, Shift up) and expects ⇧Fn recorded on Fn's press edge. It also covers Fn alone, plain keys, repeats and Esc. `swift test --disable-sandbox`: 262 tests, 4 skipped, 0 failures.
+- Acceptance check by hand: record Shift-Fn for Translate and confirm the row shows ⇧ Fn at once and the chord starts Translate in TextEdit.
+
 ### Escape closes idle HUD cards, compact notice card — 2026-10-15
 
 - `swift build --disable-sandbox` completed with no warnings. `swift test --disable-sandbox`: **174 tests, 170 passed, 4 skipped, 0 failures**. New `EscapeCancellationTests` cases: idle Escape with a visible result, failure or notice card is handled and hides the card once; idle Escape without a visible card passes through; Escape during a live run still cancels it; a failure without text uses the `notice` kind, which is shorter than `failure`. The update-installation guard is not unit-tested because `UpdateController.installing` cannot be set from tests.

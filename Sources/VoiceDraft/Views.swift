@@ -360,7 +360,7 @@ struct ProfileEditor: View {
                    state.settings.speechID != profile.id && state.settings.writingID != profile.id {
                     Button(L("Delete profile"), role: .destructive) {
                         var copy = state.settings; copy.profiles.removeAll { $0.id == profile.id }; state.save(copy); dismiss()
-                    }
+                    }.tint(VD.Palette.danger) // The sheet's accent tint would otherwise make it look like Cancel.
                 }
                 Spacer()
                 if profile.role == .writing {
@@ -414,8 +414,8 @@ struct VocabularyProjectionView: View {
         let _ = interfaceLocale
         let projection = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability)
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("App vocabulary → \(profile.model)")).font(.headline)
-            Text(L("Manage all terms in Vocabulary. Changing the model only changes the format sent to it.")).font(.caption)
+            Text(L("App vocabulary → \(profile.model)")).font(VD.Font.body.weight(.semibold)).foregroundStyle(.primary)
+            Text(L("Manage all terms in Vocabulary. Changing the model only changes the format sent to it.")).font(VD.Font.detail)
             if !vocabulary.enabled {
                 Text(L("App vocabulary is turned off."))
             } else {
@@ -423,7 +423,7 @@ struct VocabularyProjectionView: View {
                 case .weighted:
                     Text(L("\(projection.terms.count) terms ready. Strength 0–100 maps to weights 1–5; the first 50 priority terms use weight 50."))
                     Text(F("Manual terms take priority. Automatically learned terms are capped at weight 2 and do not use the priority boost.", "手动词条优先。自动学习词条的权重最高为 2，不使用优先词加权。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(VD.Font.detail).foregroundStyle(.secondary)
                 case .context:
                     Text(L("\(projection.terms.count) terms ready as context. This model does not support numeric weights or priority boosts."))
                 case .none:
@@ -434,7 +434,7 @@ struct VocabularyProjectionView: View {
                 }
                 if projection.shadowedAutomatic > 0 {
                     Text(F("\(projection.shadowedAutomatic) automatic terms are superseded by your manual spellings.", "\(projection.shadowedAutomatic) 个自动词条已由你的手动拼写覆盖。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(VD.Font.detail).foregroundStyle(.secondary)
                 }
                 if projection.downgradedPriority > 0 {
                     Text(L("\(projection.downgradedPriority) priority terms will use regular weight 5 because this model's priority limit is 50.")).foregroundStyle(VD.Palette.warning)
@@ -446,7 +446,7 @@ struct VocabularyProjectionView: View {
             if !vocabulary.legacyReferences.isEmpty {
                 Text(L("A previous remote vocabulary reference was preserved. Import its terms into the app vocabulary before using them.")).foregroundStyle(VD.Palette.warning)
             }
-        }.font(.caption).foregroundStyle(.secondary)
+        }.font(VD.Font.detail).foregroundStyle(.secondary)
     }
 }
 

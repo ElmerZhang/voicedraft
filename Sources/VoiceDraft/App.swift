@@ -112,7 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         DispatchQueue.main.async { [weak self] in self?.updateMainMenu() }
         shortcuts.onEvent = { [weak self] action, down in self?.state.shortcutEvent(action, down: down) }
-        escapeCancellation.onCancel = { [weak self] in self?.state.cancelActiveInput() ?? false }
+        escapeCancellation.onCancel = { [weak self] in
+            guard let self else { return false }
+            return self.state.handleEscape(hudVisible: self.hudShown)
+        }
         if !isolatedPreview { escapeCancellation.install() }
         state.configureShortcuts = { [weak self] bindings in
             guard let self, !isolatedPreview else { return }
@@ -256,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for name in ["recording", "locked", "starting", "live", "processing", "result", "long-result", "failure"] {
+                for name in ["recording", "locked", "starting", "live", "processing", "result", "long-result", "failure", "notice"] {
                     state.prepareHUDPreview(name); showHUD()
                     try await Task.sleep(nanoseconds: 300_000_000)
                     guard let view = hud.contentView else { continue }
@@ -266,7 +269,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
-                print("Rendered eight synthetic HUD states without microphone, model, Keychain, or persisted data access.")
+                print("Rendered nine synthetic HUD states without microphone, model, Keychain, or persisted data access.")
             } catch { fputs("HUD preview failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

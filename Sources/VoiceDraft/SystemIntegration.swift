@@ -16,6 +16,9 @@ struct InputTarget {
     let keyboardSurface: Bool
     let opaqueApplication: Bool
     let focusGuard: OpaqueInputFocusGuard?
+    /// VoiceDraft enabled this app's Electron accessibility tree, which may not
+    /// have been built yet; a later capture can still find the editor.
+    var accessibilityPending = false
 }
 
 enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWithoutConfirmation }
@@ -23,6 +26,9 @@ enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWitho
 @MainActor
 enum TextInsertion {
     private static var delivering = false
+    /// Processes whose Electron accessibility VoiceDraft enabled, keyed by PID
+    /// with the launch date guarding against PID reuse and the enable uptime.
+    private static var electronEnabled: [pid_t: (launched: Date?, at: TimeInterval)] = [:]
     static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
@@ -33,20 +39,12 @@ enum TextInsertion {
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
         let root = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(root, 0.1)
-        let rawFocus = uiElement(attribute(root, kAXFocusedUIElementAttribute))
-        let focused = rawFocus.flatMap {
-            FocusedInputResolver.focusedTarget(from: $0, capabilities: capabilities,
-                nestedFocus: { uiElement(attribute($0, kAXFocusedUIElementAttribute)) },
-                children: { children($0) },
-                isFocused: { attribute($0, kAXFocusedAttribute) as? Bool == true },
-                equals: { CFEqual($0, $1) })
+        var (rawFocus, focused, editor) = resolveFocus(root)
+        if enableElectronAccessibility(app, root: root, candidate: editor ?? focused) {
+            (rawFocus, focused, editor) = resolveFocus(root)
         }
         guard rawFocus == nil || focused != nil else { return nil }
         let window = uiElement(attribute(root, kAXFocusedWindowAttribute))
-        let editor = focused.flatMap {
-            FocusedInputResolver.resolve(from: $0, capabilities: capabilities,
-                parent: { uiElement(attribute($0, kAXParentAttribute)) }, equals: { CFEqual($0, $1) })
-        }
         // Warp's TTY surface does not consistently expose an AX text editor.
         // This is a narrow compatibility path: no browser/app-wide fallback,
         // no dialogs/buttons, and the window + exposed surface must stay focused.
@@ -77,13 +75,87 @@ enum TextInsertion {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
               sameElement(rawFocus, uiElement(attribute(root, kAXFocusedUIElementAttribute))),
               sameElement(window, uiElement(attribute(root, kAXFocusedWindowAttribute))) else { return nil }
+        let editable = terminalSurface || opaqueApplication || (editor.map { capabilities($0).acceptsInsertion } ?? false)
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
                            element: element, window: window, range: range, selection: selection,
                            value: terminalSurface ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,
-                           editable: terminalSurface || opaqueApplication || (editor.map { capabilities($0).acceptsInsertion } ?? false),
+                           editable: editable,
                            keyboardSurface: terminalSurface || opaqueApplication,
                            opaqueApplication: opaqueApplication,
-                           focusGuard: opaqueApplication && trackOpaqueFocus ? OpaqueInputFocusGuard(ignoring: shortcuts) : nil)
+                           focusGuard: opaqueApplication && trackOpaqueFocus ? OpaqueInputFocusGuard(ignoring: shortcuts) : nil,
+                           accessibilityPending: ElectronAccessibilityPolicy.capturePending(
+                               enabled: electronEnabled[app.processIdentifier] != nil, editable: editable))
+    }
+    /// Explicit focus, its resolved focus target and the editor ancestor.
+    private static func resolveFocus(_ root: AXUIElement) -> (raw: AXUIElement?, focused: AXUIElement?, editor: AXUIElement?) {
+        let raw = uiElement(attribute(root, kAXFocusedUIElementAttribute))
+        let focused = raw.flatMap {
+            FocusedInputResolver.focusedTarget(from: $0, capabilities: capabilities,
+                nestedFocus: { uiElement(attribute($0, kAXFocusedUIElementAttribute)) },
+                children: { children($0) },
+                isFocused: { attribute($0, kAXFocusedAttribute) as? Bool == true },
+                equals: { CFEqual($0, $1) })
+        }
+        let editor = focused.flatMap {
+            FocusedInputResolver.resolve(from: $0, capabilities: capabilities,
+                parent: { uiElement(attribute($0, kAXParentAttribute)) }, equals: { CFEqual($0, $1) })
+        }
+        return (raw, focused, editor)
+    }
+    /// Announces VoiceDraft to an Electron app once per process so it builds its
+    /// accessibility tree, then waits briefly for a focused element. Returns
+    /// true when focus should be resolved again. Never uses AXEnhancedUserInterface.
+    private static func enableElectronAccessibility(_ app: NSRunningApplication, root: AXUIElement, candidate: AXUIElement?) -> Bool {
+        electronEnabled = electronEnabled.filter { pid, entry in
+            NSRunningApplication(processIdentifier: pid).map { !$0.isTerminated && $0.launchDate == entry.launched } ?? false
+        }
+        let pid = app.processIdentifier
+        guard electronEnabled[pid] == nil else { return false }
+        let name = ElectronAccessibilityPolicy.attribute as CFString
+        var settable = DarwinBoolean(false)
+        let canSet = AXUIElementIsAttributeSettable(root, name, &settable) == .success && settable.boolValue
+        guard ElectronAccessibilityPolicy.shouldEnable(manualAccessibilitySettable: canSet,
+                  focusedCapability: candidate.map { capabilities($0).capability }),
+              AXUIElementSetAttributeValue(root, name, kCFBooleanTrue) == .success else { return false }
+        electronEnabled[pid] = (app.launchDate, ProcessInfo.processInfo.systemUptime)
+        // Capture runs on the main thread at recording start: never wait longer.
+        let deadline = ProcessInfo.processInfo.systemUptime + ElectronAccessibilityPolicy.captureWaitSeconds
+        repeat {
+            Thread.sleep(forTimeInterval: ElectronAccessibilityPolicy.capturePollSeconds)
+            if uiElement(attribute(root, kAXFocusedUIElementAttribute)) != nil { break }
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        return true
+    }
+    /// Re-captures a pending Electron target until its editor appears, the app
+    /// changes, or the bounded retry window ends. Returns a same-process editable
+    /// target, or nil to keep the copy-card path. Stops guards it does not return.
+    static func refreshPending(_ target: InputTarget, ignoring shortcuts: [ShortcutBinding],
+                               trackOpaqueFocus: Bool) async -> InputTarget? {
+        let deadline = ElectronAccessibilityPolicy.retryDeadline(enabledAt: electronEnabled[target.pid]?.at,
+                                                                 now: ProcessInfo.processInfo.systemUptime)
+        while true {
+            let refreshed = capture(ignoring: shortcuts, trackOpaqueFocus: trackOpaqueFocus)
+            if let refreshed, ElectronAccessibilityPolicy.acceptsRefreshed(originalPID: target.pid,
+                   refreshedPID: refreshed.pid, refreshedEditable: refreshed.editable) { return refreshed }
+            refreshed?.focusGuard?.stop()
+            guard refreshed?.pid == target.pid || refreshed == nil,
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid,
+                  ProcessInfo.processInfo.systemUptime < deadline,
+                  (try? await Task.sleep(nanoseconds: UInt64(ElectronAccessibilityPolicy.retryPollSeconds * 1_000_000_000))) != nil
+            else { return nil }
+        }
+    }
+    /// Best effort on quit: turn Electron accessibility back off in apps
+    /// VoiceDraft enabled, unless VoiceOver needs it to stay on.
+    static func resetElectronAccessibility() {
+        defer { electronEnabled = [:] }
+        guard !NSWorkspace.shared.isVoiceOverEnabled else { return }
+        for (pid, entry) in electronEnabled {
+            guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated, app.launchDate == entry.launched else { continue }
+            let root = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(root, 0.1)
+            _ = AXUIElementSetAttributeValue(root, ElectronAccessibilityPolicy.attribute as CFString, kCFBooleanFalse)
+        }
     }
     private static func nativePasteAvailability(_ root: AXUIElement) -> (present: Bool, enabled: Bool) {
         guard let menuBar = uiElement(attribute(root, kAXMenuBarAttribute)) else { return (false, false) }

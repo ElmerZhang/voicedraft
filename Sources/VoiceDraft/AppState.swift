@@ -477,7 +477,8 @@ final class AppState: ObservableObject {
         guard generation == id, let configuration = runSettings else { throw CancellationError() }
         // The take's screen text is dropped on every exit; reprocess and style edits have none.
         defer { screenContext.end(take: id) }
-        let mode = runMode, selected = runSelection, destination = target, writingKey = runWritingKey
+        let mode = runMode, selected = runSelection, writingKey = runWritingKey
+        var destination = target
         transcript = raw; result = ""
         var output = raw
         if mode != .verbatim, let writing = configuration.writing {
@@ -504,6 +505,15 @@ final class AppState: ObservableObject {
         saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
         var delivery: TextInsertionOutcome?
         defer { destination?.focusGuard?.stop() }
+        // An Electron app enabled at capture may have built its tree since; its
+        // fresh value and range are what the insertion receipt observes.
+        if let pending = destination, ElectronAccessibilityPolicy.shouldRetryCapture(pending: pending.accessibilityPending,
+               editable: pending.editable, external: runExternal, autoPaste: runAutoPaste, ask: mode == .ask), insertionAuthorized,
+           let refreshed = await TextInsertion.refreshPending(pending, ignoring: device.features.shortcuts, trackOpaqueFocus: true) {
+            try Task.checkCancellation()
+            guard generation == id else { refreshed.focusGuard?.stop(); throw CancellationError() }
+            pending.focusGuard?.stop(); destination = refreshed
+        }
         if runExternal, runAutoPaste, mode != .ask, !insertionAuthorized {
             self.error = "Enable Accessibility to paste into other apps. The result is available here."
             status = "Result ready · open VoiceDraft to copy"
@@ -840,8 +850,14 @@ extension AppState {
                 reinsertFallback(text, id: id, error: VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here."))
                 return
             }
-            let destination = TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true)
+            var destination = TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true)
             defer { destination?.focusGuard?.stop() }
+            // A first enable can take a couple of seconds to build an Electron tree.
+            if let pending = destination, pending.accessibilityPending, !pending.editable,
+               let refreshed = await TextInsertion.refreshPending(pending, ignoring: device.features.shortcuts, trackOpaqueFocus: true) {
+                guard generation == id, !Task.isCancelled else { refreshed.focusGuard?.stop(); return }
+                pending.focusGuard?.stop(); destination = refreshed
+            }
             guard let destination, destination.editable else {
                 reinsertFallback(text, id: id, error: VoiceDraftError.message("No text field is focused. Copy the result instead."))
                 return

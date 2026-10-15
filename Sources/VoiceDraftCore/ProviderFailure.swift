@@ -17,6 +17,8 @@ public enum ProviderFailure {
         let requestID = root["request_id"] as? String ?? response.value(forHTTPHeaderField: "x-request-id")
         throw http(status: response.statusCode, code: code, requestID: requestID)
     }
+    /// The usage log reads the status from this message's first argument.
+    static let httpKeyPrefix = "Model request failed (HTTP "
     public static func http(status: Int, code: String? = nil, requestID: String? = nil) -> VoiceDraftError {
         let hint: String
         switch status {

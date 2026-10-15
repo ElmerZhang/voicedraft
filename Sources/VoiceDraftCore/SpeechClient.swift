@@ -14,8 +14,9 @@ public enum SpeechClient {
     }
 
     /// `screenTerms` are temporary on-screen recognition hints with the lowest priority.
+    /// `usage` receives provider-reported counts per request (chunked recordings report once per chunk).
     public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary,
-                                  screenTerms: [String] = []) async throws -> String {
+                                  screenTerms: [String] = [], usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> String {
         try profile.validateForInference()
         try QwenRequests.validateAudio(wav)
         // These Qwen HTTP models accept at most five minutes / 10 MB per request.
@@ -26,7 +27,7 @@ public enum SpeechClient {
             for chunk in chunks {
                 try Task.checkCancellation()
                 do {
-                    transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary, screenTerms: screenTerms))
+                    transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary, screenTerms: screenTerms, usage: usage))
                 } catch SpeechRecognitionError.noSpeech {
                     // A silent chunk must not discard speech in the other chunks.
                     continue
@@ -39,6 +40,7 @@ public enum SpeechClient {
             let request = try WhisperRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
+            report(data, usage) { ProviderUsage.parse(whisper: $0) }
             return try WhisperRequests.parse(data)
         case .googleSpeech:
             return try await GoogleSpeech.transcribe(profile: profile, credential: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
@@ -48,11 +50,13 @@ public enum SpeechClient {
             let request = try QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
+            report(data, usage) { ProviderUsage.parse(chatCompletions: $0) }
             return try QwenRequests.parseSpeech(data)
         case .qwenAudioHTTP:
             let request = try AudioHTTPRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
+            report(data, usage) { ProviderUsage.parse(qwenAudio: $0) }
             return try AudioHTTPRequests.parse(data)
         case .qwenMessageWebSocket:
             let request = try MessageASRRequests.connection(profile: profile, key: key)
@@ -60,9 +64,16 @@ public enum SpeechClient {
             let start = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, screenTerms: screenTerms)
             try QwenRequests.validateAudio(wav)
             let socket = NativeASRWebSocket(request: request)
-            return try await MessageASRSession.transcribe(socket: socket, start: start, wav: wav, taskID: taskID)
+            return try await MessageASRSession.transcribe(socket: socket, start: start, wav: wav, taskID: taskID, usage: usage)
         default: throw VoiceDraftError.message("Choose a supported speech model in Models.")
         }
+    }
+
+    private static func report(_ data: Data, _ sink: (@Sendable (ProviderUsage) -> Void)?,
+                               _ parse: ([String: Any]) -> ProviderUsage?) {
+        guard let sink, let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let usage = parse(root) else { return }
+        sink(usage)
     }
 }
 
@@ -157,6 +168,8 @@ public struct MessageASRResults {
     let taskID: String
     public private(set) var started = false
     public private(set) var finished = false
+    /// `payload.usage` of `task-finished`, when the service sends one.
+    public private(set) var usage: ProviderUsage?
     private var sentences: [Int: String] = [:]
     private var hypotheses: [Int: String] = [:]
     public var preview: String {
@@ -194,6 +207,7 @@ public struct MessageASRResults {
             }
         case "task-finished":
             guard started else { throw VoiceDraftError.message("The speech task ended before it started.") }
+            usage = ProviderUsage.parse(messageASRTaskFinished: root)
             finished = true
         default: throw VoiceDraftError.message("The speech service returned an unsupported event.")
         }
@@ -256,11 +270,12 @@ final class NativeASRWebSocket: ASRWebSocket, @unchecked Sendable {
 
 enum MessageASRSession {
     static func transcribe(socket: any ASRWebSocket, start: String, wav: Data, taskID: String,
-                           timeoutNanoseconds: UInt64 = 120_000_000_000) async throws -> String {
+                           timeoutNanoseconds: UInt64 = 120_000_000_000,
+                           usage: (@Sendable (ProviderUsage) -> Void)? = nil) async throws -> String {
         try await withTaskCancellationHandler {
             defer { socket.cancel() }
             return try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await exchange(socket: socket, start: start, wav: wav, taskID: taskID) }
+                group.addTask { try await exchange(socket: socket, start: start, wav: wav, taskID: taskID, usage: usage) }
                 group.addTask {
                     try await Task.sleep(nanoseconds: timeoutNanoseconds)
                     throw VoiceDraftError.message("Speech recognition timed out. Try a shorter recording.")
@@ -271,7 +286,8 @@ enum MessageASRSession {
         } onCancel: { socket.cancel() }
     }
 
-    private static func exchange(socket: any ASRWebSocket, start: String, wav: Data, taskID: String) async throws -> String {
+    private static func exchange(socket: any ASRWebSocket, start: String, wav: Data, taskID: String,
+                                 usage: (@Sendable (ProviderUsage) -> Void)?) async throws -> String {
         try Task.checkCancellation()
         try await socket.sendText(start)
         var results = MessageASRResults(taskID: taskID)
@@ -293,6 +309,7 @@ enum MessageASRSession {
                     try Task.checkCancellation()
                     try received.accept(await socket.receive())
                 }
+                if let usage, let reported = received.usage { usage(reported) }
                 return try received.transcript()
             }
             defer { group.cancelAll(); socket.cancel() }

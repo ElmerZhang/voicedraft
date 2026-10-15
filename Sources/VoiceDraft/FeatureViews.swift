@@ -651,7 +651,7 @@ struct VocabularyFileControls: View {
             rawCandidates = fresh
             if !fresh.isEmpty {
                 filtering = true
-                let filtered = try await state.filterAgentContext(fresh)
+                let filtered = try await state.filterAgentContext(fresh, source: context == .screen ? .vocabularyScreenContextFilter : .vocabularyAgentContextFilter)
                 try Task.checkCancellation()
                 let byText = Dictionary(uniqueKeysWithValues: fresh.map { ($0.text, $0) })
                 present(filtered.terms.compactMap { byText[$0] })

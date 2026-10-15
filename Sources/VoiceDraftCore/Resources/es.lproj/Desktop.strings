@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "Activa un atajo en Ajustes para dictar desde cualquier app.";
 "Used when you record with a shortcut or on Home." = "Se usa al grabar con un atajo o desde Inicio.";
 "Allowed" = "Permitido";
-"Change" = "Cambiar";
 "Record a new shortcut" = "Grabar un atajo nuevo";
 "Clear" = "Borrar";
 "Open" = "Abrir";
@@ -115,3 +114,16 @@
 "Allow" = "Permitir";
 "Insert last result" = "Volver a insertar el último resultado";
 "Paste the last result again, wherever the cursor is now." = "Pega de nuevo el último resultado donde esté ahora el cursor.";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "Mantén pulsado para hablar y suelta para terminar. Pulsa brevemente para bloquear la grabación y vuelve a pulsar para terminar.";
+"Shortcut options" = "Opciones del atajo";
+"Use Fn alone" = "Usar solo Fn";
+"Use default shortcut (%@)" = "Usar el atajo predeterminado (%@)";
+"Press keys · Esc cancels" = "Pulsa las teclas · Esc cancela";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn funciona solo o con Mayúsculas, Control, Opción o Comando: mantén el modificador y luego pulsa Fn. Fn con letras no está disponible porque macOS reserva esos atajos 🌐.";
+"Restore default shortcuts" = "Restaurar atajos predeterminados";
+"Add Control, Option or Command, or use Fn" = "Añade Control, Opción o Comando, o usa Fn";
+"Already used by %@" = "Ya lo usa «%@»";
+"Fn system action is off" = "La acción del sistema para Fn está desactivada";
+"Check the macOS Fn action" = "Revisa la acción de Fn en macOS";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "Los atajos con Fn, solo o con teclas modificadoras, requieren ajustar «Pulsar la tecla Fn (🌐) para» en «No hacer nada» en Ajustes del Sistema → Teclado. De lo contrario, la grabación también puede cambiar la fuente de entrada, abrir los emojis o iniciar el dictado. Este ajuste del sistema se mantiene después de salir de VoiceDraft.";
+"Open Keyboard Settings" = "Abrir ajustes de Teclado";

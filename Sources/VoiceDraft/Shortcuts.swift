@@ -12,6 +12,7 @@ final class GlobalShortcuts {
     private var source: CFRunLoopSource?
     private var bindings: [ShortcutBinding] = []
     private var pressed: Set<ShortcutAction> = []
+    private var fnChords = FnChordTracker()
     var onEvent: ((ShortcutAction, Bool) -> Void)?
     private func dispatch(_ action: ShortcutAction, down: Bool) {
         if down { guard pressed.insert(action).inserted else { return } }
@@ -19,7 +20,7 @@ final class GlobalShortcuts {
         onEvent?(action, down)
     }
     func uninstall() {
-        pressed.removeAll()
+        pressed.removeAll(); fnChords.reset()
         refs.forEach { UnregisterEventHotKey($0) }; refs.removeAll()
         if let handler { RemoveEventHandler(handler) }; handler = nil
         if let tap { CGEvent.tapEnable(tap: tap, enable: false); CFMachPortInvalidate(tap) }; tap = nil
@@ -43,7 +44,7 @@ final class GlobalShortcuts {
                 return noErr
             }, 2, &specs, context, &handler)
             guard status == noErr else { throw FeatureError("Could not install keyboard shortcuts.") }
-            for (index, binding) in bindings.enumerated() where binding.enabled && binding.keyCode != 63 {
+            for (index, binding) in bindings.enumerated() where binding.enabled && !binding.isFn {
                 let masks = [shiftKey, controlKey, optionKey, cmdKey]
                 var flags: UInt32 = 0
                 for i in 0..<4 where binding.modifiers & (1 << i) != 0 { flags |= UInt32(masks[i]) }
@@ -53,7 +54,10 @@ final class GlobalShortcuts {
                 }
                 refs.append(ref)
             }
-            if bindings.contains(where: { $0.enabled && $0.keyCode == 63 }) {
+            if bindings.contains(where: { $0.enabled && $0.isFn }) {
+                // Observe modifier changes only, never key presses. Fn alone and
+                // Fn chords (Fn with Shift, Control, Option or Command) resolve in
+                // FnChordTracker; see docs/architecture.md.
                 tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                     eventsOfInterest: CGEventMask(1 << CGEventType.flagsChanged.rawValue), callback: { _, type, event, context in
                         guard let context else { return Unmanaged.passUnretained(event) }
@@ -63,15 +67,21 @@ final class GlobalShortcuts {
                                 if let tap = owner.tap { CGEvent.tapEnable(tap: tap, enable: true) }
                                 return Unmanaged.passUnretained(event)
                             }
-                            guard event.getIntegerValueField(.keyboardEventKeycode) == 63,
-                                  let binding = owner.bindings.first(where: { $0.enabled && $0.keyCode == 63 }) else { return Unmanaged.passUnretained(event) }
-                            owner.dispatch(binding.action, down: event.flags.contains(.maskSecondaryFn))
-                            // Consume both edges. macOS's separate Globe system action
-                            // must also be set to Do Nothing (see FnShortcutStatus).
+                            guard type == .flagsChanged else { return Unmanaged.passUnretained(event) }
+                            let flags = event.flags
+                            var modifiers: UInt32 = 0
+                            for (flag, bit) in [(CGEventFlags.maskShift, UInt32(1)), (.maskControl, 2), (.maskAlternate, 4), (.maskCommand, 8)] where flags.contains(flag) { modifiers |= bit }
+                            for change in owner.fnChords.observe(fnHeld: flags.contains(.maskSecondaryFn), modifiers: modifiers, bindings: owner.bindings) {
+                                owner.dispatch(change.action, down: change.down)
+                            }
+                            // Consume only Fn's own edges. Other modifier edges pass through
+                            // so apps keep a consistent modifier picture. macOS's separate
+                            // Globe system action must also be set to Do Nothing (see FnShortcutStatus).
+                            guard UInt32(event.getIntegerValueField(.keyboardEventKeycode)) == ShortcutBinding.fnKeyCode else { return Unmanaged.passUnretained(event) }
                             return nil
                         }
                     }, userInfo: context)
-                guard let tap else { throw FeatureError("Enable Accessibility before using Fn alone.") }
+                guard let tap else { throw FeatureError("Enable Accessibility before using Fn shortcuts.") }
                 source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
                 CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes); CGEvent.tapEnable(tap: tap, enable: true)
             }
@@ -80,13 +90,8 @@ final class GlobalShortcuts {
 }
 
 extension ShortcutBinding {
-    var label: String {
-        if !enabled { return F("Disabled", "未启用") }
-        if keyCode == 63 { return "Fn" }
-        let names: [UInt32: String] = [0:"A",1:"S",2:"D",3:"F",4:"H",5:"G",6:"Z",7:"X",8:"C",9:"V",11:"B",12:"Q",13:"W",14:"E",15:"R",16:"Y",17:"T",18:"1",19:"2",20:"3",21:"4",22:"6",23:"5",24:"=",25:"9",26:"7",27:"−",28:"8",29:"0",30:"]",31:"O",32:"U",33:"[",34:"I",35:"P",36:"↩",37:"L",38:"J",39:"'",40:"K",41:";",42:"\\",43:",",44:"/",45:"N",46:"M",47:".",48:"⇥",49:"Space",50:"`",51:"⌫",53:"⎋",123:"←",124:"→",125:"↓",126:"↑"]
-        let flags = [(UInt32(2),"⌃"),(4,"⌥"),(1,"⇧"),(8,"⌘")].filter { modifiers & $0.0 != 0 }.map(\.1).joined()
-        return flags + (names[keyCode] ?? "Key \(keyCode)")
-    }
+    /// Key caps text, or the localized "Disabled" for a disabled binding.
+    var label: String { enabled ? keyLabel : F("Disabled", "未启用") }
 }
 
 @MainActor

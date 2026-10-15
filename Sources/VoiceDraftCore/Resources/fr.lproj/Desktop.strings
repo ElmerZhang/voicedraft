@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "Activez un raccourci dans les Réglages pour dicter depuis n’importe quelle app.";
 "Used when you record with a shortcut or on Home." = "Utilisé pour enregistrer avec un raccourci ou depuis l’accueil.";
 "Allowed" = "Autorisé";
-"Change" = "Modifier";
 "Record a new shortcut" = "Enregistrer un nouveau raccourci";
 "Clear" = "Effacer";
 "Open" = "Ouvrir";
@@ -115,3 +114,16 @@
 "Allow" = "Autoriser";
 "Insert last result" = "Réinsérer le dernier résultat";
 "Paste the last result again, wherever the cursor is now." = "Colle à nouveau le dernier résultat là où se trouve le curseur.";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "Maintenez pour parler, relâchez pour terminer. Appuyez brièvement pour verrouiller l’enregistrement, puis appuyez de nouveau pour terminer.";
+"Shortcut options" = "Options du raccourci";
+"Use Fn alone" = "Utiliser Fn seul";
+"Use default shortcut (%@)" = "Utiliser le raccourci par défaut (%@)";
+"Press keys · Esc cancels" = "Appuyez sur des touches · Échap pour annuler";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn fonctionne seul ou avec Maj, Contrôle, Option ou Commande : maintenez le modificateur, puis appuyez sur Fn. Fn avec des lettres n’est pas disponible, car macOS réserve ces raccourcis 🌐.";
+"Restore default shortcuts" = "Rétablir les raccourcis par défaut";
+"Add Control, Option or Command, or use Fn" = "Ajoutez Contrôle, Option ou Commande, ou utilisez Fn";
+"Already used by %@" = "Déjà utilisé par « %@ »";
+"Fn system action is off" = "L’action système de Fn est désactivée";
+"Check the macOS Fn action" = "Vérifier l’action Fn de macOS";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "Les raccourcis Fn, seuls ou avec des touches de modification, nécessitent de régler « Appuyer sur la touche Fn (🌐) pour » sur « Ne rien faire » dans Réglages Système → Clavier. Sinon, l’enregistrement peut aussi changer de source de saisie, ouvrir les emoji ou lancer la dictée. Ce réglage système reste actif après avoir quitté VoiceDraft.";
+"Open Keyboard Settings" = "Ouvrir les réglages Clavier";

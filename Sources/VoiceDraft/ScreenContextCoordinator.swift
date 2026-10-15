@@ -24,7 +24,7 @@ final class ScreenContextCoordinator {
         let start: ContinuousClock.Instant
         let bundleID: String
         let name: String
-        let mode: WritingMode
+        var mode: WritingMode
         let options: DesktopOptions
         let vocabulary: AppVocabulary
         /// The complete walk (to `axWalkSeconds`), once finished.
@@ -148,6 +148,14 @@ final class ScreenContextCoordinator {
         if let diagnostics, diagnostics.isEnabled() { diagnostics.record(diagnosticRecord(record)) }
         current = nil
         signal()
+    }
+
+    /// A held Fn chord switched the take's mode; reading continues unchanged.
+    /// Only the HUD term count uses the record's mode; consumers pass their own.
+    func retarget(take id: UUID, mode: WritingMode) {
+        guard let record = current, record.id == id, record.mode != mode else { return }
+        record.mode = mode
+        onTakeUpdate?(id)
     }
 
     var hasActiveTake: Bool { current != nil }

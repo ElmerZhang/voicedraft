@@ -119,7 +119,7 @@
 "Use Fn alone" = "Fn のみを使用";
 "Use default shortcut (%@)" = "デフォルトのショートカットを使用（%@）";
 "Press keys · Esc cancels" = "キーを押してください · Esc でキャンセル";
-"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn は単独でも、Shift・Control・Option・Command と組み合わせても使えます。修飾キーを押したまま Fn を押してください。🌐 と文字キーの組み合わせは macOS が予約しているため使えません。";
+"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn は単独でも、Shift・Control・Option・Command と組み合わせても使えます。修飾キーは Fn の前でも後でも押せます。Fn を押している間に修飾キーを押すと、録音中の操作がそのショートカットに切り替わります。🌐 と文字キーの組み合わせは macOS が予約しているため使えません。";
 "Restore default shortcuts" = "デフォルトのショートカットに戻す";
 "Add Control, Option or Command, or use Fn" = "Control、Option、Command のいずれかを加えるか、Fn を使用してください";
 "Already used by %@" = "「%@」で使用中です";

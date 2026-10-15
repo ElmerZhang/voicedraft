@@ -53,7 +53,8 @@ struct RecordingHUD: View {
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
         .hudChrome(Capsule())
-        .help(state.recordingDeviceName.isEmpty ? L(state.status) : L("Input: \(state.recordingDeviceName)") + " · " + elapsedText)
+        .help((state.recording ? state.runMode.title + " · " : "")
+              + (state.recordingDeviceName.isEmpty ? L(state.status) : L("Input: \(state.recordingDeviceName)") + " · " + elapsedText))
     }
 
     @ViewBuilder private var centre: some View {
@@ -61,6 +62,8 @@ struct RecordingHUD: View {
             VStack(spacing: 3) {
                 waveform
                 HStack(spacing: 3) {
+                    // Non-default modes show their icon; a held Fn chord can switch it mid-take.
+                    if state.runMode != .polish { Image(systemName: state.runMode.icon).font(.system(size: 8, weight: .semibold)) }
                     if state.screenContextTermCount != nil { Image(systemName: "text.viewfinder").font(.system(size: 8, weight: .semibold)) }
                     if state.recordingLocked { Image(systemName: "lock.fill").font(.system(size: 8, weight: .semibold)) }
                     Text(elapsedText).font(.system(size: 10, weight: .medium).monospacedDigit())

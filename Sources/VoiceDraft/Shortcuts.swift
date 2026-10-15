@@ -19,6 +19,14 @@ final class GlobalShortcuts {
         else { guard pressed.remove(action) != nil else { return } }
         onEvent?(action, down)
     }
+    /// The held Fn chord switched actions mid-take. The pressed state moves to
+    /// `to`, so Fn's later release (sent for `to`) is matched and deduped.
+    var onRetarget: ((ShortcutAction, ShortcutAction) -> Void)?
+    private func retarget(from: ShortcutAction, to: ShortcutAction) {
+        guard from != to, pressed.remove(from) != nil else { return }
+        pressed.insert(to)
+        onRetarget?(from, to)
+    }
     func uninstall() {
         pressed.removeAll(); fnChords.reset()
         refs.forEach { UnregisterEventHotKey($0) }; refs.removeAll()
@@ -72,7 +80,11 @@ final class GlobalShortcuts {
                             var modifiers: UInt32 = 0
                             for (flag, bit) in [(CGEventFlags.maskShift, UInt32(1)), (.maskControl, 2), (.maskAlternate, 4), (.maskCommand, 8)] where flags.contains(flag) { modifiers |= bit }
                             for change in owner.fnChords.observe(fnHeld: flags.contains(.maskSecondaryFn), modifiers: modifiers, bindings: owner.bindings) {
-                                owner.dispatch(change.action, down: change.down)
+                                switch change.kind {
+                                case .down: owner.dispatch(change.action, down: true)
+                                case .up: owner.dispatch(change.action, down: false)
+                                case .retarget(let from): owner.retarget(from: from, to: change.action)
+                                }
                             }
                             // Consume only Fn's own edges. Other modifier edges pass through
                             // so apps keep a consistent modifier picture. macOS's separate

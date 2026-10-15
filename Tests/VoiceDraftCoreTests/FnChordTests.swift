@@ -54,33 +54,85 @@ final class FnChordTests: XCTestCase {
         XCTAssertNil(tracker.active)
     }
 
-    func testFnThenShiftKeepsFnAloneWhenItIsBound() {
+    func testFnThenShiftPromotesTheHeldTake() {
         var tracker = FnChordTracker()
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: both), [Event(.dictate, down: true)])
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: both), [])
-        XCTAssertEqual(tracker.active, .dictate)
-        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: shift, bindings: both), [Event(.dictate, down: false)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: both), [.retarget(from: .dictate, to: .translate)])
+        XCTAssertEqual(tracker.active, .translate)
+        // Shift released just before Fn does not demote the take.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: both), [])
+        XCTAssertEqual(tracker.active, .translate)
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: 0, bindings: both), [Event(.translate, down: false)])
+        XCTAssertNil(tracker.active)
+    }
+
+    func testShiftThenFnThenReleasingShiftKeepsTranslate() {
+        var tracker = FnChordTracker()
+        _ = tracker.observe(fnHeld: false, modifiers: shift, bindings: both)
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: both), [Event(.translate, down: true)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: both), [])
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: 0, bindings: both), [Event(.translate, down: false)])
+    }
+
+    func testReleaseLandingOnAnotherBindingDoesNotRetarget() {
+        var tracker = FnChordTracker()
+        let three = both + [.init(.ask, keyCode: fn, modifiers: control | shift)]
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: three), [Event(.dictate, down: true)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control, bindings: three), [])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [.retarget(from: .dictate, to: .ask)])
+        // Releasing Control leaves Fn-Shift (Translate) held: a release, so no event.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: three), [])
+        XCTAssertEqual(tracker.active, .ask)
+        // A later press that completes Fn-Control-Shift again matches the current action: nothing.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [])
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: control | shift, bindings: three), [Event(.ask, down: false)])
     }
 
     func testFnThenShiftSelectsTheChordWhenFnAloneIsNotBound() {
         var tracker = FnChordTracker()
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: chordOnly), [])
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: chordOnly), [Event(.translate, down: true)])
-        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: shift, bindings: chordOnly), [Event(.translate, down: false)])
+        // Releasing Shift sends nothing: the take keeps going.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: chordOnly), [])
+        XCTAssertEqual(tracker.active, .translate)
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: 0, bindings: chordOnly), [Event(.translate, down: false)])
     }
 
-    func testReleasingShiftMidChordEndsItWithoutStartingFnAlone() {
+    func testUnmatchedIntermediateChordKeepsTheCurrentAction() {
         var tracker = FnChordTracker()
-        _ = tracker.observe(fnHeld: false, modifiers: shift, bindings: both)
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: both), [Event(.translate, down: true)])
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: both), [Event(.translate, down: false)])
+        let three = both + [.init(.ask, keyCode: fn, modifiers: control | shift)]
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: three), [Event(.dictate, down: true)])
+        // Fn + Command matches nothing: no event, no cancel.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: command, bindings: three), [])
+        XCTAssertEqual(tracker.active, .dictate)
+        // Fn + Control alone is unbound on the way to Fn + Control + Shift.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control, bindings: three), [])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [.retarget(from: .dictate, to: .ask)])
+        // Extra modifiers that form no binding are ignored.
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift | command, bindings: three), [])
+        XCTAssertEqual(tracker.active, .ask)
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: 0, bindings: three), [Event(.ask, down: false)])
+    }
+
+    func testRetargetToDisabledBindingSendsNothing() {
+        var tracker = FnChordTracker()
+        let disabled = [ShortcutBinding(.dictate, keyCode: fn, modifiers: 0), .init(.translate, keyCode: fn, modifiers: shift, enabled: false)]
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: disabled), [Event(.dictate, down: true)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: disabled), [])
+        XCTAssertEqual(tracker.active, .dictate)
+    }
+
+    func testRearmsOnlyAfterFnIsReleased() {
+        var tracker = FnChordTracker()
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: both), [Event(.dictate, down: true)])
+        // The active binding stops being bound while Fn is held: released and disarmed.
+        let translateOnly = [ShortcutBinding(.translate, keyCode: fn, modifiers: shift)]
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: translateOnly), [Event(.dictate, down: false)])
         XCTAssertFalse(tracker.armed)
-        // Pressing Shift again while Fn is still held does not re-activate either.
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: both), [])
-        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: shift, bindings: both), [])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: translateOnly), [])
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: shift, bindings: translateOnly), [])
         XCTAssertTrue(tracker.armed)
-        // Re-armed only after Fn is fully released.
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: both), [Event(.translate, down: true)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: translateOnly), [Event(.translate, down: true)])
     }
 
     func testReleasingFnEndsFnAlone() {
@@ -110,5 +162,24 @@ final class FnChordTests: XCTestCase {
         var tracker = FnChordTracker()
         let bindings = [ShortcutBinding(.dictate, keyCode: fn, modifiers: 0, enabled: false)]
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: bindings), [])
+    }
+
+    func testRecordingModeMapsActionsLikeTakeStart() {
+        XCTAssertEqual(ShortcutAction.dictate.recordingMode, .polish)
+        XCTAssertEqual(ShortcutAction.translate.recordingMode, .translate)
+        XCTAssertEqual(ShortcutAction.edit.recordingMode, .edit)
+        XCTAssertEqual(ShortcutAction.ask.recordingMode, .ask)
+        XCTAssertNil(ShortcutAction.styleSelection.recordingMode)
+        XCTAssertNil(ShortcutAction.insertLast.recordingMode)
+    }
+
+    func testRetargetPolicyMirrorsTakeStartChecks() {
+        XCTAssertNil(TakeRetargetPolicy.problem(to: .translate, selection: "", writingKey: "k"))
+        XCTAssertNil(TakeRetargetPolicy.problem(to: .ask, selection: "", writingKey: "k"))
+        XCTAssertNil(TakeRetargetPolicy.problem(to: .edit, selection: "text", writingKey: "k"))
+        XCTAssertEqual(TakeRetargetPolicy.problem(to: .edit, selection: "", writingKey: "k"), .needsSelection)
+        XCTAssertEqual(TakeRetargetPolicy.problem(to: .dictate, selection: "", writingKey: ""), .needsWritingKey)
+        XCTAssertEqual(TakeRetargetPolicy.problem(to: .insertLast, selection: "", writingKey: "k"), .notRecording)
+        XCTAssertEqual(TakeRetargetPolicy.problem(to: .styleSelection, selection: "x", writingKey: "k"), .notRecording)
     }
 }

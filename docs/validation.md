@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-10-15 · Fn chord promotes the held take
+
+- **Request.** Fn then Shift should start Translate, as Typeless does, not only Shift then Fn.
+- **Rule.** While Fn is held, a modifier press that completes an enabled Fn binding promotes the take to it. Modifier releases emit nothing, so Shift released just before Fn keeps Translate. Unmatched sets keep the current action, and only Fn's release finishes. Shift then Fn still starts Translate directly. The model follows TypeFlux's observed promotion behaviour, without its time window.
+- **Tests.** `FnChordTests` replaces two tests that encoded the old rule: "Fn then Shift keeps Fn alone" and "releasing Shift mid-chord sends a release". New tests cover Fn, Shift, Shift up, Fn up giving Dictate down, retarget to Translate and Translate up; Shift then Fn then releasing Shift; a release that lands on another binding without retargeting; unmatched intermediate chords and extra modifiers; a disabled target binding; re-arming only after Fn's release; the action-to-mode mapping; and `TakeRetargetPolicy`. `FnRetargetTests` checks in preview mode that a retarget moves the held key so Fn's release still ends the hold, that a refused switch keeps the mode with the start-time message, that an unmatched hold is ignored, and that a non-recording target still takes the gesture path.
+- **Build.** `swift build --disable-sandbox` had zero warnings. `swift test --disable-sandbox` passed **279 tests, 4 skipped**. `scripts/check-desktop-localizations.py` and `scripts/check-localizations.py` passed after the Settings → Shortcuts footnote changed in all 8 catalogs. `./scripts/build-app.sh` packaged the app.
+- **Hand check, pending.** Not run, because the installed app owns the global hotkeys. In TextEdit with Fn = Dictate and Fn-Shift = Translate: Fn then Shift should give Translate; Shift then Fn should give Translate; Fn, Shift, release Shift, release Fn should give Translate; Fn alone should give Dictate.
+
 ## 2026-10-15 · On-screen context yield, chat names, diagnostics and capture approval
 
 - **Slack walk, measured.** A scratch probe linked the real `VoiceDraftCore` and the app's `ScreenContextAXReader.walk`. It read Slack Desktop's window without activating it or changing focus, and printed counts and extracted terms only. Slack was frontmost with the composer focused and its tree enabled.

@@ -3,6 +3,24 @@ import CryptoKit
 @testable import VoiceDraftCore
 
 final class FeatureTests: XCTestCase {
+    func testGestureRetargetRestartsTapWindow() {
+        var gesture = RecordingGesture()
+        XCTAssertEqual(gesture.press(at: 0, idle: true), .start)
+        // Fn held 0.5 s, then Shift completes the chord: the window restarts there.
+        gesture.retarget(at: 0.5)
+        XCTAssertEqual(gesture.release(at: 0.8, active: true), .none)
+        XCTAssertTrue(gesture.locked)
+        XCTAssertEqual(gesture.press(at: 2, idle: false), .finish)
+        // Holding and speaking after the chord still finishes on release.
+        gesture.reset()
+        XCTAssertEqual(gesture.press(at: 3, idle: true), .start)
+        gesture.retarget(at: 3.2)
+        XCTAssertEqual(gesture.release(at: 4.5, active: true), .finish)
+        // Without a held key a retarget is a no-op.
+        gesture.reset()
+        gesture.retarget(at: 5)
+        XCTAssertEqual(gesture.release(at: 5.1, active: true), .none)
+    }
     func testGestureHoldTapLockAndRepeatedDown() {
         var gesture = RecordingGesture()
         XCTAssertEqual(gesture.press(at: 0, idle: true), .start)

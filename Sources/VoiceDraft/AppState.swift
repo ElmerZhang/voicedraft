@@ -869,6 +869,8 @@ extension AppState {
         case nil: break
         }
         runMode = mode; self.mode = mode
+        // The tap-versus-hold window restarts at the chord, so a quick release locks the promoted take.
+        gesture.retarget(at: ProcessInfo.processInfo.systemUptime)
         screenContext.retarget(take: generation, mode: mode)
     }
     /// Inserts the last result (`result`, from a recording or Studio) again into

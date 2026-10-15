@@ -223,6 +223,9 @@ public struct RecordingGesture {
         if time - start < 0.6 { locked = true; return .none }
         locked = false; return .finish
     }
+    /// A chord completed while the key is still held restarts the tap-versus-hold
+    /// window, so Fn, Shift, release locks the promoted take just like a Shift-Fn tap.
+    public mutating func retarget(at time: TimeInterval) { if downAt != nil { downAt = time } }
     public mutating func reset() { downAt = nil; locked = false }
 }
 

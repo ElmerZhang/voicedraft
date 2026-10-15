@@ -475,7 +475,7 @@ struct StyleLibraryView: View {
     }
 }
 
-private struct StyleEditor: View {
+struct StyleEditor: View {
     @State var style: WritingStyle
     let save: (WritingStyle) -> Bool
     @Environment(\.dismiss) private var dismiss
@@ -522,8 +522,39 @@ struct VocabularyFileControls: View {
     @State private var filterSummary = ""
     @State private var rawCandidates: [AgentContextCandidate] = []
     @State private var scanAttempt = UUID()
+    private let fixture: ReviewFixture?
+
+    /// Synthetic review state for `VOICEDRAFT_CAPTURE_SHEETS`: the view renders only the review
+    /// sheet's content and never scans, filters or reads the screen.
+    struct ReviewFixture {
+        var context: ContextKind?
+        var app: ScreenContextApplication?
+        var scan: AgentContextScan?
+        var screenScan: ScreenContextScan?
+        var scanning = false
+        var candidates: [AgentContextCandidate] = []
+        /// Kept, found and model name of a finished model filter.
+        var filtered: (kept: Int, found: Int, model: String)?
+    }
+
+    init(state: AppState, fixture: ReviewFixture? = nil) {
+        self.state = state
+        self.fixture = fixture
+        guard let fixture else { return }
+        _context = State(initialValue: fixture.context); _screenApp = State(initialValue: fixture.app)
+        _scan = State(initialValue: fixture.scan); _screenScan = State(initialValue: fixture.screenScan)
+        _scanning = State(initialValue: fixture.scanning); _filterSummary = State(initialValue: fixture.filtered.map { Self.filterSummaryText(kept: $0.kept, found: $0.found, model: $0.model) } ?? "")
+        let entries = fixture.candidates.map { VocabularyEntry(text: $0.text) }
+        _candidates = State(initialValue: entries)
+        _selected = State(initialValue: Set(entries.prefix(3).map(\.id)))
+        _sources = State(initialValue: Self.sourceLabels(fixture.candidates, context: fixture.context, screenSource: fixture.screenScan?.source))
+    }
 
     var body: some View {
+        if fixture != nil { reviewSheet } else { controls }
+    }
+
+    private var controls: some View {
         HStack {
             Button(F("Import vocabulary", "导入词库")) { importFile() }
             Button(F("Export vocabulary", "导出词库")) { exportFile() }
@@ -533,89 +564,93 @@ struct VocabularyFileControls: View {
         .onAppear { consume(state.screenExtractionRequest) }
         .onChange(of: state.screenExtractionRequest) { consume($0) }
         .sheet(isPresented: $showPreview) {
-            VStack(alignment: .leading, spacing: VD.Space.l) {
-                VStack(alignment: .leading, spacing: VD.Space.s) {
-                    Text(F("Review words to import", "选择要导入的词条")).font(VD.Font.sheetTitle)
-                    Text(context == .agent
-                         ? F("Finds local Codex and Claude context automatically, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing.", "自动查找本机 Codex 和 Claude 上下文，再将候选词交给你的写作模型筛除通用词。只发送候选词列表，最后由你勾选导入。")
-                         : context == .screen
-                         ? String(format: D("Reads the text visible in %@ on this Mac, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing."), screenApp?.name ?? "")
-                         : F("Review the vocabulary before importing. Only selected terms are added.", "检查词库内容，只添加勾选的词条。"))
-                        .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
-                }
-                if scanning {
-                    HStack(spacing: VD.Space.s) {
-                        ProgressView().controlSize(.small)
-                        Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…")
-                             : context == .screen ? D("Reading the screen…") : F("Finding local context…", "正在查找本机上下文…")).font(VD.Font.detail)
-                    }
-                } else if context == .agent, let scan {
-                    VStack(alignment: .leading, spacing: VD.Space.xs) {
-                        Text(F("Context files read", "已读取上下文文件") + ": \(scan.filesRead) · " + (scan.sources.isEmpty ? "Codex / Claude" : scan.sources.map(\.rawValue).joined(separator: " / ")))
-                        if scan.limited { Text(F("Recent context was prioritized to keep the scan quick.", "已优先提取近期上下文，避免扫描时间过长。")) }
-                        if scan.unreadableFiles > 0 { Text(F("Some context files could not be read", "部分上下文文件无法读取") + ": \(scan.unreadableFiles)") }
-                    }.font(VD.Font.detail).foregroundStyle(.secondary)
-                }
-                if !filterSummary.isEmpty { Text(filterSummary).font(VD.Font.detail).foregroundStyle(.secondary) }
-                if !scanError.isEmpty, !blocked {
-                    VDInlineNotice(kind: .error, text: scanError)
-                    HStack {
-                        Button(F("Retry filtering", "重新筛选")) { scanning = true; scanError = ""; filterSummary = ""; candidates = []; selected = []; scanAttempt = UUID() }
-                        if !rawCandidates.isEmpty {
-                            Button(F("Review unfiltered words", "查看未筛选的词条")) {
-                                present(rawCandidates)
-                                scanError = ""; filterSummary = F("Unfiltered candidates — review carefully", "未经过模型筛选，请逐项检查")
-                            }
-                        }
-                    }
-                }
-                HStack(spacing: VD.Space.s) {
-                    Button(F("Select all", "全选")) { selected = Set(candidates.map(\.id)) }
-                    Button(F("Clear selection", "清空选择")) { selected.removeAll() }
-                    Spacer()
-                    Text("\(selected.count) / \(candidates.count)").font(VD.Font.detail).foregroundStyle(.secondary).monospacedDigit()
-                }.buttonStyle(.bordered).disabled(scanning || candidates.isEmpty)
-                if candidates.isEmpty {
-                    VDEmptyState(icon: scanning ? "hourglass" : blocked ? "hand.raised" : !scanError.isEmpty ? "exclamationmark.triangle" : "text.magnifyingglass",
-                                 title: scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…")
-                                                   : context == .screen ? D("Reading the screen…") : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
-                         : blocked ? scanError
-                         : !scanError.isEmpty ? F("Filtering did not finish. Retry or review the unfiltered list.", "筛选未完成，可以重试或查看未筛选的词条。")
-                         : !filterSummary.isEmpty ? F("The model found no terms worth adding this time.", "这次没有筛选出值得加入词库的词条。")
-                         : context == .screen
-                         ? (screenScan?.charactersRead ?? 0) == 0 ? D("No readable text was found in this window.")
-                           : D("No new candidate terms were found on this screen. Existing vocabulary words are excluded.")
-                         : scan?.filesRead == 0
-                         ? F("No readable Codex or Claude context was found in this account's home folder.", "在当前账户的用户目录中，没有找到可读取的 Codex 或 Claude 上下文。")
-                         : F("No new candidate terms were found. Existing vocabulary words are excluded.", "没有找到新的候选词，词库中已有的词条已排除。"))
-                        .multilineTextAlignment(.center).padding(.horizontal, VD.Space.xl)
-                        .frame(maxWidth: .infinity, minHeight: 260)
-                        .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
-                } else {
-                    List(candidates) { entry in
-                        HStack {
-                            Toggle(entry.text, isOn: Binding(get: { selected.contains(entry.id) }, set: { value in if value { selected.insert(entry.id) } else { selected.remove(entry.id) } }))
-                            Spacer()
-                            if let source = sources[entry.text] { Text(source).font(VD.Font.footnote).foregroundStyle(.secondary) }
-                        }
-                    }.scrollContentBackground(.hidden).frame(height: 260)
-                        .background(VD.Palette.field, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous).strokeBorder(VD.Palette.line))
-                }
-                HStack {
-                    Spacer()
-                    Button(L("Cancel")) { showPreview = false }.keyboardShortcut(.cancelAction)
-                    Button(F("Import selected words", "导入所选词条")) {
-                        do {
-                            var copy = state.settings
-                            try VocabularyFile.merge(candidates.filter { selected.contains($0.id) }, into: &copy.vocabulary)
-                            state.save(copy); if state.error.isEmpty { showPreview = false }
-                        } catch { state.error = .init(error: error) }
-                    }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(scanning || selected.isEmpty)
-                }
-            }.vdSheet(width: 600)
-                .task(id: scanAttempt) { await findAndFilter() }
+            reviewSheet.task(id: scanAttempt) { await findAndFilter() }
         }
+    }
+
+    private var reviewSheet: some View {
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            VStack(alignment: .leading, spacing: VD.Space.s) {
+                Text(F("Review words to import", "选择要导入的词条")).font(VD.Font.sheetTitle)
+                Text(context == .agent
+                     ? F("Finds local Codex and Claude context automatically, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing.", "自动查找本机 Codex 和 Claude 上下文，再将候选词交给你的写作模型筛除通用词。只发送候选词列表，最后由你勾选导入。")
+                     : context == .screen
+                     ? String(format: D("Reads the text visible in %@ on this Mac, then sends only candidate words to your writing model to filter out common terms. Review the shortlist before importing."), screenApp?.name ?? "")
+                     : F("Review the vocabulary before importing. Only selected terms are added.", "检查词库内容，只添加勾选的词条。"))
+                    .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+            }
+            if scanning {
+                HStack(spacing: VD.Space.s) {
+                    ProgressView().controlSize(.small)
+                    Text(filtering ? F("Filtering with your writing model…", "正在用写作模型筛选…")
+                         : context == .screen ? D("Reading the screen…") : F("Finding local context…", "正在查找本机上下文…")).font(VD.Font.detail)
+                }
+            } else if context == .agent, let scan {
+                VStack(alignment: .leading, spacing: VD.Space.xs) {
+                    Text(F("Context files read", "已读取上下文文件") + ": \(scan.filesRead) · " + (scan.sources.isEmpty ? "Codex / Claude" : scan.sources.map(\.rawValue).joined(separator: " / ")))
+                    if scan.limited { Text(F("Recent context was prioritized to keep the scan quick.", "已优先提取近期上下文，避免扫描时间过长。")) }
+                    if scan.unreadableFiles > 0 { Text(F("Some context files could not be read", "部分上下文文件无法读取") + ": \(scan.unreadableFiles)") }
+                }.font(VD.Font.detail).foregroundStyle(.secondary)
+            }
+            if !filterSummary.isEmpty { Text(filterSummary).font(VD.Font.detail).foregroundStyle(.secondary) }
+            if !scanError.isEmpty, !blocked {
+                VDInlineNotice(kind: .error, text: scanError)
+                HStack {
+                    Button(F("Retry filtering", "重新筛选")) { scanning = true; scanError = ""; filterSummary = ""; candidates = []; selected = []; scanAttempt = UUID() }
+                    if !rawCandidates.isEmpty {
+                        Button(F("Review unfiltered words", "查看未筛选的词条")) {
+                            present(rawCandidates)
+                            scanError = ""; filterSummary = F("Unfiltered candidates — review carefully", "未经过模型筛选，请逐项检查")
+                        }
+                    }
+                }
+            }
+            HStack(spacing: VD.Space.s) {
+                Button(F("Select all", "全选")) { selected = Set(candidates.map(\.id)) }
+                Button(F("Clear selection", "清空选择")) { selected.removeAll() }
+                Spacer()
+                Text("\(selected.count) / \(candidates.count)").font(VD.Font.detail).foregroundStyle(.secondary).monospacedDigit()
+            }.buttonStyle(.bordered).disabled(scanning || candidates.isEmpty)
+            if candidates.isEmpty {
+                VDEmptyState(icon: scanning ? "hourglass" : blocked ? "hand.raised" : !scanError.isEmpty ? "exclamationmark.triangle" : "text.magnifyingglass",
+                             title: scanning ? (filtering ? F("Selecting useful names and specialist terms…", "正在保留有价值的名称和专门术语…")
+                                               // The progress row above already names the source ("Reading the screen…").
+                                               : F("Extracting candidate terms locally…", "正在本机提取候选词…"))
+                     : blocked ? scanError
+                     : !scanError.isEmpty ? F("Filtering did not finish. Retry or review the unfiltered list.", "筛选未完成，可以重试或查看未筛选的词条。")
+                     : !filterSummary.isEmpty ? F("The model found no terms worth adding this time.", "这次没有筛选出值得加入词库的词条。")
+                     : context == .screen
+                     ? (screenScan?.charactersRead ?? 0) == 0 ? D("No readable text was found in this window.")
+                       : D("No new candidate terms were found on this screen. Existing vocabulary words are excluded.")
+                     : scan?.filesRead == 0
+                     ? F("No readable Codex or Claude context was found in this account's home folder.", "在当前账户的用户目录中，没有找到可读取的 Codex 或 Claude 上下文。")
+                     : F("No new candidate terms were found. Existing vocabulary words are excluded.", "没有找到新的候选词，词库中已有的词条已排除。"))
+                    .multilineTextAlignment(.center).padding(.horizontal, VD.Space.xl)
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                    .background(VD.Palette.surface, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+            } else {
+                List(candidates) { entry in
+                    HStack {
+                        Toggle(entry.text, isOn: Binding(get: { selected.contains(entry.id) }, set: { value in if value { selected.insert(entry.id) } else { selected.remove(entry.id) } }))
+                        Spacer()
+                        if let source = sources[entry.text] { Text(source).font(VD.Font.footnote).foregroundStyle(.secondary) }
+                    }
+                }.scrollContentBackground(.hidden).frame(height: 260)
+                    .background(VD.Palette.field, in: RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: VD.Radius.chip, style: .continuous).strokeBorder(VD.Palette.line))
+            }
+            HStack {
+                Spacer()
+                Button(L("Cancel")) { showPreview = false }.keyboardShortcut(.cancelAction)
+                Button(F("Import selected words", "导入所选词条")) {
+                    do {
+                        var copy = state.settings
+                        try VocabularyFile.merge(candidates.filter { selected.contains($0.id) }, into: &copy.vocabulary)
+                        state.save(copy); if state.error.isEmpty { showPreview = false }
+                    } catch { state.error = .init(error: error) }
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(scanning || selected.isEmpty)
+            }
+        }.vdSheet(width: 600)
     }
     /// Vocabulary's screen button reads the last external app; disabled with a reason when none or excluded.
     private var screenButton: some View {
@@ -669,7 +704,7 @@ struct VocabularyFileControls: View {
                 try Task.checkCancellation()
                 let byText = Dictionary(uniqueKeysWithValues: fresh.map { ($0.text, $0) })
                 present(filtered.terms.compactMap { byText[$0] })
-                filterSummary = F("Model selection", "模型筛选") + ": \(candidates.count) / \(fresh.count) · \(filtered.model)"
+                filterSummary = Self.filterSummaryText(kept: candidates.count, found: fresh.count, model: filtered.model)
             }
             scanning = false; filtering = false
         } catch is CancellationError { return }
@@ -682,8 +717,14 @@ struct VocabularyFileControls: View {
         let known = Set(state.settings.vocabulary.entries.flatMap { [$0.text, $0.displayAs] + $0.aliases }.map(AppVocabulary.automaticTermKey))
         let fresh = items.filter { !known.contains(AppVocabulary.automaticTermKey($0.text)) }
         candidates = fresh.map { VocabularyEntry(text: $0.text) }; selected = []
-        let screenLabel = screenScan?.source == .ocr ? D("Screen · OCR") : D("Screen · Accessibility")
-        sources = Dictionary(uniqueKeysWithValues: fresh.map {
+        sources = Self.sourceLabels(fresh, context: context, screenSource: screenScan?.source)
+    }
+    private static func filterSummaryText(kept: Int, found: Int, model: String) -> String {
+        F("Model selection", "模型筛选") + ": \(kept) / \(found) · \(model)"
+    }
+    private static func sourceLabels(_ items: [AgentContextCandidate], context: ContextKind?, screenSource: ScreenContextSource?) -> [String: String] {
+        let screenLabel = screenSource == .ocr ? D("Screen · OCR") : D("Screen · Accessibility")
+        return Dictionary(uniqueKeysWithValues: items.map {
             ($0.text, context == .screen ? screenLabel
                 : ($0.isProject ? F("Project", "项目") + " · " : "") + $0.sources.map(\.rawValue).joined(separator: " / "))
         })

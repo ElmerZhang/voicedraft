@@ -563,7 +563,7 @@ final class AppState: ObservableObject {
         } else { status = "Your text is ready" }
         gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
-        if delivery != nil { hudKind = .compact }
+        if delivery != nil { hudKind = .compact; hideHUD?() }
         else { hudText = output; hudKind = .result; showHUD?() }
         if mode == .polish || mode == .verbatim {
             resultBeforeCorrection = output
@@ -844,7 +844,10 @@ extension AppState {
         }
         recordingLocked = gesture.locked
         switch effect {
-        case .none: break
+        case .none:
+            // A press during the previous take's writing or insertion is ignored by the
+            // gesture; show the Processing capsule so the shortcut does not look dead.
+            if down, phase == "processing" { status = "Still finishing the previous take…"; showHUD?() }
         case .start:
             toggle(mode: action.recordingMode ?? .polish, external: true)
         case .finish:

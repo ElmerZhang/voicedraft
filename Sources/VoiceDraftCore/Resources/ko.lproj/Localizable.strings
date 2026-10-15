@@ -192,6 +192,7 @@
 "Test connection" = "연결 테스트";
 "Testing…" = "테스트 중…";
 "Text inserted" = "텍스트 삽입됨";
+"Still finishing the previous take…" = "이전 입력을 아직 처리 중입니다…";
 "The app vocabulary contains too many entries or duplicate entry IDs." = "앱 어휘 항목이 너무 많거나 항목 ID가 중복되었습니다.";
 "The configuration is too large to sync. Reduce vocabulary or advanced parameter data before syncing." = "설정이 너무 커서 동기화할 수 없습니다. 어휘나 고급 매개변수 데이터를 줄이세요.";
 "The input focus or selection changed. Copy the result when ready." = "입력 위치나 선택 영역이 바뀌었습니다. 결과를 직접 복사하세요.";

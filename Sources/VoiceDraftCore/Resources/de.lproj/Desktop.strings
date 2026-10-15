@@ -119,7 +119,7 @@
 "Use Fn alone" = "Nur Fn verwenden";
 "Use default shortcut (%@)" = "Standardkurzbefehl verwenden (%@)";
 "Press keys · Esc cancels" = "Tasten drücken · Esc bricht ab";
-"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn funktioniert allein oder mit Umschalt, Control, Option oder Befehl, gedrückt vor oder nach Fn. Solange Fn gehalten wird, wechselt das Drücken einer Sondertaste die Aufnahme zu diesem Kurzbefehl. Fn mit Buchstabentasten ist nicht verfügbar, weil macOS diese 🌐-Kurzbefehle reserviert.";
+"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut; releasing one does not. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn funktioniert allein oder mit Umschalt, Control, Option oder Befehl, gedrückt vor oder nach Fn. Solange Fn gehalten wird, wechselt das Drücken einer Sondertaste die Aufnahme zu diesem Kurzbefehl; das Loslassen nicht. Fn mit Buchstabentasten ist nicht verfügbar, weil macOS diese 🌐-Kurzbefehle reserviert.";
 "Restore default shortcuts" = "Standardkurzbefehle wiederherstellen";
 "Add Control, Option or Command, or use Fn" = "Füge Control, Option oder Befehl hinzu oder verwende Fn";
 "Already used by %@" = "Bereits verwendet von „%@“";

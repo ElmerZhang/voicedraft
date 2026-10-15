@@ -16,8 +16,13 @@ public struct WritingStyle: Codable, Identifiable, Equatable {
 }
 
 public enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
-    case dictate, translate, edit, ask, styleSelection
+    case dictate, translate, edit, ask, styleSelection, insertLast
     public var id: String { rawValue }
+    /// Actions understood by builds before `insertLast`. Those builds decode
+    /// `DesktopOptions.shortcuts` strictly (an unknown raw value fails the whole
+    /// device file) and accept at most five bindings, so newer actions are
+    /// stored under a separate key that older builds ignore.
+    static let legacy: Set<ShortcutAction> = [.dictate, .translate, .edit, .ask, .styleSelection]
 }
 
 public struct ShortcutBinding: Codable, Equatable, Identifiable {
@@ -33,10 +38,24 @@ public struct ShortcutBinding: Codable, Equatable, Identifiable {
     public static let defaults: [Self] = [
         .init(.dictate, keyCode: 49, modifiers: 6), .init(.translate, keyCode: 17, modifiers: 6),
         .init(.edit, keyCode: 14, modifiers: 6), .init(.ask, keyCode: 0, modifiers: 6),
-        .init(.styleSelection, keyCode: 1, modifiers: 6)
+        .init(.styleSelection, keyCode: 1, modifiers: 6), .init(.insertLast, keyCode: 9, modifiers: 6)
     ]
+    /// Appends a default binding for every action missing from stored bindings
+    /// (installs saved before that action existed). Stored bindings are kept as
+    /// they are. An appended default that would collide with an enabled binding
+    /// is appended disabled, so a migration never takes over a user's shortcut.
+    public static func fillingDefaults(_ bindings: [Self]) -> [Self] {
+        var result = bindings
+        var used = Set(bindings.filter(\.enabled).map { "\($0.keyCode):\($0.modifiers)" })
+        for binding in defaults where !result.contains(where: { $0.action == binding.action }) {
+            var added = binding
+            if added.enabled { added.enabled = used.insert("\(added.keyCode):\(added.modifiers)").inserted }
+            result.append(added)
+        }
+        return result
+    }
     public static func validate(_ bindings: [Self]) throws {
-        guard bindings.count <= 5, Set(bindings.map(\.action)).count == bindings.count else {
+        guard bindings.count <= ShortcutAction.allCases.count, Set(bindings.map(\.action)).count == bindings.count else {
             throw FeatureError("Each action can have one shortcut.")
         }
         var used = Set<String>()
@@ -85,6 +104,44 @@ public struct DesktopOptions: Codable, Equatable {
     public var updatePublicKey = ""
     public var automaticUpdates = false
     public init() {}
+    private enum CodingKeys: String, CodingKey {
+        case shortcuts, additionalShortcuts, sounds, muteOutput, retainAudio, retentionDays, recentContext
+        case onboardingCompleted, updateFeed, updatePublicKey, automaticUpdates
+    }
+    /// Unknown actions written by a newer build are skipped rather than failing the file.
+    private struct LossyBinding: Decodable {
+        let binding: ShortcutBinding?
+        init(from decoder: Decoder) throws { binding = try? ShortcutBinding(from: decoder) }
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let stored = (try c.decodeIfPresent([LossyBinding].self, forKey: .shortcuts) ?? [])
+            + (try c.decodeIfPresent([LossyBinding].self, forKey: .additionalShortcuts) ?? [])
+        var seen = Set<ShortcutAction>()
+        let bindings = stored.compactMap(\.binding).filter { seen.insert($0.action).inserted }
+        shortcuts = c.contains(.shortcuts) ? ShortcutBinding.fillingDefaults(bindings) : ShortcutBinding.defaults
+        sounds = try c.decodeIfPresent(Bool.self, forKey: .sounds) ?? true
+        muteOutput = try c.decodeIfPresent(Bool.self, forKey: .muteOutput) ?? false
+        retainAudio = try c.decodeIfPresent(Bool.self, forKey: .retainAudio) ?? false
+        retentionDays = try c.decodeIfPresent(Int.self, forKey: .retentionDays) ?? 0
+        recentContext = try c.decodeIfPresent(Bool.self, forKey: .recentContext) ?? false
+        onboardingCompleted = try c.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
+        updateFeed = try c.decodeIfPresent(String.self, forKey: .updateFeed) ?? ""
+        updatePublicKey = try c.decodeIfPresent(String.self, forKey: .updatePublicKey) ?? ""
+        automaticUpdates = try c.decodeIfPresent(Bool.self, forKey: .automaticUpdates) ?? false
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        // Older builds decode `shortcuts` strictly and ignore unknown keys.
+        try c.encode(shortcuts.filter { ShortcutAction.legacy.contains($0.action) }, forKey: .shortcuts)
+        let additional = shortcuts.filter { !ShortcutAction.legacy.contains($0.action) }
+        if !additional.isEmpty { try c.encode(additional, forKey: .additionalShortcuts) }
+        try c.encode(sounds, forKey: .sounds); try c.encode(muteOutput, forKey: .muteOutput)
+        try c.encode(retainAudio, forKey: .retainAudio); try c.encode(retentionDays, forKey: .retentionDays)
+        try c.encode(recentContext, forKey: .recentContext); try c.encode(onboardingCompleted, forKey: .onboardingCompleted)
+        try c.encode(updateFeed, forKey: .updateFeed); try c.encode(updatePublicKey, forKey: .updatePublicKey)
+        try c.encode(automaticUpdates, forKey: .automaticUpdates)
+    }
     public func validate() throws {
         try ShortcutBinding.validate(shortcuts)
         guard [0, 1, 7, 30, 90].contains(retentionDays) else { throw FeatureError("Choose a supported history retention period.") }

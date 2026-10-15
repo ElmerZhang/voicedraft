@@ -279,3 +279,7 @@
 "Paste sent · check the input field" = "Collage envoyé · vérifiez le champ de saisie";
 "Delete" = "Supprimer";
 "Save" = "Enregistrer";
+"Insert last result" = "Réinsérer le dernier résultat";
+"Nothing to insert yet. Dictate first." = "Rien à insérer pour l’instant. Dictez d’abord.";
+"Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Les touches du raccourci étaient encore enfoncées, rien n’a été collé. Copiez plutôt le résultat.";
+"No text field is focused. Copy the result instead." = "Aucun champ de texte n’est actif. Copiez plutôt le résultat.";

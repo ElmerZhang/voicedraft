@@ -113,3 +113,5 @@
 "Runs shortcuts in any app and inserts text where you type." = "모든 앱에서 단축키를 사용하고 입력 중인 위치에 텍스트를 삽입합니다.";
 "Not allowed" = "허용 안 됨";
 "Allow" = "허용";
+"Insert last result" = "마지막 결과 다시 삽입";
+"Paste the last result again, wherever the cursor is now." = "마지막 결과를 지금 커서가 있는 곳에 다시 붙여넣습니다.";

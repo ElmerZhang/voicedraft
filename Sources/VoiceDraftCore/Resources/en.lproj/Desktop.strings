@@ -113,3 +113,5 @@
 "Runs shortcuts in any app and inserts text where you type." = "Runs shortcuts in any app and inserts text where you type.";
 "Not allowed" = "Not allowed";
 "Allow" = "Allow";
+"Insert last result" = "Insert last result";
+"Paste the last result again, wherever the cursor is now." = "Paste the last result again, wherever the cursor is now.";

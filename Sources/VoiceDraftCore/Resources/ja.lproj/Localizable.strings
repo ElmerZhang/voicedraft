@@ -279,3 +279,7 @@
 "Paste sent · check the input field" = "貼り付けを送信しました。入力欄を確認してください";
 "Delete" = "削除";
 "Save" = "保存";
+"Insert last result" = "前回の結果を再挿入";
+"Nothing to insert yet. Dictate first." = "まだ挿入できる結果がありません。先に音声入力してください。";
+"Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "ショートカットキーが押されたままだったため、貼り付けませんでした。代わりに結果をコピーしてください。";
+"No text field is focused. Copy the result instead." = "入力欄にフォーカスがありません。代わりに結果をコピーしてください。";

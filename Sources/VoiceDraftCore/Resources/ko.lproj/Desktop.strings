@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "설정에서 단축키를 켜면 어느 앱에서나 받아쓰기할 수 있습니다.";
 "Used when you record with a shortcut or on Home." = "단축키나 홈에서 녹음할 때 사용됩니다.";
 "Allowed" = "허용됨";
-"Change" = "변경";
 "Record a new shortcut" = "새 단축키 기록";
 "Clear" = "지우기";
 "Open" = "열기";
@@ -115,3 +114,16 @@
 "Allow" = "허용";
 "Insert last result" = "마지막 결과 다시 삽입";
 "Paste the last result again, wherever the cursor is now." = "마지막 결과를 지금 커서가 있는 곳에 다시 붙여넣습니다.";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "누르고 있는 동안 말하고, 놓으면 끝납니다. 짧게 누르면 녹음이 고정되고, 다시 누르면 끝납니다.";
+"Shortcut options" = "단축키 옵션";
+"Use Fn alone" = "Fn만 사용";
+"Use default shortcut (%@)" = "기본 단축키 사용(%@)";
+"Press keys · Esc cancels" = "키를 누르세요 · Esc로 취소";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn은 단독으로 또는 Shift, Control, Option, Command와 함께 사용할 수 있습니다. 보조 키를 누른 채로 Fn을 누르세요. 🌐와 문자 키 조합은 macOS가 예약하고 있어 사용할 수 없습니다.";
+"Restore default shortcuts" = "기본 단축키로 복원";
+"Add Control, Option or Command, or use Fn" = "Control, Option 또는 Command를 추가하거나 Fn을 사용하세요";
+"Already used by %@" = "‘%@’에서 이미 사용 중";
+"Fn system action is off" = "Fn 시스템 동작이 꺼져 있음";
+"Check the macOS Fn action" = "macOS Fn 동작 확인";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "Fn 단축키(단독 또는 보조 키 조합)를 사용하려면 시스템 설정 → 키보드에서 ‘🌐 키를 눌러’를 ‘동작 안 함’으로 설정하세요. 그렇지 않으면 녹음할 때 입력 소스 전환, 이모티콘 또는 받아쓰기가 함께 실행될 수 있습니다. 이 시스템 전체 설정은 VoiceDraft를 종료한 후에도 유지됩니다.";
+"Open Keyboard Settings" = "키보드 설정 열기";

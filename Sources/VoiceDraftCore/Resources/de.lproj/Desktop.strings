@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "Aktiviere in den Einstellungen einen Kurzbefehl, um in jeder App zu diktieren.";
 "Used when you record with a shortcut or on Home." = "Wird bei Aufnahmen per Kurzbefehl oder auf der Startseite verwendet.";
 "Allowed" = "Erlaubt";
-"Change" = "Ändern";
 "Record a new shortcut" = "Neuen Kurzbefehl aufnehmen";
 "Clear" = "Löschen";
 "Open" = "Öffnen";
@@ -115,3 +114,16 @@
 "Allow" = "Erlauben";
 "Insert last result" = "Letztes Ergebnis erneut einfügen";
 "Paste the last result again, wherever the cursor is now." = "Fügt das letzte Ergebnis noch einmal dort ein, wo der Cursor jetzt steht.";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "Zum Sprechen halten, zum Beenden loslassen. Kurz tippen, um die Aufnahme zu sperren, und erneut tippen, um sie zu beenden.";
+"Shortcut options" = "Kurzbefehloptionen";
+"Use Fn alone" = "Nur Fn verwenden";
+"Use default shortcut (%@)" = "Standardkurzbefehl verwenden (%@)";
+"Press keys · Esc cancels" = "Tasten drücken · Esc bricht ab";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn funktioniert allein oder mit Umschalt, Control, Option oder Befehl: Halte die Sondertaste und drücke dann Fn. Fn mit Buchstabentasten ist nicht verfügbar, weil macOS diese 🌐-Kurzbefehle reserviert.";
+"Restore default shortcuts" = "Standardkurzbefehle wiederherstellen";
+"Add Control, Option or Command, or use Fn" = "Füge Control, Option oder Befehl hinzu oder verwende Fn";
+"Already used by %@" = "Bereits verwendet von „%@“";
+"Fn system action is off" = "Fn-Systemaktion ist aus";
+"Check the macOS Fn action" = "macOS-Fn-Aktion prüfen";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "Fn-Kurzbefehle, allein oder mit Sondertasten, erfordern, dass „Fn-Taste (🌐) drücken, um“ unter Systemeinstellungen → Tastatur auf „Keine Aktion“ steht. Sonst kann die Aufnahme auch die Eingabequelle wechseln, Emoji öffnen oder das Diktieren starten. Diese systemweite Einstellung bleibt nach dem Beenden von VoiceDraft bestehen.";
+"Open Keyboard Settings" = "Tastatureinstellungen öffnen";

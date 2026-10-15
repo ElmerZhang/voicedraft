@@ -54,19 +54,106 @@ public struct ShortcutBinding: Codable, Equatable, Identifiable {
         }
         return result
     }
+    /// Key code of the Fn (Globe) key. It is observed as a modifier through
+    /// `flagsChanged`, alone or together with any of the four modifier bits
+    /// (a chord such as Fn-Shift). Fn with a letter or other key is not
+    /// supported: macOS reserves many Globe-letter shortcuts, and detecting
+    /// them would require tapping every key press system-wide.
+    public static let fnKeyCode: UInt32 = 63
+    public var isFn: Bool { keyCode == Self.fnKeyCode }
+    /// Fn alone or with any modifiers; any other key needs Control, Option or
+    /// Command (Shift alone would capture ordinary typing).
+    public var isAllowed: Bool {
+        keyCode <= 127 && modifiers <= 15 && (isFn || modifiers & 14 != 0)
+    }
+    public enum Problem: Equatable {
+        /// A normal key without Control, Option or Command, or an out-of-range value.
+        case notAllowed
+        /// Another enabled action already uses the same keys.
+        case conflict(ShortcutAction)
+    }
+    /// Why `candidate` cannot replace the binding for its action among
+    /// `bindings`, or nil when it can. Does not mutate or save anything.
+    public static func problem(with candidate: Self, in bindings: [Self]) -> Problem? {
+        guard candidate.enabled else { return nil }
+        guard candidate.isAllowed else { return .notAllowed }
+        if let other = bindings.first(where: {
+            $0.action != candidate.action && $0.enabled && $0.keyCode == candidate.keyCode && $0.modifiers == candidate.modifiers
+        }) { return .conflict(other.action) }
+        return nil
+    }
+    /// Modifier symbols in the order ⌃⌥⇧⌘ followed by the key name, for
+    /// example "⌃⌥Space", "Fn" or "⇧Fn". Ignores `enabled`.
+    public var keyLabel: String {
+        Self.modifierSymbols(modifiers) + (isFn ? "Fn" : Self.keyNames[keyCode] ?? "Key \(keyCode)")
+    }
+    /// Modifier bits as symbols in the order ⌃⌥⇧⌘, e.g. 3 → "⌃⇧".
+    public static func modifierSymbols(_ modifiers: UInt32) -> String {
+        [(UInt32(2), "⌃"), (4, "⌥"), (1, "⇧"), (8, "⌘")].filter { modifiers & $0.0 != 0 }.map(\.1).joined()
+    }
+    private static let keyNames: [UInt32: String] = [
+        0:"A",1:"S",2:"D",3:"F",4:"H",5:"G",6:"Z",7:"X",8:"C",9:"V",11:"B",12:"Q",13:"W",14:"E",15:"R",16:"Y",17:"T",
+        18:"1",19:"2",20:"3",21:"4",22:"6",23:"5",24:"=",25:"9",26:"7",27:"−",28:"8",29:"0",30:"]",31:"O",32:"U",33:"[",
+        34:"I",35:"P",36:"↩",37:"L",38:"J",39:"'",40:"K",41:";",42:"\\",43:",",44:"/",45:"N",46:"M",47:".",48:"⇥",
+        49:"Space",50:"`",51:"⌫",53:"⎋",123:"←",124:"→",125:"↓",126:"↑"
+    ]
     public static func validate(_ bindings: [Self]) throws {
         guard bindings.count <= ShortcutAction.allCases.count, Set(bindings.map(\.action)).count == bindings.count else {
             throw FeatureError("Each action can have one shortcut.")
         }
         var used = Set<String>()
         for b in bindings where b.enabled {
-            guard b.keyCode <= 127, b.modifiers <= 15,
-                  (b.keyCode == 63 && b.modifiers == 0) || (b.keyCode != 63 && b.modifiers & 14 != 0),
-                  used.insert("\(b.keyCode):\(b.modifiers)").inserted else {
-                throw FeatureError("Use distinct shortcuts with Control, Option or Command, or Fn alone.")
+            guard b.isAllowed, used.insert("\(b.keyCode):\(b.modifiers)").inserted else {
+                throw FeatureError("Use distinct shortcuts with Control, Option or Command, or Fn.")
             }
         }
     }
+}
+
+/// Turns Fn (Globe) `flagsChanged` observations into shortcut press and
+/// release events for bindings whose key is Fn, alone or in a chord.
+///
+/// - Activation needs Fn held, no active chord, and `armed`. It picks the
+///   enabled Fn binding whose modifiers equal the held set exactly, so
+///   "hold Shift, then press Fn" and "press Fn, then add Shift" both select
+///   Fn-Shift (the latter only when no Fn-alone binding claimed the press).
+/// - An active chord stays down while Fn and the binding's own modifiers stay
+///   held; extra modifiers do not cancel it. Otherwise it is released.
+/// - Any release disarms until Fn is fully let go, so releasing Shift while
+///   still holding Fn never starts the Fn-alone action.
+public struct FnChordTracker: Equatable {
+    public struct Event: Equatable {
+        public let action: ShortcutAction
+        public let down: Bool
+        public init(_ action: ShortcutAction, down: Bool) { self.action = action; self.down = down }
+    }
+    public private(set) var active: ShortcutAction?
+    public private(set) var armed = true
+    private var activeModifiers: UInt32 = 0
+    public init() {}
+
+    /// - Parameters:
+    ///   - fnHeld: whether the event flags contain the secondary-Fn mask.
+    ///   - modifiers: held Shift = 1, Control = 2, Option = 4, Command = 8.
+    ///   - bindings: all bindings; only enabled Fn bindings are considered.
+    public mutating func observe(fnHeld: Bool, modifiers: UInt32, bindings: [ShortcutBinding]) -> [Event] {
+        let held = modifiers & 15
+        var events: [Event] = []
+        if let action = active {
+            let stillBound = bindings.contains { $0.action == action && $0.enabled && $0.isFn }
+            if fnHeld && stillBound && held & activeModifiers == activeModifiers { return [] }
+            events.append(Event(action, down: false))
+            active = nil; activeModifiers = 0; armed = false
+        }
+        guard fnHeld else { armed = true; return events }
+        if armed, let binding = bindings.first(where: { $0.enabled && $0.isFn && $0.modifiers == held }) {
+            active = binding.action; activeModifiers = binding.modifiers
+            events.append(Event(binding.action, down: true))
+        }
+        return events
+    }
+
+    public mutating func reset() { self = Self() }
 }
 
 /// A release can arrive while permission/network startup is still pending.

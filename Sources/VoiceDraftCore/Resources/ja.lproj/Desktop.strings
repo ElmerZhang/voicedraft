@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "設定でショートカットをオンにすると、どのアプリでも音声入力できます。";
 "Used when you record with a shortcut or on Home." = "ショートカットまたはホームで録音するときに使用します。";
 "Allowed" = "許可済み";
-"Change" = "変更";
 "Record a new shortcut" = "新しいショートカットを記録";
 "Clear" = "消去";
 "Open" = "開く";
@@ -115,3 +114,16 @@
 "Allow" = "許可";
 "Insert last result" = "前回の結果を再挿入";
 "Paste the last result again, wherever the cursor is now." = "前回の結果を、今カーソルがある場所にもう一度貼り付けます。";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "押している間に話し、離すと終了します。短く押すと録音を固定し、もう一度押すと終了します。";
+"Shortcut options" = "ショートカットのオプション";
+"Use Fn alone" = "Fn のみを使用";
+"Use default shortcut (%@)" = "デフォルトのショートカットを使用（%@）";
+"Press keys · Esc cancels" = "キーを押してください · Esc でキャンセル";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn は単独でも、Shift・Control・Option・Command と組み合わせても使えます。修飾キーを押したまま Fn を押してください。🌐 と文字キーの組み合わせは macOS が予約しているため使えません。";
+"Restore default shortcuts" = "デフォルトのショートカットに戻す";
+"Add Control, Option or Command, or use Fn" = "Control、Option、Command のいずれかを加えるか、Fn を使用してください";
+"Already used by %@" = "「%@」で使用中です";
+"Fn system action is off" = "Fn のシステム動作はオフです";
+"Check the macOS Fn action" = "macOS の Fn 動作を確認";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "Fn ショートカット（単独または修飾キーとの組み合わせ）を使うには、システム設定 → キーボードで「🌐キーを押して」を「何もしない」に設定してください。そうしないと、録音時に入力ソースの切り替え、絵文字、音声入力が同時に起動することがあります。このシステム全体の設定は VoiceDraft を終了しても残ります。";
+"Open Keyboard Settings" = "キーボード設定を開く";

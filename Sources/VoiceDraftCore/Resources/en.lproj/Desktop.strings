@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "Turn on a shortcut in Settings to dictate from any app.";
 "Used when you record with a shortcut or on Home." = "Used when you record with a shortcut or on Home.";
 "Allowed" = "Allowed";
-"Change" = "Change";
 "Record a new shortcut" = "Record a new shortcut";
 "Clear" = "Clear";
 "Open" = "Open";
@@ -115,3 +114,16 @@
 "Allow" = "Allow";
 "Insert last result" = "Insert last result";
 "Paste the last result again, wherever the cursor is now." = "Paste the last result again, wherever the cursor is now.";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish.";
+"Shortcut options" = "Shortcut options";
+"Use Fn alone" = "Use Fn alone";
+"Use default shortcut (%@)" = "Use default shortcut (%@)";
+"Press keys · Esc cancels" = "Press keys · Esc cancels";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts.";
+"Restore default shortcuts" = "Restore default shortcuts";
+"Add Control, Option or Command, or use Fn" = "Add Control, Option or Command, or use Fn";
+"Already used by %@" = "Already used by %@";
+"Fn system action is off" = "Fn system action is off";
+"Check the macOS Fn action" = "Check the macOS Fn action";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits.";
+"Open Keyboard Settings" = "Open Keyboard Settings";

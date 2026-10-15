@@ -32,7 +32,7 @@ struct FnShortcutStatus: View {
     @ObservedObject var state: AppState
     var showReady = false
     @State private var systemActionDisabled: Bool?
-    private var usesFn: Bool { state.device.features.shortcuts.contains { $0.enabled && $0.keyCode == 63 } }
+    private var usesFn: Bool { state.device.features.shortcuts.contains { $0.enabled && $0.isFn } }
 
     var body: some View {
         // Keep a mounted container while the first preference read is pending.
@@ -44,14 +44,14 @@ struct FnShortcutStatus: View {
                     Image(systemName: systemActionDisabled ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(tint)
                     VStack(alignment: .leading, spacing: VD.Space.s) {
                         Text(systemActionDisabled
-                             ? F("Fn system action is off", "Fn 系统动作已关闭")
-                             : F("Check the macOS Fn action", "检查 macOS 的 Fn 系统动作"))
+                             ? D("Fn system action is off")
+                             : D("Check the macOS Fn action"))
                             .font(VD.Font.body.weight(.semibold))
                         if !systemActionDisabled {
-                            Text(F("In System Settings → Keyboard, set ‘Press Fn (🌐) key to’ to ‘Do Nothing’ so recording does not also switch input sources, open emoji or start Dictation. This is a system-wide setting and stays in effect after VoiceDraft quits.", "在系统设置 → 键盘中，将“按 Fn（🌐）键”设为“不执行任何操作”，避免录音时同时切换输入法、打开表情或启动系统听写。这是系统级设置，退出 VoiceDraft 后也会保留。"))
+                            Text(D("Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits."))
                                 .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
-                        Button(F("Open Keyboard Settings", "打开键盘设置")) {
+                        Button(D("Open Keyboard Settings")) {
                             guard !state.preview, let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") else { return }
                             NSWorkspace.shared.open(url)
                         }
@@ -73,65 +73,143 @@ struct FnShortcutStatus: View {
     }
 }
 
+/// Settings → Shortcuts. Each row's key caps are one control that starts
+/// recording; the overflow menu offers Fn alone and the default binding.
+/// Rejected recordings keep the previous binding and explain why inline.
 struct ShortcutPreferences: View {
     @ObservedObject var state: AppState
     @State private var capturing: ShortcutAction?
+    @State private var liveModifiers: UInt32 = 0
+    @State private var problems: [ShortcutAction: String] = [:]
     @State private var monitor: Any?
     var body: some View {
         VStack(alignment: .leading, spacing: VD.Space.s) {
-            Text(F("Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish.", "按住说话，松开结束；轻按后锁定录音，再按一次结束。启动麦克风时松开也会保留你的操作。"))
+            Text(D("Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish."))
                 .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach(state.device.features.shortcuts) { binding in
-                VDSettingRow(title: binding.action.title, detail: binding.action.detail) {
-                    HStack(spacing: VD.Space.s) {
-                        if capturing == binding.action {
-                            Text(F("Press shortcut… (Esc cancels)", "按下快捷键…（Esc 取消）")).font(VD.Font.detail.weight(.medium)).foregroundStyle(VD.Palette.accent)
-                        } else {
-                            VDKeyCaps(label: binding.label, size: 12).opacity(binding.enabled ? 1 : 0.4)
+                VStack(alignment: .trailing, spacing: 2) {
+                    VDSettingRow(title: binding.action.title, detail: binding.action.detail) {
+                        HStack(spacing: VD.Space.s) {
+                            keyField(binding)
+                            VDOverflowMenu(label: D("Shortcut options")) {
+                                Button(D("Use Fn alone")) { apply(binding.action) { $0.keyCode = ShortcutBinding.fnKeyCode; $0.modifiers = 0 } }
+                                if let fallback = ShortcutBinding.defaults.first(where: { $0.action == binding.action }) {
+                                    Button(String(format: D("Use default shortcut (%@)"), fallback.keyLabel)) {
+                                        apply(binding.action) { $0.keyCode = fallback.keyCode; $0.modifiers = fallback.modifiers }
+                                    }
+                                }
+                            }
+                            VDSwitch(binding.action.title, isOn: Binding(get: { binding.enabled }, set: { value in apply(binding.action) { $0.enabled = value } }))
                         }
-                        Button(D("Change")) { begin(binding.action) }.help(D("Record a new shortcut"))
-                        Button("Fn") { change(binding) { $0.keyCode = 63; $0.modifiers = 0 } }.help(F("Fn requires Accessibility", "单独使用 Fn 需要辅助功能权限"))
-                        VDSwitch(binding.action.title, isOn: Binding(get: { binding.enabled }, set: { value in change(binding) { $0.enabled = value } }))
-                            .padding(.leading, VD.Space.s)
+                    }
+                    if let problem = problems[binding.action] {
+                        Text(problem).font(VD.Font.footnote).foregroundStyle(VD.Palette.danger)
+                            .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.trailing)
+                    }
+                    if capturing == binding.action {
+                        Text(D("Press keys · Esc cancels")).font(VD.Font.footnote).foregroundStyle(VD.Palette.accent)
                     }
                 }
             }
+            Text(D("Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts."))
+                .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                Button(F("Restore default shortcuts", "恢复默认快捷键")) {
-                    end(); var options = state.device.features; options.shortcuts = ShortcutBinding.defaults; state.saveFeatures(options)
+                Button(D("Restore default shortcuts")) {
+                    end(); problems.removeAll()
+                    var options = state.device.features; options.shortcuts = ShortcutBinding.defaults; state.saveFeatures(options)
                 }
             }
             FnShortcutStatus(state: state, showReady: true)
         }.disabled(state.busy).onDisappear { end() }
     }
-    private func change(_ binding: ShortcutBinding, update: (inout ShortcutBinding) -> Void) {
-        end(); var options = state.device.features
-        if let i = options.shortcuts.firstIndex(where: { $0.action == binding.action }) { update(&options.shortcuts[i]) }
-        state.saveFeatures(options)
+
+    /// The key caps as one button: click to record, click again to cancel.
+    private func keyField(_ binding: ShortcutBinding) -> some View {
+        let recording = capturing == binding.action
+        let shape = RoundedRectangle(cornerRadius: VD.Radius.control, style: .continuous)
+        return Button { recording ? end() : begin(binding.action) } label: {
+            Group {
+                if recording {
+                    HStack(spacing: 5) {
+                        let held = ShortcutBinding.modifierSymbols(liveModifiers)
+                        if !held.isEmpty { VDKeyCaps(label: held, size: 12) }
+                        Text("…").font(.system(size: 13, weight: .semibold)).foregroundStyle(VD.Palette.accent)
+                    }.padding(.horizontal, VD.Space.s)
+                } else {
+                    VDKeyCaps(label: binding.keyLabel, size: 12).opacity(binding.enabled ? 1 : 0.4)
+                }
+            }
+            .frame(minWidth: 56, minHeight: 32)
+            .padding(2)
+            .background(recording ? VD.Palette.accentSoft : .clear, in: shape)
+            .overlay(shape.strokeBorder(recording ? VD.Palette.accent : .clear, lineWidth: 1.5))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .help(recording ? D("Press keys · Esc cancels") : D("Record a new shortcut"))
+        .accessibilityLabel("\(binding.action.title), \(binding.keyLabel)")
+        .accessibilityHint(D("Record a new shortcut"))
     }
+
+    private func message(for problem: ShortcutBinding.Problem) -> String {
+        switch problem {
+        case .notAllowed: return D("Add Control, Option or Command, or use Fn")
+        case .conflict(let other): return String(format: D("Already used by %@"), other.title)
+        }
+    }
+
+    /// Validates the edited binding against the other actions without saving.
+    /// On success returns the options to save; otherwise shows the reason under
+    /// the row and returns nil, leaving the saved binding unchanged.
+    private func candidate(_ action: ShortcutAction, update: (inout ShortcutBinding) -> Void) -> DesktopOptions? {
+        var options = state.device.features
+        guard let i = options.shortcuts.firstIndex(where: { $0.action == action }) else { return nil }
+        update(&options.shortcuts[i])
+        if let problem = ShortcutBinding.problem(with: options.shortcuts[i], in: options.shortcuts) {
+            problems[action] = message(for: problem); return nil
+        }
+        problems[action] = nil
+        return options
+    }
+
+    private func apply(_ action: ShortcutAction, update: (inout ShortcutBinding) -> Void) {
+        end()
+        if let options = candidate(action, update: update) { state.saveFeatures(options) }
+    }
+
+    private static func modifierBits(_ flags: NSEvent.ModifierFlags) -> UInt32 {
+        var modifiers: UInt32 = 0
+        for (flag, bit) in [(NSEvent.ModifierFlags.shift, UInt32(1)), (.control, 2), (.option, 4), (.command, 8)] where flags.contains(flag) { modifiers |= bit }
+        return modifiers
+    }
+
     private func begin(_ action: ShortcutAction) {
         end()
         do { try state.configureShortcuts?([]) }
         catch { state.error = .init(error: error); return }
-        capturing = action
+        capturing = action; problems[action] = nil
+        liveModifiers = Self.modifierBits(NSEvent.modifierFlags)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             if event.type == .keyDown && event.keyCode == 53 { end(); return nil }
-            if event.type == .flagsChanged && event.keyCode != 63 { return event }
-            guard event.type == .keyDown || event.modifierFlags.contains(.function), !event.isARepeat else { return nil }
-            var options = state.device.features
-            if let i = options.shortcuts.firstIndex(where: { $0.action == action }) {
-                var modifiers: UInt32 = 0
-                for (flag, bit) in [(NSEvent.ModifierFlags.shift, UInt32(1)), (.control, 2), (.option, 4), (.command, 8)] where event.modifierFlags.contains(flag) { modifiers |= bit }
-                options.shortcuts[i].keyCode = UInt32(event.keyCode); options.shortcuts[i].modifiers = modifiers
-                options.shortcuts[i].enabled = true
+            let modifiers = Self.modifierBits(event.modifierFlags)
+            if event.type == .flagsChanged && UInt32(event.keyCode) != ShortcutBinding.fnKeyCode {
+                liveModifiers = modifiers; return event
             }
-            end(); state.saveFeatures(options); return nil
+            // Fn's release edge, or a key repeat: nothing to record.
+            guard event.type == .keyDown || event.modifierFlags.contains(.function), !event.isARepeat else { return nil }
+            let keyCode = UInt32(event.keyCode)
+            // A rejected combination keeps recording so the user can try another.
+            guard let options = candidate(action, update: { $0.keyCode = keyCode; $0.modifiers = modifiers; $0.enabled = true }) else { return nil }
+            end(); state.saveFeatures(options)
+            return nil
         }
     }
+    /// Stops recording and reinstalls the saved bindings as global shortcuts.
     private func end() {
         if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil
         if capturing != nil { try? state.configureShortcuts?(state.device.features.shortcuts) }; capturing = nil
+        liveModifiers = 0
     }
 }
 

@@ -33,7 +33,6 @@
 "Turn on a shortcut in Settings to dictate from any app." = "在设置中开启快捷键，即可在任何应用中听写。";
 "Used when you record with a shortcut or on Home." = "通过快捷键或在首页录音时使用。";
 "Allowed" = "已允许";
-"Change" = "更改";
 "Record a new shortcut" = "录制新的快捷键";
 "Clear" = "清空";
 "Open" = "打开";
@@ -115,3 +114,16 @@
 "Allow" = "允许";
 "Insert last result" = "重新插入上一段";
 "Paste the last result again, wherever the cursor is now." = "把上一次的结果再插入到当前光标处。";
+"Hold to talk. Release to finish. Tap briefly to lock recording, then tap again to finish." = "按住说话，松开结束；轻按后锁定录音，再按一次结束。启动麦克风时松开也会保留你的操作。";
+"Shortcut options" = "快捷键选项";
+"Use Fn alone" = "单独使用 Fn";
+"Use default shortcut (%@)" = "使用默认快捷键（%@）";
+"Press keys · Esc cancels" = "请按键 · Esc 取消";
+"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn 可以单独使用，也可以与 Shift、Control、Option 或 Command 组合：先按住修饰键，再按 Fn。macOS 保留了 🌐 与字母键的组合，因此不支持 Fn 加字母键。";
+"Restore default shortcuts" = "恢复默认快捷键";
+"Add Control, Option or Command, or use Fn" = "请加上 Control、Option 或 Command，或使用 Fn";
+"Already used by %@" = "已被“%@”使用";
+"Fn system action is off" = "Fn 系统动作已关闭";
+"Check the macOS Fn action" = "检查 macOS 的 Fn 系统动作";
+"Fn shortcuts, alone or with modifier keys, need ‘Press Fn (🌐) key to’ set to ‘Do Nothing’ in System Settings → Keyboard. Otherwise recording can also switch input sources, open emoji or start Dictation. This system-wide setting stays in effect after VoiceDraft quits." = "使用 Fn 快捷键（单独或与修饰键组合）时，需要在系统设置 → 键盘中将“按 Fn（🌐）键”设为“不执行任何操作”，否则录音时可能同时切换输入法、打开表情或启动系统听写。这是系统级设置，退出 VoiceDraft 后也会保留。";
+"Open Keyboard Settings" = "打开键盘设置";

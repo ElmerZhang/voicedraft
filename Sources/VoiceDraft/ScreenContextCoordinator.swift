@@ -27,15 +27,38 @@ final class ScreenContextCoordinator {
         let mode: WritingMode
         let options: DesktopOptions
         let vocabulary: AppVocabulary
+        /// The complete walk (to `axWalkSeconds`), once finished.
         var ax: ScreenContextSnapshot?
+        var axCollection: ScreenTextCollection?
         var axDone = false
+        var axElapsed: Duration?
+        /// Text collected so far while the walk runs; the live gate uses it.
+        var axPartial: ScreenTextCollection?
+        var partialSnapshot: ScreenContextSnapshot?
+        var partialStale = false
+        var axKey: String?
+        /// This window's complete AX snapshot from an earlier take (≤ `cacheSeconds`).
+        var cachedAX: ScreenContextSnapshot?
         var axNeedsOCR = true
         var ocr: ScreenContextSnapshot?
+        var ocrCollection: ScreenTextCollection?
         var ocrPending = false
-        var cached: ScreenContextSnapshot?
+        var ocrStart: ContinuousClock.Instant?
+        var ocrElapsed: Duration?
+        var cachedOCR: ScreenContextSnapshot?
         /// Keys of every screen term offered to speech or writing, for learning exclusion.
         var offeredKeys = Set<String>()
+        /// Diagnostics only: what each consumer received.
+        var offeredTerms: [String] = []
+        var gateHadTerms: Bool?
+        var asrTermsSent = 0
+        var writingTerms: [String] = []
+        var excerptLength = 0
         var tasks: [Task<Void, Never>] = []
+        var startedAt = Date()
+        func offer(_ terms: [String]) {
+            for term in terms where offeredKeys.insert(AppVocabulary.automaticTermKey(term)).inserted { offeredTerms.append(term) }
+        }
         init(id: UUID, start: ContinuousClock.Instant, bundleID: String, name: String, mode: WritingMode,
              options: DesktopOptions, vocabulary: AppVocabulary) {
             self.id = id; self.start = start; self.bundleID = bundleID; self.name = name; self.mode = mode
@@ -52,6 +75,8 @@ final class ScreenContextCoordinator {
     private var cache: ScreenContextCache
     private var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+    /// Opt-in device-local diagnostics; nil in preview mode.
+    var diagnostics: ScreenContextDiagnosticsLog?
     /// The last regular app other than VoiceDraft that became active; Vocabulary's target.
     private(set) var lastExternalApplication: ScreenContextApplication?
     /// Called on the main actor whenever a take's offered context changes.
@@ -79,15 +104,21 @@ final class ScreenContextCoordinator {
         guard ScreenContextPolicy.shouldCapture(options: options, external: true, secure: target.secure,
                                                 bundleID: bundleID, ownBundleID: ownBundleID), let bundleID else { return false }
         let record = Take(id: id, start: .now, bundleID: bundleID, name: target.name, mode: mode, options: options, vocabulary: vocabulary)
+        record.startedAt = now()
         current = record
         let request = ScreenReadRequest(pid: target.pid, window: target.window, focused: target.element,
                                         focusedValue: target.value, focusedRange: target.range)
         let reader = reader, recognizer = recognizer, limits = limits
+        // The walk continues past the ASR gate to `axWalkSeconds`; partial results
+        // feed the gate, the complete one feeds writing and the per-window cache.
+        let sink: @Sendable (ScreenReadProgress) -> Void = { [weak self] event in
+            Task { @MainActor in self?.progress(id, event) }
+        }
         record.tasks.append(Task { [weak self] in
-            let collection = await reader.collect(request, limits: limits)
+            let collection = await reader.collect(request, limits: limits, progress: sink)
             self?.finishAccessibility(id, collection)
         })
-        // Takes only preflight: a dictation never triggers a permission prompt.
+        // Takes only check; a dictation never triggers a permission prompt.
         if options.screenContextOCR, recognizer.permitted() {
             record.ocrPending = true
             let deadline = record.start.advanced(by: .milliseconds(Int(limits.ocrSeconds * 1000)))
@@ -97,10 +128,12 @@ final class ScreenContextCoordinator {
                 guard let location else { self.finishOCR(id, nil, key: nil); return }
                 let key = ScreenContextCache.key(pid: request.pid, windowID: location.windowID)
                 self.useCache(id, key: key)
-                await self.wait(id, until: deadline) { !$0.axDone }
+                // Decides as soon as the walk (or a partial with enough text) shows whether OCR is needed.
+                await self.wait(id, until: deadline) { !$0.axDone && $0.axNeedsOCR }
                 guard self.current?.id == id, self.current?.axNeedsOCR == true, !Task.isCancelled else {
                     self.finishOCR(id, nil, key: nil); return
                 }
+                self.current?.ocrStart = .now
                 let collection = await recognizer.recognize(location, deadline: deadline, limits: limits)
                 self.finishOCR(id, collection, key: key)
             })
@@ -112,6 +145,7 @@ final class ScreenContextCoordinator {
     func end(take id: UUID) {
         guard let record = current, record.id == id else { return }
         record.tasks.forEach { $0.cancel() }
+        if let diagnostics, diagnostics.isEnabled() { diagnostics.record(diagnosticRecord(record)) }
         current = nil
         signal()
     }
@@ -121,17 +155,24 @@ final class ScreenContextCoordinator {
     // MARK: Consumers
 
     /// Live ASR gate: waits until the AX walk finishes or `deadline` (t0 + 250 ms),
-    /// then returns AX terms, else cached OCR terms for the same window, else [].
+    /// then returns the terms ready now: the complete walk, else the partial walk
+    /// merged with this window's cached AX snapshot, plus OCR or cached OCR; else [].
     func asrTerms(take id: UUID, until deadline: ContinuousClock.Instant) async -> [String] {
         await wait(id, until: deadline) { !$0.axDone }
-        return currentASRTerms(take: id)
+        let terms = currentASRTerms(take: id)
+        if let record = current, record.id == id {
+            record.gateHadTerms = !terms.isEmpty
+            onTakeUpdate?(id)
+        }
+        return terms
     }
 
     /// HTTP adapters at stop: whatever is ready now, including finished OCR. Never waits.
     func currentASRTerms(take id: UUID) -> [String] {
         guard let record = current, record.id == id, record.options.screenContextASR else { return [] }
         let terms = ScreenContextPolicy.asrTerms(snapshot(record), vocabulary: record.vocabulary, limits: limits)
-        record.offeredKeys.formUnion(ScreenContextPolicy.keys(of: terms))
+        record.offer(terms)
+        record.asrTermsSent = terms.count
         return terms
     }
 
@@ -143,7 +184,9 @@ final class ScreenContextCoordinator {
         await wait(id, until: record.start.advanced(by: .milliseconds(Int(limits.ocrSeconds * 1000)))) { !$0.axDone || $0.ocrPending }
         guard let record = current, record.id == id, let snapshot = snapshot(record),
               let context = ScreenWritingContext(snapshot: snapshot, mode: mode, limits: limits) else { return nil }
-        record.offeredKeys.formUnion(ScreenContextPolicy.keys(of: context.terms))
+        record.offer(context.terms)
+        record.writingTerms = context.terms
+        record.excerptLength = context.excerpt.count
         return context
     }
 
@@ -174,20 +217,36 @@ final class ScreenContextCoordinator {
         }
         // An explicit, on-demand read is not on the dictation latency path.
         var extraction = limits
-        extraction.axSeconds = max(limits.axSeconds, 0.5)
+        extraction.axWalkSeconds = max(limits.axWalkSeconds, 1.5)
         let request = ScreenReadRequest(pid: app.pid, window: nil, focused: nil, focusedValue: nil, focusedRange: nil)
+        let started = ContinuousClock.now
         let ax = await reader.collect(request, limits: extraction)
+        let axElapsed = started.duration(to: .now)
         try Task.checkCancellation()
         var ocr: ScreenTextCollection?
+        var ocrElapsed: Duration?
         if options.screenContextOCR, ScreenContextPolicy.needsOCR(ax, limits: limits), recognizer.permitted(),
            let location = await recognizer.locate(request) {
             try Task.checkCancellation()
+            let ocrStarted = ContinuousClock.now
             ocr = await recognizer.recognize(location, deadline: .now.advanced(by: .milliseconds(Int(limits.ocrSeconds * 1000))), limits: limits)
+            ocrElapsed = ocrStarted.duration(to: .now)
             try Task.checkCancellation()
         }
         let collections = [ax, ocr].compactMap { $0 }.filter { !$0.segments.isEmpty }
         let source: ScreenContextSource? = ocr?.segments.isEmpty == false ? .ocr : ax?.segments.isEmpty == false ? .accessibility : nil
-        return ScreenContextScan.make(collections: collections, source: source, applicationName: app.name, vocabulary: vocabulary)
+        let scan = ScreenContextScan.make(collections: collections, source: source, applicationName: app.name, vocabulary: vocabulary)
+        if let diagnostics, diagnostics.isEnabled() {
+            diagnostics.record(ScreenContextDiagnosticRecord(
+                kind: .extraction, date: now(), takeID: nil, bundleID: app.bundleID,
+                sources: [ax?.segments.isEmpty == false ? ScreenContextSource.accessibility : nil, ocr?.segments.isEmpty == false ? .ocr : nil].compactMap { $0?.rawValue },
+                nodesVisited: (ax?.nodesVisited ?? 0) + (ocr?.nodesVisited ?? 0),
+                charactersCollected: (ax?.charactersCollected ?? 0) + (ocr?.charactersCollected ?? 0),
+                axElapsedMs: ax == nil ? nil : axElapsed.roundedMilliseconds, ocrElapsedMs: ocrElapsed?.roundedMilliseconds,
+                truncated: (ax?.truncated ?? false) || (ocr?.truncated ?? false), gateHadTerms: nil,
+                termsOffered: scan.candidates.map(\.text), excerptLength: 0, asrTermsSent: 0, writingTerms: []))
+        }
+        return scan
     }
 
     // MARK: Cache and observers
@@ -236,30 +295,80 @@ final class ScreenContextCoordinator {
 
     // MARK: Internals
 
+    /// Complete walk, else partial walk + cached AX; then fresh OCR, else cached OCR.
     private func snapshot(_ record: Take) -> ScreenContextSnapshot? {
-        ScreenContextSnapshot.merged(record.ax, record.ocr ?? record.cached, limits: limits)
+        let ax = record.ax ?? ScreenContextSnapshot.merged(partial(record), record.cachedAX, limits: limits)
+        return ScreenContextSnapshot.merged(ax, record.ocr ?? record.cachedOCR, limits: limits)
+    }
+
+    /// Built lazily from the latest partial collection, at most once per update.
+    private func partial(_ record: Take) -> ScreenContextSnapshot? {
+        if record.partialStale, let collection = record.axPartial {
+            record.partialSnapshot = ScreenContextSnapshot.make(collection: collection, source: .accessibility, bundleID: record.bundleID,
+                                                                applicationName: record.name, vocabulary: record.vocabulary, limits: limits, now: now())
+            record.partialStale = false
+        }
+        return record.partialSnapshot
+    }
+
+    private func progress(_ id: UUID, _ event: ScreenReadProgress) {
+        guard let record = current, record.id == id else { return }
+        switch event {
+        case .window(let key):
+            record.axKey = key
+            // Events hop to the main actor separately; a key that arrives after the walk still caches it.
+            if let snapshot = record.ax { cache.store(snapshot, key: key, now: now()); return }
+            if record.cachedAX == nil, let cached = cache.snapshot(for: key, now: now()) { record.cachedAX = cached }
+        case .partial(let collection):
+            guard !record.axDone else { return }
+            record.axPartial = collection
+            record.partialStale = true
+            // Enough text already: OCR is not needed, whatever the rest of the walk finds.
+            if !ScreenContextPolicy.needsOCR(collection, limits: limits) { record.axNeedsOCR = false }
+        }
+        signal()
     }
 
     private func finishAccessibility(_ id: UUID, _ collection: ScreenTextCollection?) {
         guard let record = current, record.id == id else { return }
         record.axDone = true
-        record.axNeedsOCR = ScreenContextPolicy.needsOCR(collection, limits: limits)
+        record.axElapsed = record.start.duration(to: .now)
+        record.axCollection = collection
+        record.axNeedsOCR = record.axNeedsOCR && ScreenContextPolicy.needsOCR(collection, limits: limits)
         record.ax = collection.flatMap {
             ScreenContextSnapshot.make(collection: $0, source: .accessibility, bundleID: record.bundleID,
                                        applicationName: record.name, vocabulary: record.vocabulary, limits: limits, now: now())
         }
+        // The next take in this window starts from the complete snapshot.
+        if let key = record.axKey, let snapshot = record.ax { cache.store(snapshot, key: key, now: now()) }
         signal(); onTakeUpdate?(id)
     }
 
     private func useCache(_ id: UUID, key: String) {
         guard let record = current, record.id == id, let cached = cache.snapshot(for: key, now: now()) else { return }
-        record.cached = cached
+        record.cachedOCR = cached
         signal(); onTakeUpdate?(id)
+    }
+
+    private func diagnosticRecord(_ record: Take) -> ScreenContextDiagnosticRecord {
+        let merged = snapshot(record)
+        let ax = record.axCollection ?? record.axPartial
+        return ScreenContextDiagnosticRecord(
+            kind: .take, date: record.startedAt, takeID: record.id,
+            bundleID: record.bundleID, sources: (merged?.sources ?? []).map(\.rawValue),
+            nodesVisited: (ax?.nodesVisited ?? 0) + (record.ocrCollection?.nodesVisited ?? 0),
+            charactersCollected: (ax?.charactersCollected ?? 0) + (record.ocrCollection?.charactersCollected ?? 0),
+            axElapsedMs: record.axElapsed?.roundedMilliseconds, ocrElapsedMs: record.ocrElapsed?.roundedMilliseconds,
+            truncated: (ax?.truncated ?? false) || (record.ocrCollection?.truncated ?? false),
+            gateHadTerms: record.gateHadTerms, termsOffered: record.offeredTerms, excerptLength: record.excerptLength,
+            asrTermsSent: record.asrTermsSent, writingTerms: record.writingTerms)
     }
 
     private func finishOCR(_ id: UUID, _ collection: ScreenTextCollection?, key: String?) {
         guard let record = current, record.id == id else { return }
         record.ocrPending = false
+        record.ocrCollection = collection
+        if let started = record.ocrStart { record.ocrElapsed = started.duration(to: .now) }
         if let collection, let snapshot = ScreenContextSnapshot.make(collection: collection, source: .ocr, bundleID: record.bundleID,
                                                                    applicationName: record.name, vocabulary: record.vocabulary,
                                                                    limits: limits, now: now()) {
@@ -287,5 +396,11 @@ final class ScreenContextCoordinator {
         let pending = waiters
         waiters.removeAll()
         pending.values.forEach { $0.resume() }
+    }
+}
+
+private extension Duration {
+    var roundedMilliseconds: Int {
+        Int(((Double(components.seconds) + Double(components.attoseconds) / 1e18) * 1000).rounded())
     }
 }

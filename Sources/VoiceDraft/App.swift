@@ -116,7 +116,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             guard let self else { return false }
             return self.state.handleEscape(hudVisible: self.hudShown)
         }
-        if !isolatedPreview { escapeCancellation.install(); state.screenContext.startObserving() }
+        if !isolatedPreview {
+            escapeCancellation.install(); state.screenContext.startObserving()
+            // With OCR already on, surface a due capture approval at launch rather than in the first take.
+            if state.device.features.screenContext, state.device.features.screenContextOCR { ScreenRecordingPermission.confirm() }
+        }
         state.configureShortcuts = { [weak self] bindings in
             guard let self, !isolatedPreview else { return }
             let previous = self.state.device.features.shortcuts

@@ -553,6 +553,10 @@ private struct DesktopSettingsView: View {
             repeat {
                 accessibilityAllowed = state.insertionAuthorized
                 screenRecordingAllowed = state.preview || ScreenRecordingPermission.granted
+                // Settings is a user-present moment: surface a due capture approval here, never in a take.
+                if !state.preview, state.device.features.screenContext, state.device.features.screenContextOCR {
+                    ScreenRecordingPermission.confirm()
+                }
                 do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
             } while !Task.isCancelled
         }

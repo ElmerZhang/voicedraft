@@ -6,21 +6,102 @@ import Vision
 import VoiceDraftCore
 
 /// Screen Recording permission for the optional window OCR fallback.
-/// A take only preflights; requests come from explicit Allow buttons and the OCR switch.
+///
+/// macOS has two separate gates. TCC's Screen Recording grant is what
+/// `CGPreflightScreenCaptureAccess` reports and `CGRequestScreenCaptureAccess`
+/// asks for. From macOS 15, ScreenCaptureKit also asks the user to approve
+/// direct capture (replayd's "bypass the private window picker" alert, repeated
+/// about monthly); preflight stays true while that alert is due, and the alert
+/// appears at the first actual capture, not at a content query. So takes capture
+/// only after this app session has completed one capture outside a take: from
+/// the OCR switch, an Allow button, the Settings page, or launch with OCR on.
+/// Takes only check; they never request or confirm.
 enum ScreenRecordingPermission {
     private static let requestedKey = "screenRecordingRequested"
+    private static let confirmation = Confirmation()
 
     static var granted: Bool { CGPreflightScreenCaptureAccess() }
 
-    /// Shows the system prompt the first time. macOS answers later calls with
-    /// false and no prompt, so those open the Privacy & Security pane instead.
+    /// True when takes may capture: TCC granted and, on macOS 14+, a capture
+    /// outside a take succeeded in this app session. Never prompts.
+    static var capturePermitted: Bool {
+        guard granted else { return false }
+        if #available(macOS 14, *) { return confirmation.confirmed }
+        return true
+    }
+
+    /// From the OCR switch and Allow buttons only. Shows the TCC prompt when the
+    /// permission is undetermined, surfaces the ScreenCaptureKit approval once it
+    /// is granted, and opens Privacy & Security only for a repeated request that
+    /// raised no system prompt (the permission was already denied).
     @MainActor static func request() {
-        guard !granted else { return }
+        if granted { confirm(retry: true); return }
         let askedBefore = UserDefaults.standard.bool(forKey: requestedKey)
         UserDefaults.standard.set(true, forKey: requestedKey)
-        guard !CGRequestScreenCaptureAccess(), askedBefore,
-              let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") else { return }
-        NSWorkspace.shared.open(url)
+        if CGRequestScreenCaptureAccess() { confirm(retry: true); return }
+        Task { @MainActor in
+            // A system prompt takes key focus from VoiceDraft; give it a moment to appear.
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            if !granted, NSApp.isActive, #available(macOS 14, *) {
+                // When CGRequest raised nothing, a content query asks for an undetermined permission.
+                _ = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                try? await Task.sleep(nanoseconds: 800_000_000)
+            }
+            if !granted, askedBefore, NSApp.isActive,
+               let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                NSWorkspace.shared.open(url)
+            }
+            // A grant in System Settings often needs a relaunch before preflight reports it.
+            for _ in 0..<60 where !granted { try? await Task.sleep(nanoseconds: 1_000_000_000) }
+            if granted { confirm(retry: true) }
+        }
+    }
+
+    /// Completes one minimal capture outside a take so any due ScreenCaptureKit
+    /// approval alert appears now. Called from request(), the Settings page and
+    /// launch when OCR is on. Does nothing until TCC is granted or once confirmed.
+    /// Automatic callers try once per session, so a declined alert is not repeated;
+    /// `retry` (the switch and Allow buttons) tries again.
+    @MainActor static func confirm(retry: Bool = false) {
+        guard granted else { return }
+        if #available(macOS 14, *) {
+            guard confirmation.begin(retry: retry) else { return }
+            Task.detached(priority: .utility) {
+                let confirmed = await probeCapture()
+                confirmation.finish(confirmed)
+            }
+        }
+    }
+
+    /// A 2×2-pixel capture of the main display, discarded immediately; four
+    /// averaged pixels carry no readable content. Only the capture, not the
+    /// shareable-content query, counts as a use for the approval alert.
+    @available(macOS 14, *)
+    private static func probeCapture() async -> Bool {
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            guard let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? content.displays.first else { return false }
+            let configuration = SCStreamConfiguration()
+            configuration.width = 2; configuration.height = 2
+            configuration.showsCursor = false
+            _ = try await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(display: display, excludingWindows: []),
+                                                           configuration: configuration)
+            return true
+        } catch { return false }
+    }
+
+    private final class Confirmation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var state: (confirmed: Bool, running: Bool, attempted: Bool) = (false, false, false)
+        var confirmed: Bool { lock.withLock { state.confirmed } }
+        func begin(retry: Bool) -> Bool {
+            lock.withLock {
+                guard !state.confirmed, !state.running, retry || !state.attempted else { return false }
+                state.running = true; state.attempted = true
+                return true
+            }
+        }
+        func finish(_ confirmed: Bool) { lock.withLock { state.confirmed = confirmed; state.running = false } }
     }
 }
 
@@ -33,7 +114,7 @@ struct ScreenWindowLocation: Equatable, Sendable {
 
 /// Window OCR, injectable so the coordinator is testable without capture.
 protocol WindowTextRecognizing: Sendable {
-    /// Preflight only; never prompts.
+    /// Never prompts: TCC preflight plus this session's confirmation capture.
     func permitted() -> Bool
     func locate(_ request: ScreenReadRequest) async -> ScreenWindowLocation?
     func recognize(_ location: ScreenWindowLocation, deadline: ContinuousClock.Instant,
@@ -50,7 +131,7 @@ final class WindowTextRecognizer: WindowTextRecognizing, @unchecked Sendable {
     private let lock = NSLock()
     private var busy = false
 
-    func permitted() -> Bool { ScreenRecordingPermission.granted }
+    func permitted() -> Bool { ScreenRecordingPermission.capturePermitted }
 
     private func acquire() -> Bool {
         lock.lock(); defer { lock.unlock() }

@@ -9,23 +9,46 @@ private enum Fixture {
     static let rich = "Alice Chen will demo VoiceDraft on the Raspberry Pi. We switch qwen3-asr-flash to Doubao after the review, then ship the HUD and the Raspberry Pi build."
     static let thin = "Inbox"
     static let ocrText = "Kickoff for Project Atlas with Bob Lee and the Zephyr team"
+    static let partial = "Notes about Project Atlas"
+}
+
+private extension JSONDecoder {
+    static var iso8601: JSONDecoder { let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601; return decoder }
 }
 
 @MainActor
 final class ScreenContextCoordinatorTests: XCTestCase {
 
+    /// Optionally publishes a window key at once and a partial result after
+    /// `partial.delay`, then returns the complete text after `delay`.
     private final class FakeReader: ScreenTextReading, @unchecked Sendable {
         private let lock = NSLock()
         private var _calls = 0
         private var _delay: TimeInterval
+        private var _partial: (delay: TimeInterval, text: String)?
         let text: String
-        init(delay: TimeInterval, text: String) { _delay = delay; self.text = text }
+        let key: String?
+        init(delay: TimeInterval, text: String, partial: (delay: TimeInterval, text: String)? = nil, key: String? = nil) {
+            _delay = delay; self.text = text; _partial = partial; self.key = key
+        }
         var calls: Int { lock.withLock { _calls } }
         var delay: TimeInterval { get { lock.withLock { _delay } } set { lock.withLock { _delay = newValue } } }
-        func collect(_ request: ScreenReadRequest, limits: ScreenContextLimits) async -> ScreenTextCollection? {
-            let delay = lock.withLock { _calls += 1; return _delay }
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            return ScreenTextCollection(segments: [ScreenTextSegment(kind: .body, text: text, order: 0)], nodesVisited: 3, charactersCollected: text.count)
+        var partial: (delay: TimeInterval, text: String)? { get { lock.withLock { _partial } } set { lock.withLock { _partial = newValue } } }
+        static func collection(_ text: String) -> ScreenTextCollection {
+            ScreenTextCollection(segments: [ScreenTextSegment(kind: .body, text: text, order: 0)], nodesVisited: 3, charactersCollected: text.count)
+        }
+        func collect(_ request: ScreenReadRequest, limits: ScreenContextLimits,
+                     progress: @escaping @Sendable (ScreenReadProgress) -> Void) async -> ScreenTextCollection? {
+            let (delay, partial) = lock.withLock { _calls += 1; return (_delay, _partial) }
+            if let key { progress(.window(key: key)) }
+            var slept: TimeInterval = 0
+            if let partial {
+                try? await Task.sleep(nanoseconds: UInt64(partial.delay * 1_000_000_000))
+                progress(.partial(Self.collection(partial.text)))
+                slept = partial.delay
+            }
+            try? await Task.sleep(nanoseconds: UInt64(max(0, delay - slept) * 1_000_000_000))
+            return Self.collection(text)
         }
     }
 
@@ -121,6 +144,103 @@ final class ScreenContextCoordinatorTests: XCTestCase {
         first.end(take: next)
         first.clearCache()
         XCTAssertEqual(first.cachedEntries, 0)
+    }
+
+    func testWalkContinuesAfterTheGateAndWritingGetsTheFullSnapshot() async {
+        let reader = FakeReader(delay: 0.6, text: Fixture.rich, partial: (0.05, Fixture.partial), key: "4242:ax:1:Notes")
+        let screen = coordinator(reader, FakeRecognizer(allowed: false), ocrSeconds: 2)
+        let take = UUID()
+        screen.begin(take: take, target: target(), bundleID: "com.example.notes", mode: .polish, options: options(), vocabulary: AppVocabulary())
+        let started = ContinuousClock.now
+        let gate = await screen.asrTerms(take: take, until: gate())
+        XCTAssertLessThan(started.duration(to: .now), .milliseconds(450), "The live gate must not wait for the whole walk.")
+        XCTAssertTrue(gate.contains("Project Atlas"), "The gate uses the partial walk: \(gate)")
+        XCTAssertFalse(gate.contains("VoiceDraft"), "\(gate)")
+        XCTAssertEqual(screen.cachedEntries, 0, "Partial walks are never cached.")
+
+        let context = await screen.writingContext(take: take, mode: .polish)
+        XCTAssertGreaterThanOrEqual(started.duration(to: .now), .milliseconds(500), "Writing waits for the complete walk.")
+        XCTAssertTrue(context?.terms.contains("VoiceDraft") == true, "\(String(describing: context))")
+        XCTAssertTrue(context?.excerpt.contains("Raspberry Pi") == true)
+        XCTAssertEqual(screen.cachedEntries, 1, "The complete walk is cached for the window.")
+        XCTAssertTrue(screen.learningExclusions(take: take).contains(AppVocabulary.automaticTermKey("Project Atlas")))
+        screen.end(take: take)
+    }
+
+    func testCacheStoresTheFullSnapshotForTheNextTakeInTheSameWindow() async {
+        let reader = FakeReader(delay: 0.05, text: Fixture.rich, partial: (0.01, Fixture.partial), key: "4242:ax:1:Notes")
+        let screen = coordinator(reader, FakeRecognizer(allowed: false), ocrSeconds: 2)
+        let first = UUID()
+        screen.begin(take: first, target: target(), bundleID: "com.example.notes", mode: .polish, options: options(), vocabulary: AppVocabulary())
+        _ = await screen.writingContext(take: first, mode: .polish)
+        screen.end(take: first)
+        XCTAssertEqual(screen.cachedEntries, 1)
+
+        // The next walk is slow and has nothing by the gate; the cached complete snapshot answers.
+        reader.delay = 0.8; reader.partial = nil
+        let next = UUID()
+        screen.begin(take: next, target: target(), bundleID: "com.example.notes", mode: .polish, options: options(), vocabulary: AppVocabulary())
+        let terms = await screen.asrTerms(take: next, until: gate())
+        XCTAssertTrue(terms.contains("VoiceDraft"), "\(terms)")
+        XCTAssertTrue(terms.contains("Raspberry Pi"), "\(terms)")
+        screen.end(take: next)
+
+        // Another window of the same app gets nothing from that cache.
+        let other = FakeReader(delay: 0.8, text: Fixture.rich, key: "4242:ax:2:Other")
+        let fresh = coordinator(other, FakeRecognizer(allowed: false))
+        let take = UUID()
+        fresh.begin(take: take, target: target(), bundleID: "com.example.notes", mode: .polish, options: options(), vocabulary: AppVocabulary())
+        let none = await fresh.asrTerms(take: take, until: gate())
+        XCTAssertEqual(none, [])
+        fresh.end(take: take)
+    }
+
+    func testDiagnosticsRecordTermsAndCountsButNeverTheExcerpt() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("vd-screen-diag-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var enabled = false
+        let log = ScreenContextDiagnosticsLog(directory: directory, isEnabled: { enabled })
+        let screen = coordinator(FakeReader(delay: 0.02, text: Fixture.rich, key: "4242:ax:1:Notes"), FakeRecognizer(allowed: false))
+        screen.diagnostics = log
+
+        let off = UUID()
+        screen.begin(take: off, target: target(), bundleID: "com.example.notes", mode: .polish, options: options(), vocabulary: AppVocabulary())
+        _ = await screen.asrTerms(take: off, until: gate())
+        screen.end(take: off)
+        log.flush()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: log.fileURL.path), "Nothing is written while the switch is off.")
+
+        enabled = true
+        let take = UUID()
+        screen.begin(take: take, target: target(), bundleID: "com.example.notes", mode: .polish, options: options(), vocabulary: AppVocabulary())
+        let asr = await screen.asrTerms(take: take, until: gate())
+        let written = await screen.writingContext(take: take, mode: .polish)
+        let context = try XCTUnwrap(written)
+        screen.end(take: take)
+        log.flush()
+
+        let data = try Data(contentsOf: log.fileURL)
+        let lines = data.split(separator: 0x0A)
+        XCTAssertEqual(lines.count, 1)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(lines[0])) as? [String: Any])
+        XCTAssertEqual(Set(object.keys), ["v", "kind", "date", "takeID", "bundleID", "sources", "nodesVisited", "charactersCollected",
+                                          "axElapsedMs", "truncated", "gateHadTerms", "termsOffered", "excerptLength", "asrTermsSent",
+                                          "writingTerms"])
+        XCTAssertNil(object["excerpt"])
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("will demo"), "No screen text beyond terms.")
+        let record = try JSONDecoder.iso8601.decode(ScreenContextDiagnosticRecord.self, from: Data(lines[0]))
+        XCTAssertEqual(record.kind, .take)
+        XCTAssertEqual(record.takeID, take)
+        XCTAssertEqual(record.bundleID, "com.example.notes")
+        XCTAssertEqual(record.sources, ["accessibility"])
+        XCTAssertEqual(record.gateHadTerms, true)
+        XCTAssertEqual(record.asrTermsSent, asr.count)
+        XCTAssertEqual(record.writingTerms, context.terms)
+        XCTAssertEqual(record.excerptLength, context.excerpt.count)
+        XCTAssertTrue(record.termsOffered.contains("VoiceDraft"))
+        XCTAssertEqual(record.nodesVisited, 3)
+        let attributes = try FileManager.default.attributesOfItem(atPath: log.fileURL.path)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
     }
 
     func testCurrentTermsNeverWait() async {

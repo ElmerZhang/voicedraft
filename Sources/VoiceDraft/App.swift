@@ -364,6 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillTerminate(_ notification: Notification) {
         escapeCancellation.uninstall(); shortcuts.uninstall(); state.cancel()
         state.screenContext.stopObserving(); state.screenContext.clearCache()
+        TextInsertion.resetElectronAccessibility()
     }
 }
 

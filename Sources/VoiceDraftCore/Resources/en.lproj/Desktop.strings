@@ -119,7 +119,7 @@
 "Use Fn alone" = "Use Fn alone";
 "Use default shortcut (%@)" = "Use default shortcut (%@)";
 "Press keys · Esc cancels" = "Press keys · Esc cancels";
-"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts.";
+"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut; releasing one does not. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut; releasing one does not. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts.";
 "Restore default shortcuts" = "Restore default shortcuts";
 "Add Control, Option or Command, or use Fn" = "Add Control, Option or Command, or use Fn";
 "Already used by %@" = "Already used by %@";

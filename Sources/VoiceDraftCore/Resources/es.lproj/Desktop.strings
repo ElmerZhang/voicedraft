@@ -119,7 +119,7 @@
 "Use Fn alone" = "Usar solo Fn";
 "Use default shortcut (%@)" = "Usar el atajo predeterminado (%@)";
 "Press keys · Esc cancels" = "Pulsa las teclas · Esc cancela";
-"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn funciona solo o con Mayúsculas, Control, Opción o Comando, pulsados antes o después de Fn. Mientras mantienes Fn, pulsar un modificador cambia la grabación a ese atajo. Fn con letras no está disponible porque macOS reserva esos atajos 🌐.";
+"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut; releasing one does not. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn funciona solo o con Mayúsculas, Control, Opción o Comando, pulsados antes o después de Fn. Mientras mantienes Fn, pulsar un modificador cambia la grabación a ese atajo; soltarlo no. Fn con letras no está disponible porque macOS reserva esos atajos 🌐.";
 "Restore default shortcuts" = "Restaurar atajos predeterminados";
 "Add Control, Option or Command, or use Fn" = "Añade Control, Opción o Comando, o usa Fn";
 "Already used by %@" = "Ya lo usa «%@»";

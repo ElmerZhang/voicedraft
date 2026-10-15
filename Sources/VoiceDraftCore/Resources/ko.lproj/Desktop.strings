@@ -119,7 +119,7 @@
 "Use Fn alone" = "Fn만 사용";
 "Use default shortcut (%@)" = "기본 단축키 사용(%@)";
 "Press keys · Esc cancels" = "키를 누르세요 · Esc로 취소";
-"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn은 단독으로 또는 Shift, Control, Option, Command와 함께 사용할 수 있으며, 보조 키는 Fn 앞이나 뒤에 눌러도 됩니다. Fn을 누르고 있는 동안 보조 키를 누르면 녹음이 해당 단축키로 전환됩니다. 🌐와 문자 키 조합은 macOS가 예약하고 있어 사용할 수 없습니다.";
+"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut; releasing one does not. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn은 단독으로 또는 Shift, Control, Option, Command와 함께 사용할 수 있으며, 보조 키는 Fn 앞이나 뒤에 눌러도 됩니다. Fn을 누르고 있는 동안 보조 키를 누르면 녹음이 해당 단축키로 전환되며, 보조 키를 떼면 전환되지 않습니다. 🌐와 문자 키 조합은 macOS가 예약하고 있어 사용할 수 없습니다.";
 "Restore default shortcuts" = "기본 단축키로 복원";
 "Add Control, Option or Command, or use Fn" = "Control, Option 또는 Command를 추가하거나 Fn을 사용하세요";
 "Already used by %@" = "‘%@’에서 이미 사용 중";

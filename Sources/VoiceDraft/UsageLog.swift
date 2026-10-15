@@ -32,14 +32,18 @@ final class UsageLog: @unchecked Sendable {
     /// Enqueues the append; failures are silent and never interrupt a take.
     func record(_ record: ModelUsageRecord) {
         guard let url = fileURL(for: record.date) else { return }
-        queue.async { [encoder] in try? Self.append(record, to: url, encoder: encoder) }
+        queue.async { [encoder] in try? JSONLines.append(record, to: url, encoder: encoder) }
     }
 
     /// Waits for queued appends (tests).
     func flush() { queue.sync {} }
+}
 
-    private static func append(_ record: ModelUsageRecord, to url: URL, encoder: JSONEncoder) throws {
-        var line = try encoder.encode(record); line.append(0x0A)
+/// Append-only JSON Lines files shared by the device-local logs: folder 0700,
+/// file 0600, one encoded value per line. Callers ignore failures.
+enum JSONLines {
+    static func append<T: Encodable>(_ value: T, to url: URL, encoder: JSONEncoder) throws {
+        var line = try encoder.encode(value); line.append(0x0A)
         let manager = FileManager.default
         try manager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
                                     attributes: [.posixPermissions: 0o700])

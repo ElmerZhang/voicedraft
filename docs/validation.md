@@ -1,5 +1,44 @@
 # Validation record
 
+## 2026-10-15 · On-screen context yield, chat names, diagnostics and capture approval
+
+- **Slack walk, measured.** A scratch probe linked the real `VoiceDraftCore` and the app's `ScreenContextAXReader.walk`. It read Slack Desktop's window without activating it or changing focus, and printed counts and extracted terms only. Slack was frontmost with the composer focused and its tree enabled.
+
+  | Walk | Nodes | Text segments | Characters | Elapsed | Terms (high-confidence) |
+  | --- | --- | --- | --- | --- | --- |
+  | HEAD c5b67be, standard limits | 61 (depth cap hit) | 2: title + 1 body | 60 | 4.5 ms | 1 (1): the workspace name from the window title |
+  | HEAD c5b67be, no node, depth or time cap | 524 | 121 | 2,097 | 31 ms | 36 (25) |
+  | This change, standard limits | 473 (toolbars not descended; 0 off-screen, as Slack virtualizes its list) | 121 | 2,097 | 24.5–27 ms | 37 (26), every visible sender as a proper name |
+
+- **Cause of finding A.** The 12-level depth cap, not time: Slack's message text sits deeper. The node and time budgets were never reached. The batched attribute read took about 0.04 ms per node over 524 calls (20 ms in total), far below the expected 0.5–2 ms. Parent reads and `AXVisibleChildren` (offered by 2 nodes) cost the same. The first text node was node #51 at 3 ms, and all 115 text nodes arrived by 23 ms. Roles were mostly AXGroup (202), AXStaticText (115) and AXRow (72).
+- **Electron quirks.** Chromium reports `AXExpanded` = 0 on every web node, so it is not used for collapsed-row pruning. While Slack's window was on another Space and not on screen, its tree stayed at 11–13 nodes, even 10 seconds after setting `AXManualAccessibility`. A hidden Electron window exposes nothing.
+- **Slack senders.** Each sender is an AXButton (title = name), then a short node, a permalink whose description ends in the time, and a "10:32 AM" static text. Because buttons are control segments, sender detection now also runs over all segments interleaved in reading order.
+- **WeChat.** AX exposes 4 nodes and the window title, before and after this change, so names there come only from OCR. The probe mirrored the app's OCR on the WeChat window: 42 lines and 454 characters, capture 112–130 ms, Vision 550–810 ms. The image was held in memory only. The old extractor found 27 terms (2 high-confidence) and no names, although the text held two 老师 and four 妈妈 forms. The new one finds 7 high-confidence chat names, including the teacher and parent forms (X老师 ×2, X妈妈 ×3) and contact names from the chat list. Two chat-list headers ("Official Accounts", "Service Accounts") were added to the UI stoplist after this run.
+- **Finding C: what prompted.** Read-only checks of TCC and replayd state showed:
+  - TCC Screen Recording for `com.voicedraft.mac` was granted at 21:06:57.
+  - The running app was launched at 21:07:02.
+  - replayd's `ScreenCaptureApprovals.plist` recorded `kScreenCaptureApprovalLastAlerted` for VoiceDraft at 21:07:37, with 10 alertable uses.
+
+  So the take-time prompt was macOS 15+'s ScreenCaptureKit approval, raised by the session's first capture while preflight was already true, not the TCC prompt. A terminal probe confirmed which call counts. One `SCShareableContent` query left the terminal's usage counter unchanged at 38. One 2×2-pixel display capture raised it to 39 and updated `LastUsed`. Neither probe showed a prompt, because the terminal's approval is current until 2026-11-13. No probe called `CGRequestScreenCaptureAccess()`, and no TCC state was changed.
+- **What changed:**
+  - The walk deadline is now 1.2 s, separate from the 250 ms ASR gate, with partial results every 0.1 s. Depth is 40 and nodes 4,000.
+  - The walk order is now nearest-first rings over up to 8 ancestors, depth-first. Off-screen frames are skipped and toolbars are not descended.
+  - Complete AX snapshots are cached per window.
+  - Chat sender labels and name + suffix forms are now high-confidence proper names.
+  - A hidden diagnostics switch writes `Diagnostics/screen-context.jsonl`.
+  - Takes capture only after a session confirmation capture made from the switch, an Allow button, the Settings page or launch.
+- **Tests and build.** `swift build --disable-sandbox` had zero warnings. `swift test --disable-sandbox` passed **270 tests, 4 skipped**. Eight tests are new:
+  - Walker: visible-first rings and off-screen skipping; partial progress and cancellation.
+  - Extractor: chat labels and suffix names; Slack-style sender buttons; repeated name lines.
+  - Coordinator: walk continues after the gate and writing gets the full snapshot; the full snapshot is cached for the next take in the same window; diagnostics record shape with no excerpt key.
+
+  The worked chat example now expects 章山 (a "章山：" label) as a high-confidence proper name. The toolbar walker test now expects toolbars not to be descended. All test text is synthetic.
+- **Pending hand checks:**
+  - With OCR off and the approval due (a new build, or after a month), turning OCR on shows the ScreenCaptureKit alert at the switch, and the first take shows none.
+  - Relaunching with OCR on shows a due alert at launch.
+  - A Slack take shows many terms in the HUD, and the diagnostics line lists the senders.
+  - The first take after a fresh Slack launch still meets the cold tree (about 2.2 s). The walk ends early with a small tree, and the second take uses the warm tree.
+
 ## 2026-10-15 · Local model usage log
 
 - Every inference call (live/recorded speech, History retry, writing, vocabulary learning, agent-context filtering, connection test) now appends one schema v1 record to `Usage/usage-YYYY-MM.jsonl` in the app data directory. Each record names its `kind` and exact call-site `source` (11 stable values; History rewrite and the writing pass after Transcribe again share `history.rewrite`, style application has its own value, and agent versus screen candidate filtering are distinguished by the caller). Records hold adapter/model/host, timings, outcome categories and provider-reported counts only. Model discovery is not logged.

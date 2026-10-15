@@ -58,7 +58,7 @@ public enum TermExtractor {
         "notifications", "messages", "message", "chat", "chats", "contacts", "calendar", "mail", "archive", "trash", "draft", "drafts",
         "sent", "favorites", "recent", "recents", "downloads", "documents", "desktop", "apply", "continue", "submit", "yes", "no",
         "loading", "untitled", "show", "hide", "sort", "filter", "refresh", "update", "upload", "download", "like", "follow", "comment",
-        "comments", "edited", "online", "offline", "pinned", "mute", "unread", "read", "the", "and", "or", "of", "to", "for", "on", "at",
+        "comments", "edited", "online", "offline", "pinned", "mute", "unread", "read", "official", "accounts", "service", "services", "the", "and", "or", "of", "to", "for", "on", "at",
         "by", "with", "from", "this", "that", "you", "we", "it", "is", "are", "was", "be", "not"
     ])
 
@@ -72,8 +72,33 @@ public enum TermExtractor {
         "一样", "一起", "一直", "非常", "比较", "特别", "其实", "当然", "确实", "真的", "一定", "不要", "不用", "不会", "不能", "能够",
         "就要", "还要", "回复", "转发", "分享", "删除", "复制", "粘贴", "撤销", "保存", "打开", "关闭", "新建", "返回", "首页", "消息",
         "通知", "联系人", "收藏", "更多", "全部", "查看", "详情", "登录", "退出", "帮助", "窗口", "视图", "格式", "工具", "文本", "输入",
-        "完成", "下载", "上传", "刷新", "星期", "已读", "未读", "置顶", "表情", "图片", "语音", "视频", "链接", "评论", "点赞", "关注"
+        "完成", "下载", "上传", "刷新", "星期", "已读", "未读", "置顶", "表情", "图片", "语音", "视频", "链接", "评论", "点赞", "关注",
+        "老师", "同学", "先生", "女士", "爸爸", "妈妈", "撤回", "已撤回", "语音通话", "视频通话", "群公告", "红包", "转账", "名片", "位置"
     ]
+
+    /// Line-initial labels followed by a colon that are field names, not speakers.
+    public static let fieldLabelStoplist: Set<String> = [
+        "re", "fwd", "fw", "note", "notes", "nb", "todo", "from", "to", "cc", "bcc", "subject", "date", "time", "title", "status",
+        "summary", "error", "warning", "tip", "tips", "example", "step", "answer", "question", "update", "result", "output", "input",
+        "location", "address", "phone", "email", "tel", "name", "id", "total", "price", "cost", "reason", "fix", "bug", "issue",
+        "description", "details", "detail", "info", "source", "author", "version", "type", "category", "tags", "tag", "link", "links",
+        "url", "file", "files", "path", "command", "usage", "caution", "important", "hint", "q", "a", "ps", "goal", "owner", "due",
+        "时间", "日期", "地点", "地址", "备注", "注意", "原因", "结论", "问题", "答案", "步骤", "主题", "标题", "内容", "说明", "描述",
+        "结果", "状态", "电话", "邮箱", "姓名", "名称", "编号", "价格", "总计", "合计", "提示", "例如", "比如", "回复", "引用", "发件人",
+        "收件人", "抄送", "优点", "缺点", "目标", "背景", "方案", "总结", "要求", "任务", "进度", "负责人", "截止", "会议", "议题",
+        "附件", "来源", "作者", "版本", "用途", "类型", "分类", "关键词", "补充", "更新", "修改", "建议", "意见", "目的", "范围", "预算"
+    ]
+
+    /// Titles and kinship words that follow a personal name in Chinese chat.
+    static let nameSuffixes = ["老师", "同学", "先生", "女士", "爸爸", "妈妈", "总", "哥", "姐"]
+    /// Characters that cannot start a name before a suffix (pronouns, determiners, prepositions).
+    static let nonNameCharacters: Set<Character> = Set("我你他她它您咱这那哪各每某几两一的了是在和与及或把被给从对向说个有不跟找问请让叫位们也都还又很吗呢吧啊着过好新前后上下大该本此其诸众全")
+    /// Characters that make 总/哥/姐 part of an ordinary word (总是, 总结, 哥哥, 姐妹...).
+    static let singleSuffixWordFollowers: [String: Set<Character>] = [
+        "总": Set("是结共体之部算的数量和计统归得监裁"), "哥": Set("哥们弟"), "姐": Set("姐妹们弟")
+    ]
+    /// The most common single-character surnames; required before 总/哥/姐.
+    static let commonSurnames: Set<Character> = Set("王李张刘陈杨黄赵吴周徐孙马朱胡郭何高林罗郑梁谢宋唐许韩冯邓曹彭曾肖田董袁潘于蒋蔡余杜叶程苏魏吕丁任沈姚卢姜崔钟谭陆汪范金石廖贾夏韦付方白邹孟熊秦邱江尹薛闫段雷侯龙史陶黎贺顾毛郝龚邵万钱严覃武戴莫孔向汤常温康施文牛樊葛邢安齐易乔伍庞颜倪庄聂章鲁岳翟殷詹申欧耿关兰焦俞左柳甘祝包宁尚符舒阮柯纪梅童凌毕单季裴霍涂成苗谷盛曲翁冉骆蓝路游辛靳管柴蒙鲍华喻祁蒲房滕屈饶解牟艾尤阳时穆农司卓古吉缪简车项连芦麦褚娄窦戚岑景党宫费卜冷晏席卫米柏宗瞿桂全佟应臧闵苟邬边卞姬师和仇栾隋商刁沙荣巫寇桑郎甄丛仲虞敖巩明佘池查麻苑迟邝")
 
     /// Single Han characters that do not start or end a repeated n-gram term.
     static let cjkEdgeFunctionCharacters: Set<Character> = Set("的了是在和与及或把被我你他她它们这那就也都还又很吗呢吧啊着过给从对向说个有不")
@@ -147,6 +172,11 @@ public enum TermExtractor {
             guard !term.contains(where: { "。！？.!?".contains($0) }) else { continue }
             tally.add(term, kind: .quoted, offset: inner.location); claim(match.range)
         }
+        // Chat sender labels and name + title/kinship forms count as proper names.
+        for name in chatNames(ns) {
+            tally.add(name.text, kind: .properName, offset: name.range.location)
+            if name.claim { claim(name.range) }
+        }
         // Proper names: 2-4 title-case words, leading function words removed.
         var properInitial: [String: Bool] = [:]
         for match in properNamePattern.matches(in: text, range: full) where free(match.range) {
@@ -191,6 +221,139 @@ public enum TermExtractor {
             if candidate.kind == .properName, properInitial[candidate.text] == true, candidate.count < 2 { return false }
             return isAcceptedScreenTerm(candidate.text)
         }.sorted { $0.firstOffset < $1.firstOffset }
+    }
+
+    private static let timePattern = #"(?:(?:上午|下午|中午|凌晨|晚上|早上|昨天|今天|前天|星期[一二三四五六日天]|周[一二三四五六日天]|Yesterday|Today)\s*(?:at\s+)?)?(?:\d{4}[/.-]\d{1,2}[/.-]\d{1,2}\s*|\d{1,2}月\d{1,2}日\s*)?\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp]\.?[Mm]\.?)?"#
+    private static let namePattern = #"[\p{Han}·]{2,8}|[A-Za-z][A-Za-z0-9._'’-]*(?: [A-Za-z][A-Za-z0-9._'’-]*){0,2}"#
+    /// "Name: message" at a line start.
+    private static let colonLabel = try! NSRegularExpression(pattern: "^[ \\t]*(" + namePattern + ")[ \\t]*[:：]")
+    /// "Name 10:32", "Name  Yesterday at 9:41 AM" as a whole line.
+    private static let timedLabel = try! NSRegularExpression(pattern: "^[ \\t]*(" + namePattern + ")[ \\t]+" + timePattern + "[ \\t]*$")
+    /// A whole line that is only a name.
+    private static let bareLabel = try! NSRegularExpression(pattern: "^[ \\t]*(" + namePattern + ")[ \\t]*$")
+    private static let timeLine = try! NSRegularExpression(pattern: "^[ \\t]*" + timePattern + "[ \\t]*$")
+    /// A short line ending in a clock time ("Today at 9:41:15 AM", "10月14日 10:32").
+    private static let timeEnding = try! NSRegularExpression(pattern: #"^.{0,30}\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp]\.?[Mm]\.?)?\s*$"#)
+    private static let hanNameSuffix = try! NSRegularExpression(pattern: #"\p{Han}+"#)
+
+    struct ChatName { let text: String; let range: NSRange; let claim: Bool }
+
+    /// Sender labels found across all of a window's text in reading order, with
+    /// their counts. Used over interleaved body and control text, because chat
+    /// apps often expose the sender as a button next to the message time.
+    public static func senderLabels(in text: String) -> [(text: String, count: Int)] {
+        var tally = Tally()
+        let filtered = safeLines(text)
+        let ns = screenScrub.stringByReplacingMatches(in: filtered, range: NSRange(filtered.startIndex..., in: filtered), withTemplate: " ") as NSString
+        for name in chatNames(ns) where name.claim && isAcceptedScreenTerm(name.text) {
+            tally.add(name.text, kind: .properName, offset: name.range.location)
+        }
+        return tally.candidates.map { ($0.text, $0.count) }
+    }
+
+    /// Sender labels in chat transcripts and Chinese name + title/kinship forms.
+    /// Labels: a line-initial name followed by a colon, a name line followed by (or
+    /// ending with) a timestamp, or a name that repeats as a whole line. Suffix forms:
+    /// 1-2 Han characters + 老师/同学/先生/女士/爸爸/妈妈, or a common surname + 总/哥/姐.
+    static func chatNames(_ ns: NSString) -> [ChatName] {
+        var lines: [NSRange] = []
+        var location = 0
+        while location <= ns.length {
+            let next = ns.range(of: "\n", range: NSRange(location: location, length: ns.length - location))
+            let end = next.location == NSNotFound ? ns.length : next.location
+            lines.append(NSRange(location: location, length: end - location))
+            if next.location == NSNotFound { break }
+            location = end + 1
+        }
+        func match(_ regex: NSRegularExpression, _ line: NSRange) -> NSRange? {
+            guard line.length > 0, let found = regex.firstMatch(in: ns as String, range: line) else { return nil }
+            return found.range(at: 1).location == NSNotFound ? found.range : found.range(at: 1)
+        }
+        func isTime(_ line: NSRange) -> Bool { line.length > 0 && timeLine.firstMatch(in: ns as String, range: line) != nil }
+        func endsWithTime(_ line: NSRange) -> Bool { line.length > 0 && timeEnding.firstMatch(in: ns as String, range: line) != nil }
+        let nonEmpty = lines.filter { ns.substring(with: $0).contains { !$0.isWhitespace } }
+
+        // `timed`: a time on the same line, or within three lines behind short separators.
+        var labels: [(text: String, range: NSRange, colon: Bool, timed: Bool)] = []
+        for (index, line) in nonEmpty.enumerated() {
+            if let range = match(colonLabel, line) {
+                labels.append((ns.substring(with: range), range, true, false))
+            } else if let range = match(timedLabel, line) {
+                labels.append((ns.substring(with: range), range, false, true))
+            } else if let range = match(bareLabel, line), !isTime(line) {
+                // Chat apps put the time right after the sender, sometimes behind a short separator node.
+                var timed = false
+                for next in nonEmpty[(index + 1)..<min(nonEmpty.count, index + 4)] {
+                    if endsWithTime(next) { timed = true; break }
+                    guard ns.substring(with: next).trimmingCharacters(in: .whitespaces).count <= 3 else { break }
+                }
+                labels.append((ns.substring(with: range), range, false, timed))
+            }
+        }
+        var counts: [String: Int] = [:]
+        for label in labels { counts[label.text, default: 0] += 1 }
+
+        var result: [ChatName] = []
+        for label in labels {
+            let text = label.text, repeated = (counts[text] ?? 0) >= 2
+            let words = text.split(separator: " ").map { $0.lowercased() }
+            guard !cjkStoplist.contains(text), !fieldLabelStoplist.contains(text.lowercased()),
+                  !words.allSatisfy({ englishUIStoplist.contains($0) || fieldLabelStoplist.contains($0) }) else { continue }
+            let accepted: Bool
+            if text.unicodeScalars.contains(where: isHanScalar) {
+                let suffixed = nameSuffixes.contains { text.hasSuffix($0) && text.count > $0.count }
+                // Two to four characters cover most personal names; longer labels need a title suffix.
+                guard text.count <= 4 || suffixed, let first = text.first, !nonNameCharacters.contains(first) else { continue }
+                accepted = label.colon || label.timed || repeated
+            } else {
+                // Latin: a timestamp is enough; otherwise two or more title-case words, or a repeated colon label.
+                let titled = text.split(separator: " ").allSatisfy { $0.first?.isUppercase == true }
+                let multiword = words.count >= 2
+                accepted = label.timed || (label.colon && (repeated || (titled && multiword))) || (repeated && titled && multiword)
+            }
+            if accepted { result.append(ChatName(text: text, range: label.range, claim: true)) }
+        }
+
+        // Name + suffix forms inside running Han text. A name starts on a word
+        // boundary, so 谢谢程老师 yields 程老师 rather than 谢程老师.
+        let labelRanges = result.map(\.range)
+        let tokenizer = NLTokenizer(unit: .word)
+        for match in hanNameSuffix.matches(in: ns as String, range: NSRange(location: 0, length: ns.length)) {
+            let string = ns.substring(with: match.range)
+            let run = Array(string)
+            guard run.count >= 2, nameSuffixes.contains(where: { string.contains($0) }) else { continue }
+            tokenizer.string = string
+            tokenizer.setLanguage(.simplifiedChinese)
+            // Word boundaries as Character offsets in the run.
+            var boundaries: Set<Int> = [0, run.count]
+            tokenizer.enumerateTokens(in: string.startIndex..<string.endIndex) { range, _ in
+                boundaries.insert(string.distance(from: string.startIndex, to: range.lowerBound))
+                boundaries.insert(string.distance(from: string.startIndex, to: range.upperBound)); return true
+            }
+            var i = 1
+            while i < run.count {
+                guard let suffix = nameSuffixes.first(where: { s in
+                    let chars = Array(s); return i + chars.count <= run.count && Array(run[i..<(i + chars.count)]) == chars
+                }) else { i += 1; continue }
+                let length = suffix.count
+                defer { i += length }
+                // A token that runs on past the suffix (总是, 哥们) is an ordinary word.
+                if length == 1, i + 1 < run.count, !boundaries.contains(i + 1) { continue }
+                if length == 1, i + 1 < run.count, singleSuffixWordFollowers[suffix]?.contains(run[i + 1]) == true { continue }
+                let maxPrefix = length == 1 ? 1 : 2
+                guard let start = (max(0, i - maxPrefix)..<i).first(where: { start in
+                    boundaries.contains(start) && run[start..<i].allSatisfy { !nonNameCharacters.contains($0) }
+                }) else { continue }
+                if length == 1, !commonSurnames.contains(run[start]) { continue }
+                let name = String(run[start..<i]) + suffix
+                guard !cjkStoplist.contains(name) else { continue }
+                let offset = match.range.location + String(run[0..<start]).utf16.count
+                // A sender label already counted this occurrence.
+                if labelRanges.contains(where: { NSLocationInRange(offset, $0) }) { continue }
+                result.append(ChatName(text: name, range: NSRange(location: offset, length: name.utf16.count), claim: false))
+            }
+        }
+        return result
     }
 
     /// Low-confidence repeated Han words. NLTokenizer splits unknown names such as

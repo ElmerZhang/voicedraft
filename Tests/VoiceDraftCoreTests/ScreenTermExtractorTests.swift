@@ -18,12 +18,78 @@ final class ScreenTermExtractorTests: XCTestCase {
             (.body, "章山：好的，HUD 改完我发 PR")
         ]
         let result = ScreenTermExtractor.terms(from: collection(lines), excludingKeys: [])
-        XCTAssertEqual(result.map(\.text), ["VoiceDraft", "qwen3-asr-flash", "语音识别最佳实践", "HUD", "Doubao", "Alice Chen", "Raspberry Pi", "章山"])
-        XCTAssertEqual(result.map(\.kind), [.camelCase, .identifier, .quoted, .acronym, .embeddedLatin, .properName, .properName, .cjkRun])
+        // "章山：" is a chat sender label, so 章山 is a high-confidence proper name
+        // (properName 2 × (1 + log2 2) = 4, tied with VoiceDraft and ordered after it).
+        XCTAssertEqual(result.map(\.text), ["VoiceDraft", "章山", "qwen3-asr-flash", "语音识别最佳实践", "HUD", "Doubao", "Alice Chen", "Raspberry Pi"])
+        XCTAssertEqual(result.map(\.kind), [.camelCase, .properName, .identifier, .quoted, .acronym, .embeddedLatin, .properName, .properName])
         XCTAssertEqual(result.first { $0.text == "HUD" }?.count, 2)
+        XCTAssertEqual(result.first { $0.text == "章山" }?.count, 2)
         XCTAssertEqual(result.first?.score, 4) // camelCase 3 + window title 1
-        XCTAssertFalse(result.last!.highConfidence)
-        XCTAssertTrue(result.dropLast().allSatisfy(\.highConfidence))
+        XCTAssertTrue(result.allSatisfy(\.highConfidence))
+    }
+
+    func testChatSenderLabelsAndChineseNameSuffixesAreProperNames() throws {
+        let chat = """
+        小易老师：明天早上八点到校
+        程老师 10:32
+        今天的作业已经发到群里了
+        高琪爸爸
+        上午 10:35
+        收到，谢谢程老师
+        王总说下午开会，我总是迟到，李哥们都在
+        Alice Chen 9:41 AM
+        elmer: ok
+        elmer: sounds good
+        dana: once
+        时间：下午三点
+        Note: bring laptops
+        我和高琪爸爸一起去，各位老师辛苦了
+        """
+        let found = try terms(chat)
+        for name in ["小易老师", "程老师", "高琪爸爸", "王总", "Alice Chen", "elmer"] {
+            XCTAssertEqual(found[name]?.kind, .properName, name)
+        }
+        XCTAssertEqual(found["程老师"]?.count, 2)
+        XCTAssertEqual(found["高琪爸爸"]?.count, 2)
+        for rejected in ["谢程老师", "谢谢程老师", "各位老师", "位老师", "老师", "我总", "李哥", "时间", "Note", "dana", "爸爸"] {
+            XCTAssertNil(found[rejected].map { _ in rejected }, rejected)
+        }
+
+        // Ranked output: the names are high-confidence terms.
+        let ranked = ScreenTermExtractor.terms(from: collection([(.body, chat)]), excludingKeys: [])
+        for name in ["小易老师", "程老师", "高琪爸爸", "王总", "Alice Chen", "elmer"] {
+            XCTAssertTrue(ranked.contains { $0.text == name && $0.highConfidence }, name)
+        }
+    }
+
+    func testSenderButtonsFollowedByTheMessageTimeAreNames() {
+        // Slack's AX order: sender button (a control), a permalink, the time, then the message.
+        let lines: [(ScreenTextSegment.Kind, String)] = [
+            (.windowTitle, "general (Channel) - Example - Slack"),
+            (.control, "Jinrui"), (.body, "Today at 10:32:15 AM"), (.body, "10:32 AM"), (.body, "我们下周发版"),
+            (.control, "Reply"), (.control, "Add reaction"),
+            (.control, "Simon Tsao"), (.body, "Today at 10:40:02 AM"), (.body, "10:40 AM"), (.body, "OK"),
+            (.control, "Search"), (.body, "Settings")
+        ]
+        let result = ScreenTermExtractor.terms(from: collection(lines), excludingKeys: [])
+        let jinrui = result.first { $0.text == "Jinrui" }
+        XCTAssertEqual(jinrui?.kind, .properName)
+        XCTAssertTrue(jinrui?.highConfidence == true)
+        XCTAssertEqual(result.first { $0.text == "Simon Tsao" }?.kind, .properName)
+        XCTAssertFalse(result.contains { ["Reply", "Search", "Settings", "Add reaction"].contains($0.text) }, "\(result.map(\.text))")
+        // Excluded vocabulary stays excluded.
+        let excluded = ScreenTermExtractor.terms(from: collection(lines), excludingKeys: [AppVocabulary.automaticTermKey("Jinrui")])
+        XCTAssertFalse(excluded.contains { $0.text == "Jinrui" })
+    }
+
+    func testRepeatedNameLinesCountAsSenders() throws {
+        // OCR of a group chat: the sender's name sits on its own line above each bubble.
+        let found = try terms("章小山\n好的我看一下\n刘一\n收到\n章小山\n已经改好了\n刘一\n谢谢\nBob Lee\nLooks fine\nBob Lee\nShip it\nThread\nok\nThread\nok")
+        XCTAssertEqual(found["章小山"]?.kind, .properName)
+        XCTAssertEqual(found["刘一"]?.kind, .properName)
+        XCTAssertEqual(found["Bob Lee"]?.kind, .properName)
+        XCTAssertNil(found["Thread"], "a repeated single English word is not a sender")
+        XCTAssertNil(try terms("回复\n转发\n回复\n转发")["回复"], "UI words never become names")
     }
 
     func testCamelAcronymAndIdentifierRules() throws {

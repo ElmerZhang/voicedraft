@@ -15,11 +15,13 @@ private struct FakeTree {
     }
 
     func collect(title: String? = nil, focused: Int? = nil, value: String? = nil, range: NSRange? = nil,
-                 limits: ScreenContextLimits = .standard, now: @escaping () -> TimeInterval = { 0 }) -> ScreenTextCollection {
+                 windowFrame: CGRect? = nil, limits: ScreenContextLimits = .standard, now: @escaping () -> TimeInterval = { 0 },
+                 progress: ((ScreenTextCollection) -> Void)? = nil, isCancelled: @escaping () -> Bool = { false }) -> ScreenTextCollection {
         ScreenTextWalker.collect(window: 0, windowTitle: title, focused: focused, focusedValue: value, focusedRange: range,
+            windowFrame: windowFrame,
             attributes: { reads($0); return attributes[$0] ?? ScreenTextAttributes(role: "AXGroup") },
             children: { node, visibleOnly in visibleOnly ? (visibleChildren[node] ?? children[node] ?? []) : (children[node] ?? []) },
-            parent: { parents[$0] }, limits: limits, now: now)
+            parent: { parents[$0] }, limits: limits, now: now, progress: progress, isCancelled: isCancelled)
     }
 }
 
@@ -71,8 +73,9 @@ final class ScreenContextTests: XCTestCase {
         XCTAssertFalse(visited.contains(2), "secure subtrees are never descended")
         XCTAssertFalse(visited.contains(4), "hidden subtrees are never descended")
         XCTAssertFalse(visited.contains(6), "menus are never descended")
-        XCTAssertEqual(result.segments.map(\.kind), [.control, .control, .control, .control])
-        XCTAssertEqual(result.segments.map(\.text), ["Deploy", "Avatar of Alice", "TabTitle", "Toolbar label"])
+        XCTAssertFalse(visited.contains(11), "toolbars are never descended")
+        XCTAssertEqual(result.segments.map(\.kind), [.control, .control, .control])
+        XCTAssertEqual(result.segments.map(\.text), ["Deploy", "Avatar of Alice", "TabTitle"])
         XCTAssertEqual(result.contentCharacters, 0)
     }
 
@@ -91,10 +94,11 @@ final class ScreenContextTests: XCTestCase {
         XCTAssertEqual(result.segments.map(\.text), ["Level 1", "Level 2"])
 
         var clock: TimeInterval = 0
-        limits = .standard
+        limits = .standard; limits.axWalkSeconds = 0.15
         result = chain.collect(limits: limits, now: { clock += 0.04; return clock })
         XCTAssertTrue(result.truncated)
         XCTAssertLessThan(result.nodesVisited, 5, "a 150 ms budget stops the walk")
+        XCTAssertGreaterThanOrEqual(ScreenContextLimits.standard.axWalkSeconds, 1, "the standard walk outlives the 250 ms ASR gate")
 
         limits = .standard; limits.charactersCollected = 12
         result = chain.collect(limits: limits)
@@ -104,6 +108,68 @@ final class ScreenContextTests: XCTestCase {
         limits = .standard; limits.characterPerNode = 4
         result = chain.collect(limits: limits)
         XCTAssertEqual(result.segments.first?.text, "Leve")
+    }
+
+    /// A chat-like window: sidebar first in child order, then the message pane
+    /// (one row scrolled away) and the focused composer.
+    private func chatTree() -> FakeTree {
+        var tree = FakeTree()
+        let row = CGRect(x: 0, y: 100, width: 500, height: 40)
+        tree.add(0, ScreenTextAttributes(role: "AXWindow", frame: CGRect(x: 0, y: 0, width: 1000, height: 800)))
+        tree.add(1, ScreenTextAttributes(role: "AXGroup"), under: 0)
+        tree.add(2, text("AXStaticText", "Sidebar channel"), under: 1)
+        tree.add(3, ScreenTextAttributes(role: "AXGroup"), under: 0)
+        tree.add(4, ScreenTextAttributes(role: "AXGroup"), under: 3)
+        tree.add(5, ScreenTextAttributes(role: "AXStaticText", value: "Older message", frame: CGRect(x: 0, y: -500, width: 100, height: 20)), under: 4)
+        tree.add(6, ScreenTextAttributes(role: "AXGroup", frame: row), under: 4)
+        tree.add(7, text("AXStaticText", "Visible message A"), under: 6)
+        tree.add(8, text("AXStaticText", "Visible message B"), under: 6)
+        tree.add(9, ScreenTextAttributes(role: "AXRow", title: "Thread"), under: 4)
+        tree.add(10, text("AXStaticText", "Thread reply"), under: 9)
+        tree.add(11, ScreenTextAttributes(role: "AXGroup"), under: 3)
+        tree.add(12, ScreenTextAttributes(role: "AXGroup"), under: 11)
+        tree.add(13, text("AXTextArea", "never read"), under: 12)
+        return tree
+    }
+
+    func testRingsAroundTheFocusComeFirstAndOffscreenNodesAreSkipped() {
+        let frame = CGRect(x: 0, y: 0, width: 1000, height: 800)
+        let result = chatTree().collect(focused: 13, value: "draft", windowFrame: frame)
+        XCTAssertEqual(result.segments.map(\.text), ["draft", "Visible message A", "Visible message B", "Thread", "Thread reply", "Sidebar channel"])
+        XCTAssertEqual(result.segments.map(\.kind), [.focused, .neighbour, .neighbour, .neighbour, .neighbour, .body])
+        XCTAssertEqual(result.skippedOffscreen, 1)
+
+        // With one ring only, the message pane is reached after the sidebar, in reading order.
+        var limits = ScreenContextLimits.standard
+        limits.axNeighbourAncestors = 1
+        let narrow = chatTree().collect(focused: 13, value: "draft", windowFrame: frame, limits: limits)
+        XCTAssertEqual(narrow.segments.map(\.text), ["draft", "Sidebar channel", "Visible message A", "Visible message B", "Thread", "Thread reply"])
+
+        // Without a window frame nothing is pruned as offscreen.
+        let unbounded = chatTree().collect(focused: 13, value: "draft")
+        XCTAssertTrue(unbounded.segments.contains { $0.text == "Older message" })
+        XCTAssertEqual(unbounded.skippedOffscreen, 0)
+    }
+
+    func testWalkPublishesPartialResultsAndStopsWhenCancelled() {
+        var chain = FakeTree()
+        chain.add(0, ScreenTextAttributes(role: "AXWindow"))
+        for node in 1...20 { chain.add(node, ScreenTextAttributes(role: "AXGroup", title: "Level \(node)"), under: node - 1) }
+        var clock: TimeInterval = 0
+        var partials: [Int] = []
+        var limits = ScreenContextLimits.standard
+        limits.axProgressSeconds = 0.1
+        let result = chain.collect(limits: limits, now: { clock += 0.025; return clock }, progress: { partials.append($0.segments.count) })
+        XCTAssertFalse(result.truncated)
+        XCTAssertGreaterThanOrEqual(partials.count, 4)
+        XCTAssertEqual(partials, partials.sorted(), "partials only grow")
+        XCTAssertLessThan(partials.last ?? 0, result.segments.count)
+
+        var visits = 0
+        chain.reads = { _ in visits += 1 }
+        let cancelled = chain.collect(isCancelled: { visits >= 5 })
+        XCTAssertEqual(cancelled.nodesVisited, 5)
+        XCTAssertTrue(cancelled.truncated)
     }
 
     func testCyclesTerminateAndVisibleChildrenAreUsedForLists() {

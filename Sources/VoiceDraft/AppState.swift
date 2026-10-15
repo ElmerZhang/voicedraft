@@ -197,6 +197,7 @@ final class AppState: ObservableObject {
         do {
             let store = try LocalStore(); self.store = store
             usageLog = UsageLog(store: store)
+            screenContext.diagnostics = ScreenContextDiagnosticsLog(store: store)
             settings = try store.read("settings", fallback: SharedSettings())
             try settings.validate()
             device = try store.read("device", fallback: DeviceSettings())

@@ -145,35 +145,50 @@ Warp (`dev.warp.Warp-Stable`) has a narrow keyboard-surface path for its standar
 
 Opt-in and off by default (Settings → General → On-screen context). When the user dictates into another app, VoiceDraft reads the text visible in that app's front window and uses it three ways: lowest-priority recognition hints, a bounded writing reference for Polish/Translate (terms only for Edit), and on-demand "Extract words from this screen" into the Vocabulary review sheet.
 
-**Boundary.** This is the first feature that uploads text VoiceDraft did not produce and the user did not select: surrounding window text goes to the user's configured speech and writing providers. It is a separate, explicit egress path; correction observation still never uploads surrounding document text. Speech models receive only term-shaped tokens (2–64 characters, ≤ 4 words, no newline). The writing model receives at most 1,500 redacted characters plus ≤ 40 terms as `on_screen_context_reference_only`, with a system rule that it is untrusted reference data that may only resolve names, terms, spellings and tone. That rule is a model instruction, not a guarantee. No code parses instructions, paths or URLs from screen text, the app never executes model output, and insertion keeps every focus check. Ask and Verbatim receive nothing. Screen data travels only as explicit request parameters; it is never stored on `SharedSettings`, in History, on disk or in sync, and never logged.
+**Boundary.** This is the first feature that uploads text VoiceDraft did not produce and the user did not select: surrounding window text goes to the user's configured speech and writing providers. It is a separate, explicit egress path; correction observation still never uploads surrounding document text. Speech models receive only term-shaped tokens (2–64 characters, ≤ 4 words, no newline). The writing model receives at most 1,500 redacted characters plus ≤ 40 terms as `on_screen_context_reference_only`, with a system rule that it is untrusted reference data that may only resolve names, terms, spellings and tone. That rule is a model instruction, not a guarantee. No code parses instructions, paths or URLs from screen text, the app never executes model output, and insertion keeps every focus check. Ask and Verbatim receive nothing. Screen data travels only as explicit request parameters; it is never stored on `SharedSettings`, in History or in sync. The only disk copy is the opt-in diagnostics file below, which holds screen-derived terms (never the excerpt) and exists only while its hidden switch is on.
 
 **Mechanics.** Pure algorithms live in VoiceDraftCore (`ScreenContext.swift`, `TermExtraction.swift`); the app target supplies adapters.
 
 | Piece | Where | Behavior |
 | --- | --- | --- |
 | Policy | `ScreenContextPolicy` | Captures only for external takes with the master switch and at least one consumer on, a non-secure target, and an allowed bundle ID. Built-in exclusions (1Password 8/7, Bitwarden, Keychain Access, Passwords) plus user exclusions match case-insensitively and exactly; VoiceDraft is always excluded. Checked before any read. |
-| AX reader | `ScreenContextAXReader` (app) over `ScreenTextWalker` (Core) | Focused value first (from the captured `InputTarget`, no extra AX call), then window title, up to three ancestors' neighbourhoods, then the rest of the window in child order. Secure fields are skipped and never descended; hidden nodes and menus are skipped; button titles are terms-only controls. One batched `AXUIElementCopyMultipleAttributeValues` per node, `AXVisibleCharacterRange`/`AXStringForRange` for text roles, `AXVisibleChildren` for lists, ≤ 160 children per node, 50 ms per-message timeouts on fresh objects. Never sets `AXEnhancedUserInterface` or `AXManualAccessibility`. Runs on one serial queue with a busy flag and a wall timeout of `axSeconds + 0.05`; late results are discarded. |
-| OCR | `WindowTextRecognizer` (app) | Only with master and OCR on, Screen Recording preflight true, and too little AX content (< 120 non-whitespace content characters, excluding title, controls and the focused field) or no AX result. Window ID from `CGWindowListCopyWindowInfo` (PID, layer 0, bounds matched to the AX window within 2 pt, else frontmost; no window names). macOS 14+: `SCShareableContent` → `SCContentFilter(desktopIndependentWindow:)` → `SCScreenshotManager`. macOS 13: `CGWindowListCreateImage(.optionIncludingWindow)` behind `#available`; if a future SDK removes it, a one-frame `SCStream` with the same filter is the documented replacement. Long edge ≤ 2,560 px. Vision `VNRecognizeTextRequest` accurate, revision 3, languages = interface language, zh-Hans, en-US filtered by supported languages (≤ 3), confidence ≥ 0.4, ≤ 8,000 characters, lines ranked by distance to the focused field when its frame is known. One window only; the image is never written and is released after recognition. |
-| Terms and excerpt | `ScreenTermExtractor`, `ScreenExcerptBuilder` (Core) | Ranked term kinds (quoted, identifier, camelCase, embedded Latin, proper name, acronym; low-confidence repeated CJK runs), stoplists and rejection filters; excluding every vocabulary spelling and deletion hash. Excerpt: focused field around the caret, title and heading, neighbours, then body/OCR lines; credential/URL lines dropped, long digits and secret-like tokens masked. |
-| Coordinator | `ScreenContextCoordinator` (app, main actor) | One take record at a time: `begin` at recording start, `end` on delivery, failure or cancel. Reader and recognizer are injected through `ScreenTextReading` / `WindowTextRecognizing`. Tracks the last external regular app through `NSWorkspace` activation notifications for Vocabulary (identity only). Caches OCR snapshots keyed by `pid:windowID`. |
+| AX reader | `ScreenContextAXReader` (app) over `ScreenTextWalker` (Core) | Visible-first order: focused value (from the captured `InputTarget`, no extra AX call), window title, then nearest-first rings around the focus (each of up to 8 ancestors' subtrees), then the rest of the window. Each ring is walked depth-first in child order, so text arrives in reading order. Lists, outlines, tables and scroll areas use `AXVisibleChildren`, then `AXVisibleRows`, when offered. A node whose frame lies entirely outside the window (scrolled away) is counted and not descended. Secure fields, hidden nodes, menus and toolbars are not descended; button titles are terms-only controls. `AXExpanded` is not used, because Chromium reports it as false on every web node. One batched `AXUIElementCopyMultipleAttributeValues` per node (role, subrole, value, title, description, hidden, children, position, size), `AXVisibleCharacterRange`/`AXStringForRange` for text roles, ≤ 160 children per node, 50 ms per-message timeouts on fresh objects. It publishes the window key ("pid:ax:hash:title") first, then a partial collection every 0.1 s. Never sets `AXEnhancedUserInterface` or `AXManualAccessibility`. Runs on one serial queue with a busy flag and a wall timeout of `axWalkSeconds + 0.1`; ending the take cancels the walk at the next node, and late results are discarded. |
+| OCR | `WindowTextRecognizer` (app) | Only with master and OCR on, Screen Recording permitted (preflight true and this session's confirmation capture done, see Permissions), and too little AX content (< 120 non-whitespace content characters, excluding title, controls and the focused field) or no AX result. Window ID from `CGWindowListCopyWindowInfo` (PID, layer 0, bounds matched to the AX window within 2 pt, else frontmost; no window names). macOS 14+: `SCShareableContent` → `SCContentFilter(desktopIndependentWindow:)` → `SCScreenshotManager`. macOS 13: `CGWindowListCreateImage(.optionIncludingWindow)` behind `#available`; if a future SDK removes it, a one-frame `SCStream` with the same filter is the documented replacement. Long edge ≤ 2,560 px. Vision `VNRecognizeTextRequest` accurate, revision 3, languages = interface language, zh-Hans, en-US filtered by supported languages (≤ 3), confidence ≥ 0.4, ≤ 8,000 characters, lines ranked by distance to the focused field when its frame is known. One window only; the image is never written and is released after recognition. |
+| Terms and excerpt | `ScreenTermExtractor`, `ScreenExcerptBuilder` (Core) | Ranked term kinds (quoted, identifier, camelCase, embedded Latin, proper name, acronym; low-confidence repeated CJK runs), stoplists and rejection filters; excluding every vocabulary spelling and deletion hash. Chat names are high-confidence proper names (see below). Excerpt: focused field around the caret, title and heading, neighbours, then body/OCR lines; credential/URL lines dropped, long digits and secret-like tokens masked. |
+| Coordinator | `ScreenContextCoordinator` (app, main actor) | One take record at a time: `begin` at recording start, `end` on delivery, failure or cancel. Reader and recognizer are injected through `ScreenTextReading` / `WindowTextRecognizing`. Tracks the last external regular app through `NSWorkspace` activation notifications for Vocabulary (identity only). Caches complete AX snapshots by the reader's window key and OCR snapshots by `pid:windowID`, in memory. |
 
-**Budgets.** AX: 2,000 nodes, depth 12, 150 ms, 2,000 characters per node, 20,000 total (extraction allows 500 ms). ASR gate 250 ms. OCR 2 s from take start. ASR ≤ 300 terms / 6,000 UTF-8 bytes. Excerpt ≤ 1,500 characters; writing terms ≤ 40, high-confidence only. Cache 60 s, 4 entries. Extraction ≤ 200 candidates.
+**Budgets.** AX walk: 4,000 nodes, depth 40, walk deadline 1.2 s (`axWalkSeconds`; extraction allows 1.5 s), partial results every 0.1 s, 2,000 characters per node, 20,000 total. ASR gate 250 ms (`asrGateSeconds`). OCR 2 s from take start. ASR ≤ 300 terms / 6,000 UTF-8 bytes. Excerpt ≤ 1,500 characters; writing terms ≤ 40, high-confidence only. Cache 60 s, 4 entries shared by AX and OCR snapshots. Extraction ≤ 200 candidates.
+
+The old 12-level depth cap was the cause of thin results in Electron apps: Slack's message text sits deeper than 12 levels, so the walk saw only 61 nodes and the window title. AX messages answered in about 0.04 ms each in Slack, so the node and time budgets were not the limit (see validation.md, 2026-10-15).
+
+**Walk deadline versus gate.** The ASR gate and the walk deadline are separate. The live gate waits at most 250 ms and then uses whatever is ready: the complete walk if it finished, otherwise the latest partial collection merged with this window's cached complete snapshot (≤ 60 s old), plus fresh or cached OCR. The walk keeps going to its 1.2 s deadline. The complete result feeds the writing reference and is cached under the window key, so the next take in the same window starts from it. A partial collection with enough content (≥ 120 characters) also settles the OCR decision early. Partial walks are never cached.
+
+**Chat names.** Chat transcripts carry the names users dictate most often, and NLTokenizer splits unknown Chinese names into single characters. `TermExtractor.chatNames` therefore adds high-confidence proper names from:
+
+- Sender labels: a line-initial name followed by ":" or "："; a name line followed by a time ("10:32", "上午 10:35", "Today at 9:41:15 AM") on the same line or within three lines with only short separators between; or a name that repeats as a whole line. Han labels are 2–4 characters (longer only with a title suffix) and cannot start with a pronoun or function character. Latin labels need a time, or a colon plus repetition or two title-case words, or two title-case words repeated. Field labels (时间, 备注, Note, Subject…) and UI words are rejected.
+- Name + title or kinship suffix: 1–2 Han characters + 老师/同学/先生/女士/爸爸/妈妈 (小易老师, 程老师, 高琪爸爸), or a common surname + 总/哥/姐 (王总). The name starts on an NLTokenizer word boundary, so 谢谢程老师 yields 程老师; 总是, 哥们, 各位老师 and similar words are rejected.
+- `ScreenTermExtractor` also runs the sender rules over body and control segments interleaved in reading order, because Slack exposes each sender as a button followed by its permalink and time.
 
 **Timing.**
 
 ```text
 t0  toggle(external:)  TextInsertion.capture, validation, then ScreenContextCoordinator.begin
-     ├─ AX walk (screen-context queue, ≤ 150 ms + message overrun)
-     │     └─ needs OCR && OCR on && preflight → window lookup → capture → Vision (deadline t0 + 2 s) → cache
+     ├─ AX walk (screen-context queue, ≤ 1.2 s + message overrun)
+     │     ├─ window key at once → cached complete AX snapshot for this window, if any
+     │     ├─ partial collection every 0.1 s (enough text → OCR not needed)
+     │     ├─ complete collection → writing snapshot + AX cache
+     │     └─ needs OCR && OCR on && permitted → window lookup → capture → Vision (deadline t0 + 2 s) → cache
      ├─ live adapters (Message WS, Doubao): socket handshake starts, then
-     │     await asrTerms(until: t0 + 250 ms) = AX terms if ready, else cached OCR terms for the window, else []
+     │     await asrTerms(until: t0 + 250 ms) = complete walk if done, else partial + cached AX,
+     │     plus OCR or cached OCR for the window, else []
      │     → start frame → task-started → microphone (order unchanged)
      └─ HTTP adapters: recorder starts immediately; at stop currentASRTerms() never waits
 deliverTranscript: writingContext() waits only until t0 + 2 s (normally already past)
-end of take: end(take:) cancels work and drops the record; late results are discarded
+end of take: end(take:) cancels work (the walk stops at its next node), writes the
+             diagnostics line when enabled, and drops the record; late results are discarded
 ```
 
-OCR never delays ASR start. If AX is late, live ASR proceeds without screen terms (or with cached OCR terms); the AX result still feeds writing. The first take in an OCR-only app has no ASR screen terms, only the writing reference.
+OCR never delays ASR start. If the walk is slow, live ASR proceeds with the partial walk and cached snapshots (or nothing); the complete walk still feeds writing. The first take in an OCR-only app has no ASR screen terms, only the writing reference.
 
 **Adapter injection.**
 
@@ -188,9 +203,45 @@ OCR never delays ASR start. If AX is late, live ASR proceeds without screen term
 
 **Never persisted, counted or learned.** Usage counting only increments stored entries. Discovery learning receives the keys of every screen term offered to speech or writing for the take and cannot promote them; correction learning from explicit user edits is unaffected. Extraction imports only terms the user checks.
 
-**Permissions.** Accessibility is already required. Screen Recording is requested only from the OCR switch, the Settings Allow button, Home or onboarding; a take only calls `CGPreflightScreenCaptureAccess()`. The first request shows the system prompt; later requests open Privacy & Security. Preflight can stay false until relaunch after a grant, and ad-hoc rebuilds can lose the grant. macOS 15 and later can periodically ask the user to reconfirm screen capture; when declined, OCR is skipped quietly.
+**Permissions.** Accessibility is already required. Screen capture has two separate macOS gates:
+
+1. TCC Screen Recording, which `CGPreflightScreenCaptureAccess()` reports and `CGRequestScreenCaptureAccess()` requests.
+2. From macOS 15, a ScreenCaptureKit approval kept by replayd ("bypass the private window picker"), asked again about monthly. Preflight stays true while this alert is due. The alert appears at the first actual capture (`SCScreenshotManager`), not at an `SCShareableContent` query.
+
+The user-reported prompt during the first take was gate 2. TCC was granted, preflight was true, and the take performed the session's first capture (validation.md, 2026-10-15).
+
+`ScreenRecordingPermission.request()` runs from the OCR switch (turning it on), the Settings Allow button, Home and onboarding:
+
+- When preflight is true, it immediately performs the confirmation capture described below, so a due approval alert appears now.
+- Otherwise it calls `CGRequestScreenCaptureAccess()`, which shows the TCC prompt when the permission is undetermined.
+- If no system prompt took focus within 0.8 s and preflight is still false, it runs one `SCShareableContent` query (macOS 14+, result ignored), which asks for an undetermined permission.
+- Only a repeated request that raised no prompt opens Privacy & Security.
+- It then polls preflight for 60 s and confirms once it turns true. Preflight can stay false until relaunch after a grant.
+
+The confirmation capture is a 2×2-pixel capture of the main display, discarded at once; four averaged pixels hold no readable content. A session that completes it is "capture-confirmed" (memory only, nothing on disk). Automatic triggers try once per session: launch with OCR on, and the Settings page while OCR is on. A declined alert is therefore not repeated; the switch and Allow buttons may retry.
+
+Takes and extraction only check `capturePermitted`: preflight true and, on macOS 14+, capture-confirmed. Nothing in a take requests, queries or captures before that check passes. A take can still meet the monthly re-approval if the app has run for weeks since the last confirmation; when it is declined, OCR is skipped quietly.
 
 **Extraction.** The status menu item waits 0.25 s for the menu to close, reads the still-frontmost app, then opens Vocabulary's review sheet in screen mode. Vocabulary's button reads the last tracked external app; the app need not be frontmost for AX. Exclusions always apply; OCR runs only when its switch is on and permission is granted. Only candidate IDs, words and kinds reach the writing model.
+
+**Diagnostics (opt-in).** A hidden device-local switch, the `ScreenContextDiagnostics` Bool in `UserDefaults`, has no UI:
+
+```sh
+defaults write com.voicedraft.mac ScreenContextDiagnostics -bool true    # on
+defaults delete com.voicedraft.mac ScreenContextDiagnostics              # off
+```
+
+While it is on, `ScreenContextDiagnosticsLog` appends one JSON line per take (at `end(take:)`) and per extraction to `~/Library/Application Support/VoiceDraft/Diagnostics/screen-context.jsonl`. The file follows the usage log's rules: shared `JSONLines` writer, folder 0700, file 0600, silent failures, never synced, read or shown, and nothing in preview mode.
+
+Fields:
+
+- `v`, `kind` (`take` or `extraction`), `date`, `takeID`, `bundleID`, `sources`
+- `nodesVisited`, `charactersCollected`, `axElapsedMs`, `ocrElapsedMs`, `truncated`
+- `gateHadTerms` (live adapters only), `asrTermsSent`
+- `termsOffered` (every term offered to speech or writing, or the extraction candidates)
+- `excerptLength`, `writingTerms`
+
+**The file contains screen-derived words** (terms and names read from other apps' windows). It never contains the excerpt or any other screen text. It exists only because the switch was turned on; turning the switch off stops writing, and deleting the `Diagnostics` folder removes it.
 
 **Preview.** Isolated preview mode never reads AX, captures a window or requests permissions; extraction returns an empty scan. `VOICEDRAFT_CAPTURE_PREVIEWS` also writes `settings-screen-context.png` (the section rendered alone, since it sits below the fold), and `VOICEDRAFT_CAPTURE_HUD_PREVIEWS` adds `screen-context` and `screen-context-compact`.
 

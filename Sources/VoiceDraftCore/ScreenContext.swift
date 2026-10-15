@@ -20,9 +20,15 @@ public struct ScreenTerm: Equatable, Sendable {
 }
 
 public struct ScreenContextLimits: Equatable, Sendable {
-    public var axNodes = 2_000
-    public var axDepth = 12
-    public var axSeconds: TimeInterval = 0.15
+    public var axNodes = 4_000
+    public var axDepth = 40
+    /// Walk deadline. The walk keeps going after the ASR gate so writing and the
+    /// per-window cache get a fuller snapshot; the gate uses whatever is ready.
+    public var axWalkSeconds: TimeInterval = 1.2
+    /// Interval between partial results published while the walk runs.
+    public var axProgressSeconds: TimeInterval = 0.1
+    /// Ancestors of the focused element walked as nearest-first rings before the window.
+    public var axNeighbourAncestors = 8
     /// Per AX message, fresh objects only.
     public var axMessageTimeout: Float = 0.05
     public var characterPerNode = 2_000
@@ -56,10 +62,12 @@ public struct ScreenTextAttributes: Equatable, Sendable {
     /// AXVisibleCharacterRange + AXStringForRange, when available.
     public var visibleText: String?
     public var hidden: Bool
+    /// Screen frame (AXPosition + AXSize), when exposed.
+    public var frame: CGRect?
     public init(role: String, subrole: String = "", value: String? = nil, title: String? = nil,
-                description: String? = nil, visibleText: String? = nil, hidden: Bool = false) {
+                description: String? = nil, visibleText: String? = nil, hidden: Bool = false, frame: CGRect? = nil) {
         self.role = role; self.subrole = subrole; self.value = value; self.title = title
-        self.description = description; self.visibleText = visibleText; self.hidden = hidden
+        self.description = description; self.visibleText = visibleText; self.hidden = hidden; self.frame = frame
     }
     public var isSecure: Bool { subrole == "AXSecureTextField" }
 }
@@ -83,10 +91,12 @@ public struct ScreenTextCollection: Equatable, Sendable {
     public var charactersCollected = 0
     public var truncated = false
     public var skippedSecure = 0
+    /// Nodes whose frame lies outside the window (scrolled away); never descended.
+    public var skippedOffscreen = 0
     public init(segments: [ScreenTextSegment] = [], nodesVisited: Int = 0, charactersCollected: Int = 0,
-                truncated: Bool = false, skippedSecure: Int = 0) {
+                truncated: Bool = false, skippedSecure: Int = 0, skippedOffscreen: Int = 0) {
         self.segments = segments; self.nodesVisited = nodesVisited; self.charactersCollected = charactersCollected
-        self.truncated = truncated; self.skippedSecure = skippedSecure
+        self.truncated = truncated; self.skippedSecure = skippedSecure; self.skippedOffscreen = skippedOffscreen
     }
     /// Non-whitespace characters from heading/neighbour/body segments (not the
     /// window title, controls or the focused field).
@@ -100,24 +110,44 @@ public struct ScreenTextCollection: Equatable, Sendable {
 
 /// Bounded, focus-first traversal of a window's accessibility tree. Generic so
 /// it can be tested with fake trees; the app target supplies AX closures.
+///
+/// Order: the focused value (already captured), the window title, then
+/// nearest-first rings around the focused element (each ancestor's subtree,
+/// depth-first in child order, up to `axNeighbourAncestors`), then the rest of
+/// the window. Visible children are preferred where a container offers them;
+/// nodes whose frame lies outside the window (scrolled away), hidden and secure
+/// nodes, menus and toolbars are not descended. AXExpanded is not used:
+/// Chromium reports it as false on every web node, and AppKit outlines already
+/// omit the children of collapsed rows.
 public enum ScreenTextWalker {
     private static let textRoles: Set<String> = ["AXTextArea", "AXTextField", "AXComboBox", "AXSearchField"]
     private static let controlRoles: Set<String> = ["AXButton", "AXMenuButton", "AXPopUpButton", "AXRadioButton", "AXCheckBox"]
-    private static let menuRoles: Set<String> = ["AXMenuBar", "AXMenu", "AXMenuItem", "AXMenuBarItem"]
+    private static let menuRoles: Set<String> = ["AXMenuBar", "AXMenu", "AXMenuItem", "AXMenuBarItem", "AXToolbar"]
     private static let visibleChildRoles: Set<String> = ["AXList", "AXOutline", "AXTable", "AXBrowser", "AXScrollArea"]
 
+    /// - Parameters:
+    ///   - windowFrame: the window's screen frame; nodes entirely outside it are skipped.
+    ///   - progress: receives the partial collection every `axProgressSeconds` while walking.
+    ///   - isCancelled: checked before each node; a cancelled walk stops and marks the result truncated.
     public static func collect<Node: Hashable>(
         window: Node, windowTitle: String?,
         focused: Node?, focusedValue: String?, focusedRange: NSRange?,
+        windowFrame: CGRect? = nil,
         attributes: (Node) -> ScreenTextAttributes,
         children: (Node, _ visibleOnly: Bool) -> [Node],
         parent: (Node) -> Node?,
         limits: ScreenContextLimits = .standard,
-        now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+        now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        progress: ((ScreenTextCollection) -> Void)? = nil,
+        isCancelled: () -> Bool = { false }
     ) -> ScreenTextCollection {
         var result = ScreenTextCollection()
-        let deadline = now() + limits.axSeconds
+        let started = now()
+        let deadline = started + limits.axWalkSeconds
+        var lastProgress = started
         var visited = Set<Node>(), seenText = Set<String>(), order = 0, stopped = false
+        // A degenerate or unknown window frame disables offscreen pruning.
+        let bounds = windowFrame.flatMap { $0.width > 0 && $0.height > 0 ? $0.insetBy(dx: -2, dy: -2) : nil }
 
         func emit(_ kind: ScreenTextSegment.Kind, _ raw: String?, caret: Int? = nil) {
             guard !stopped, let raw else { return }
@@ -137,6 +167,9 @@ public enum ScreenTextWalker {
             let a = attributes(node)
             if a.hidden { return (false, false, nil) }
             if a.isSecure { result.skippedSecure += 1; return (false, false, nil) }
+            if let bounds, let frame = a.frame, frame.width > 0, frame.height > 0, !frame.intersects(bounds) {
+                result.skippedOffscreen += 1; return (false, false, nil)
+            }
             let kind = inherited ?? context
             let role = a.role
             if role == "AXStaticText" {
@@ -150,8 +183,8 @@ public enum ScreenTextWalker {
                 emit(headingKind, first(a.title, a.value, a.description)); return (true, false, headingKind)
             }
             if role == "AXLink" { emit(kind, first(a.title, a.description)); return (true, false, inherited) }
+            // Menus and toolbars hold commands, not content.
             if menuRoles.contains(role) { return (false, false, nil) }
-            if role == "AXToolbar" { return (true, false, .control) }
             if controlRoles.contains(role) || a.subrole == "AXTab" { emit(.control, a.title); return (false, false, nil) }
             if role == "AXImage" {
                 if let description = a.description, description.count <= 80 { emit(.control, description) }
@@ -161,19 +194,25 @@ public enum ScreenTextWalker {
             return (true, visibleChildRoles.contains(role), inherited)
         }
 
+        /// Depth-first in child order, so text arrives in reading order.
         func walk(from root: Node, context: ScreenTextSegment.Kind) {
-            var queue: [(node: Node, depth: Int, inherited: ScreenTextSegment.Kind?)] = [(root, 0, nil)]
-            var head = 0
-            while head < queue.count, !stopped {
-                let item = queue[head]; head += 1
+            var stack: [(node: Node, depth: Int, inherited: ScreenTextSegment.Kind?)] = [(root, 0, nil)]
+            while let item = stack.popLast(), !stopped {
                 guard visited.insert(item.node).inserted else { continue }
-                if result.nodesVisited >= limits.axNodes || now() >= deadline { result.truncated = true; stopped = true; return }
+                let time = now()
+                if result.nodesVisited >= limits.axNodes || time >= deadline || isCancelled() {
+                    result.truncated = true; stopped = true; return
+                }
+                if let progress, time - lastProgress >= limits.axProgressSeconds {
+                    lastProgress = time
+                    progress(result)
+                }
                 result.nodesVisited += 1
                 let step = visit(item.node, context: context, inherited: item.inherited)
                 guard step.descend else { continue }
                 guard item.depth < limits.axDepth else { result.truncated = true; continue }
-                for child in children(item.node, step.visibleOnly) where !visited.contains(child) {
-                    queue.append((child, item.depth + 1, step.inherit))
+                for child in children(item.node, step.visibleOnly).reversed() where !visited.contains(child) {
+                    stack.append((child, item.depth + 1, step.inherit))
                 }
             }
         }
@@ -186,10 +225,10 @@ public enum ScreenTextWalker {
         }
         // 2. Window title.
         if let windowTitle { emit(.windowTitle, String(windowTitle.prefix(200))) }
-        // 3. Neighbourhood: up to three ancestors of the focused element, nearest first.
+        // 3. Neighbourhood: nearest-first rings of the focused element's ancestors.
         if let focused {
             var current = focused, climbed: [Node] = [], seen: Set<Node> = [focused]
-            while climbed.count < 3, !stopped, let up = parent(current), up != window, seen.insert(up).inserted {
+            while climbed.count < limits.axNeighbourAncestors, !stopped, let up = parent(current), up != window, seen.insert(up).inserted {
                 climbed.append(up); current = up
             }
             for ancestor in climbed where !stopped { walk(from: ancestor, context: .neighbour) }
@@ -281,6 +320,22 @@ public enum ScreenTermExtractor {
                 entries[key] = entry
             } else {
                 entries[key] = Entry(text: candidate.text, kind: candidate.kind, count: candidate.count, offset: offset, inMain: inMain)
+                order.append(key)
+            }
+        }
+        // Sender labels across body and controls in reading order (a sender button followed by its time).
+        let interleaved = ordered.filter { $0.kind != .focused }.map(\.text).joined(separator: "\n")
+        for sender in TermExtractor.senderLabels(in: interleaved) {
+            let key = AppVocabulary.automaticTermKey(sender.text)
+            guard !excludingKeys.contains(key) else { continue }
+            if var entry = entries[key] {
+                entry.inMain = true
+                if entry.kind == .cjkRun { entry.kind = .properName }
+                entries[key] = entry
+            } else {
+                let offset = (main as NSString).range(of: sender.text).location
+                entries[key] = Entry(text: sender.text, kind: .properName, count: sender.count,
+                                     offset: offset == NSNotFound ? controlBase : offset, inMain: true)
                 order.append(key)
             }
         }
@@ -434,8 +489,10 @@ public struct ScreenContextSnapshot: Equatable, Sendable {
                     truncated: collection.truncated, skippedSecure: collection.skippedSecure, capturedAt: now)
     }
 
-    /// AX excerpt first, then OCR lines; terms unioned by `automaticTermKey` in AX order
-    /// first, high-confidence terms before low-confidence ones.
+    /// The first snapshot's excerpt lines, then the second's; terms unioned by
+    /// `automaticTermKey` in the first snapshot's order first, high-confidence terms
+    /// before low-confidence ones. Used for AX + OCR and for a partial walk + the
+    /// window's cached AX snapshot. Sources are the union, first snapshot first.
     public static func merged(_ ax: Self?, _ ocr: Self?, limits: ScreenContextLimits = .standard) -> Self? {
         guard let ax else { return ocr }
         guard let ocr else { return ax }
@@ -448,7 +505,9 @@ public struct ScreenContextSnapshot: Equatable, Sendable {
         var keys = Set<String>(), terms: [ScreenTerm] = []
         for term in ax.terms + ocr.terms where keys.insert(AppVocabulary.automaticTermKey(term.text)).inserted { terms.append(term) }
         terms = terms.filter(\.highConfidence) + terms.filter { !$0.highConfidence }
-        return Self(sources: [.accessibility, .ocr], bundleID: ax.bundleID, applicationName: ax.applicationName, excerpt: excerpt,
+        var sources: [ScreenContextSource] = []
+        for source in ax.sources + ocr.sources where !sources.contains(source) { sources.append(source) }
+        return Self(sources: sources, bundleID: ax.bundleID, applicationName: ax.applicationName, excerpt: excerpt,
                     terms: Array(terms.prefix(limits.asrTerms)), nodesVisited: ax.nodesVisited + ocr.nodesVisited,
                     charactersCollected: ax.charactersCollected + ocr.charactersCollected,
                     truncated: ax.truncated || ocr.truncated, skippedSecure: ax.skippedSecure + ocr.skippedSecure,
@@ -526,7 +585,8 @@ public struct ScreenContextScan: Sendable {
 
 // MARK: - Cache
 
-/// OCR-derived snapshots keyed by "pid:windowID", memory only.
+/// Memory-only snapshots per window: OCR keyed by "pid:windowID", complete AX
+/// walks keyed by the reader's "pid:ax:…" window key. Expire after `cacheSeconds`.
 public struct ScreenContextCache {
     private struct Entry { let key: String; let snapshot: ScreenContextSnapshot; let storedAt: Date }
     private var entries: [Entry] = []

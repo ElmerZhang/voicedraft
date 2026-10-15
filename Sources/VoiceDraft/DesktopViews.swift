@@ -371,6 +371,19 @@ private struct DesktopVocabularyView: View {
             }
     }
     private var bulkSheet: some View {
+        VocabularyBulkAddSheet(state: state, words: $words, isPresented: $bulkOpen)
+    }
+    private func update(_ change: (inout AppVocabulary) -> Void) {
+        var copy = state.settings; change(&copy.vocabulary); state.save(copy)
+    }
+}
+
+/// Vocabulary's "Add several terms" sheet; standalone so `VOICEDRAFT_CAPTURE_SHEETS` can render it.
+struct VocabularyBulkAddSheet: View {
+    @ObservedObject var state: AppState
+    @Binding var words: String
+    @Binding var isPresented: Bool
+    var body: some View {
         VStack(alignment: .leading, spacing: VD.Space.l) {
             VStack(alignment: .leading, spacing: VD.Space.xs) {
                 Text(L("Add several terms")).font(VD.Font.sheetTitle)
@@ -382,17 +395,14 @@ private struct DesktopVocabularyView: View {
             }
             HStack {
                 Spacer()
-                Button(L("Cancel")) { bulkOpen = false }.keyboardShortcut(.cancelAction)
+                Button(L("Cancel")) { isPresented = false }.keyboardShortcut(.cancelAction)
                 Button(L("Add to vocabulary")) {
-                    update { $0.appendLines(words) }
-                    if state.error.isEmpty { words = ""; bulkOpen = false }
+                    var copy = state.settings; copy.vocabulary.appendLines(words); state.save(copy)
+                    if state.error.isEmpty { words = ""; isPresented = false }
                 }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     .disabled(words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }.vdSheet(width: 520)
-    }
-    private func update(_ change: (inout AppVocabulary) -> Void) {
-        var copy = state.settings; change(&copy.vocabulary); state.save(copy)
     }
 }
 

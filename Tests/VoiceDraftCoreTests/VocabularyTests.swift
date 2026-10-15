@@ -119,3 +119,45 @@ final class VocabularyTests: XCTestCase {
         XCTAssertEqual(try SyncCrypto.decrypt(SyncCrypto.encrypt(snapshot, passphrase: "test-passphrase-only"), passphrase: "test-passphrase-only"), snapshot)
     }
 }
+
+// On-screen terms append after vocabulary in the leftover budget only.
+extension VocabularyTests {
+    func testScreenTermsAppendAfterVocabularyWithoutChangingVocabularyProjection() {
+        var vocabulary = AppVocabulary(words: "A1Kit\nB2Kit")
+        vocabulary.entries[0].priority = true
+        for capability in [VocabularyCapability.none, .context, .weighted] {
+            let base = VocabularyProjection.make(vocabulary, for: capability)
+            XCTAssertEqual(VocabularyProjection.make(vocabulary, for: capability, screenTerms: []), base)
+            let mixed = VocabularyProjection.make(vocabulary, for: capability, screenTerms: ["ScreenOne", "a1kit", " ", "line\nbreak", "ScreenTwo"])
+            XCTAssertEqual(mixed.omitted, base.omitted); XCTAssertEqual(mixed.shadowedAutomatic, base.shadowedAutomatic)
+            XCTAssertEqual(mixed.downgradedPriority, base.downgradedPriority)
+            XCTAssertEqual(Array(mixed.terms.prefix(base.terms.count)), base.terms)
+            switch capability {
+            case .none:
+                XCTAssertEqual(mixed.screenTerms, []); XCTAssertEqual(mixed.screenOmitted, 2)
+            case .context:
+                XCTAssertEqual(mixed.terms, ["A1Kit", "B2Kit", "ScreenOne", "ScreenTwo"])
+                XCTAssertEqual(mixed.context, "A1Kit, B2Kit, ScreenOne, ScreenTwo")
+            case .weighted:
+                XCTAssertEqual(mixed.weighted, ["A1Kit": 50, "B2Kit": 3, "ScreenOne": 1, "ScreenTwo": 1])
+                XCTAssertEqual(mixed.screenTerms, ["ScreenOne", "ScreenTwo"])
+            }
+        }
+        vocabulary.enabled = false
+        XCTAssertEqual(VocabularyProjection.make(vocabulary, for: .context, screenTerms: ["ScreenOne"]), VocabularyProjection())
+    }
+
+    func testScreenTermsNeverDisplaceVocabularyAndCountWhatDidNotFit() {
+        let full = AppVocabulary(words: (0..<300).map { "Full\($0)" }.joined(separator: "\n"))
+        let context = VocabularyProjection.make(full, for: .context, screenTerms: ["ScreenOne", "ScreenTwo"])
+        XCTAssertEqual(context.terms.count, 300); XCTAssertEqual(context.screenTerms, []); XCTAssertEqual(context.screenOmitted, 2)
+        XCTAssertEqual(context.omitted, 0)
+        // One long term uses 5,992 of 6,000 bytes: room for "Fits" (6 bytes) and then nothing else.
+        let long = AppVocabulary(words: String(repeating: "x", count: 5_990))
+        let bytes = VocabularyProjection.make(long, for: .context, screenTerms: ["TooLongForRoom", "Fits", "Ok"])
+        XCTAssertEqual(bytes.screenTerms, ["Fits"]); XCTAssertEqual(bytes.screenOmitted, 2)
+        let weighted = VocabularyProjection.make(AppVocabulary(), for: .weighted,
+            screenTerms: ["one two three four five six seven eight", "十六个汉字十六个汉字十六个汉字十", "短语"])
+        XCTAssertEqual(weighted.weighted, ["短语": 1]); XCTAssertEqual(weighted.screenOmitted, 2)
+    }
+}

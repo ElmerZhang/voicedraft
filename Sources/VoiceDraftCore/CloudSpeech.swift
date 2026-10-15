@@ -51,7 +51,8 @@ public enum WaveAudio {
 }
 
 public enum WhisperRequests {
-    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary, boundary: String = UUID().uuidString) throws -> URLRequest {
+    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary, boundary: String = UUID().uuidString,
+                              screenTerms: [String] = []) throws -> URLRequest {
         try profile.validateForInference(); try QwenRequests.validateAudio(wav)
         guard profile.adapter == .whisper else { throw FeatureError("Choose the Whisper protocol.") }
         let extras = try profile.modelParameters()
@@ -61,8 +62,8 @@ public enum WhisperRequests {
             guard value is String || value is NSNumber else { throw FeatureError("Whisper options must be strings or numbers.") }
             fields[name] = String(describing: value)
         }
-        let context = VocabularyProjection.make(vocabulary, for: .context).context
-        if !context.isEmpty { fields["prompt"] = [fields["prompt"] ?? "", String(context.prefix(1800))].filter { !$0.isEmpty }.joined(separator: "\n") }
+        let context = promptTerms(VocabularyProjection.make(vocabulary, for: .context, screenTerms: screenTerms).terms, limit: 1800)
+        if !context.isEmpty { fields["prompt"] = [fields["prompt"] ?? "", context].filter { !$0.isEmpty }.joined(separator: "\n") }
         var body = Data()
         for name in fields.keys.sorted() {
             body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(fields[name]!)\r\n".utf8))
@@ -75,6 +76,16 @@ public enum WhisperRequests {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         return request
     }
+    /// Joins whole terms with ", " up to `limit` characters; a term is never cut.
+    static func promptTerms(_ terms: [String], limit: Int) -> String {
+        var result = ""
+        for term in terms {
+            let candidate = result.isEmpty ? term : result + ", " + term
+            guard candidate.count <= limit else { break }
+            result = candidate
+        }
+        return result
+    }
     public static func parse(_ data: Data) throws -> String {
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let text = object["text"] as? String else { throw FeatureError("Whisper returned an unexpected response.") }
         return try SpeechClient.transcript(text)
@@ -82,7 +93,8 @@ public enum WhisperRequests {
 }
 
 public enum GoogleSpeech {
-    public static func request(profile: ModelProfile, token: String, pcm: Data, vocabulary: AppVocabulary) throws -> URLRequest {
+    public static func request(profile: ModelProfile, token: String, pcm: Data, vocabulary: AppVocabulary,
+                               screenTerms: [String] = []) throws -> URLRequest {
         try profile.validateForInference()
         guard pcm.count <= 1_600_000 else { throw FeatureError("Google inline audio chunks must be shorter than 60 seconds.") }
         let extras = try profile.modelParameters()
@@ -90,7 +102,7 @@ public enum GoogleSpeech {
         var config: [String: Any] = ["autoDecodingConfig": [:], "model": profile.model,
             "languageCodes": extras["languageCodes"] ?? ["cmn-Hans-CN"]]
         if let features = extras["features"] { config["features"] = features }
-        let words = VocabularyProjection.make(vocabulary, for: .context).terms
+        let words = VocabularyProjection.make(vocabulary, for: .context, screenTerms: screenTerms).terms
         if !words.isEmpty { config["adaptation"] = ["phraseSets": [["inlinePhraseSet": ["phrases": words.prefix(100).map { ["value": $0] }]]]] }
         var request = URLRequest(url: try Endpoint.validate(profile.endpoint), timeoutInterval: 120)
         request.httpMethod = "POST"
@@ -104,13 +116,14 @@ public enum GoogleSpeech {
         // Silence is legal for an individual chunk; require a nonempty combined transcript later.
         return (root["results"] as? [[String: Any]] ?? []).compactMap { ($0["alternatives"] as? [[String: Any]])?.first?["transcript"] as? String }.joined(separator: "\n")
     }
-    public static func transcribe(profile: ModelProfile, credential: String, wav: Data, vocabulary: AppVocabulary) async throws -> String {
+    public static func transcribe(profile: ModelProfile, credential: String, wav: Data, vocabulary: AppVocabulary,
+                                  screenTerms: [String] = []) async throws -> String {
         let pcm = try WaveAudio.decode(wav)
         let token = try await GoogleCredential.accessToken(credential)
         var texts: [String] = []
         for chunk in WaveAudio.chunks(pcm) {
             try Task.checkCancellation()
-            let (data, response) = try await HTTPTransport().send(request(profile: profile, token: token, pcm: chunk, vocabulary: vocabulary))
+            let (data, response) = try await HTTPTransport().send(request(profile: profile, token: token, pcm: chunk, vocabulary: vocabulary, screenTerms: screenTerms))
             try ProviderFailure.check(data, response: response)
             texts.append(try parse(data))
         }

@@ -101,26 +101,6 @@ public enum ContextVocabulary {
     }
 
     static func terms(in source: String) throws -> [String] {
-        var text = source
-        // Avoid lines containing credentials/URLs and cap the proposed list. The user reviews every import.
-        text = text.components(separatedBy: .newlines).filter { line in
-            !["api_key", "api-key", "secret", "password", "bearer ", "private key", "token=", "https://", "http://"].contains { line.lowercased().contains($0) }
-        }.joined(separator: "\n")
-        let pattern = #"(?<![A-Za-z0-9_-])(?:[A-Z][a-z]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]{2,12}|[A-Za-z]{2,20}_[A-Za-z_]{2,30})(?![A-Za-z0-9_-])"#
-        let regex = try NSRegularExpression(pattern: pattern)
-        let range = NSRange(text.startIndex..., in: text)
-        var counts: [String: Int] = [:]
-        for match in regex.matches(in: text, range: range) {
-            guard let range = Range(match.range, in: text) else { continue }
-            let term = String(text[range])
-            if (2...64).contains(term.count) { counts[term, default: 0] += 1 }
-        }
-        // Quoted local terminology also covers Chinese product/project names.
-        let quoted = try NSRegularExpression(pattern: #"[`「『]([\p{Han}A-Za-z0-9_]{2,24})[`」』]"#)
-        for match in quoted.matches(in: text, range: range) {
-            guard let termRange = Range(match.range(at: 1), in: text) else { continue }
-            counts[String(text[termRange]), default: 0] += 1
-        }
-        return Array(counts.keys.sorted { counts[$0] == counts[$1] ? $0 < $1 : counts[$0]! > counts[$1]! }.prefix(200))
+        try TermExtractor.candidates(in: source, options: .agentContext).map(\.text)
     }
 }

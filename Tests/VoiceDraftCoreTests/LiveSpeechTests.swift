@@ -297,3 +297,67 @@ final class PCM16AudioTests: XCTestCase {
         XCTAssertThrowsError(try PCM16Audio.data(from: buffer(flags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsBigEndian)))
     }
 }
+
+private final class EventLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String] = []
+    func append(_ item: String) { lock.withLock { items.append(item) } }
+    var all: [String] { lock.withLock { items } }
+}
+
+// On-screen context: the start frame is built by an awaited provider after the socket exists.
+extension LiveSpeechTests {
+    func testStartBuilderIsAwaitedBeforeSendAndSlowBuilderKeepsReadyAfterAcknowledgement() async throws {
+        let socket = LiveFixtureSocket(), feed = LiveAudioFeed(), log = EventLog()
+        socket.onStart = { log.append("run-task sent") }
+        socket.onFinish = {
+            socket.publish("result-generated", sentence: ["sentence_id": 1, "text": "Fixture text.", "sentence_end": true])
+            socket.publish("task-finished")
+        }
+        let profile = profile()
+        let text = try await MessageASRSession.transcribeLive(socket: socket, start: {
+            log.append("builder start")
+            try await Task.sleep(nanoseconds: 50_000_000)
+            log.append("builder done")
+            return try MessageASRRequests.start(profile: profile, vocabulary: AppVocabulary(), taskID: socket.id, live: true, screenTerms: ["ScreenKit"])
+        }, audio: feed.stream, taskID: socket.id, startTimeout: 2_000_000_000, finishTimeout: 2_000_000_000, totalTimeout: 3_000_000_000,
+        onReady: {
+            log.append("ready")
+            try feed.append(Data(repeating: 0, count: 3200)); try feed.finish()
+        }, onUpdate: { _ in })
+        XCTAssertEqual(text, "Fixture text.")
+        XCTAssertEqual(log.all, ["builder start", "builder done", "run-task sent", "ready"])
+        XCTAssertEqual(socket.state.sent, ["run-task", "audio", "finish-task"])
+    }
+
+    func testCancelledStartBuilderClosesSocketWithoutSending() async throws {
+        let socket = LiveFixtureSocket(), feed = LiveAudioFeed(), entered = expectation(description: "builder")
+        let operation = Task {
+            try await MessageASRSession.transcribeLive(socket: socket, start: {
+                entered.fulfill()
+                try await Task.sleep(nanoseconds: 60_000_000_000)
+                return "unused"
+            }, audio: feed.stream, taskID: socket.id, onReady: { XCTFail("Not ready without a start frame") }, onUpdate: { _ in })
+        }
+        await fulfillment(of: [entered], timeout: 1)
+        operation.cancel()
+        do { _ = try await operation.value; XCTFail("Cancellation returned success") }
+        catch { XCTAssertTrue(error is CancellationError, "\(error)") }
+        XCTAssertTrue(socket.state.closed)
+        XCTAssertEqual(socket.state.sent, [])
+    }
+
+    func testStartBuilderDeadlineStillApplies() async throws {
+        let socket = LiveFixtureSocket(), feed = LiveAudioFeed()
+        do {
+            _ = try await MessageASRSession.transcribeLive(socket: socket, start: {
+                try await Task.sleep(nanoseconds: 60_000_000_000); return "unused"
+            }, audio: feed.stream, taskID: socket.id, startTimeout: 50_000_000, onUpdate: { _ in })
+            XCTFail("Expected the start deadline")
+        } catch {
+            XCTAssertFalse(error is CancellationError)
+        }
+        XCTAssertTrue(socket.state.closed)
+        XCTAssertEqual(socket.state.sent, [])
+    }
+}

@@ -190,10 +190,26 @@ public struct DesktopOptions: Codable, Equatable {
     public var updateFeed = ""
     public var updatePublicKey = ""
     public var automaticUpdates = false
+    /// On-screen context master switch ("Use on-screen text as context").
+    public var screenContext = false
+    /// Recognition hints consumer; effective only with `screenContext`.
+    public var screenContextASR = true
+    /// Writing reference consumer; effective only with `screenContext`.
+    public var screenContextWriting = true
+    /// Window OCR fallback; effective only with `screenContext` and Screen Recording.
+    public var screenContextOCR = false
+    /// User-added exclusions. Built-ins are `ScreenContextPolicy.builtInExcludedBundleIDs`.
+    public var screenContextExcludedApps: [String] = []
     public init() {}
     private enum CodingKeys: String, CodingKey {
         case shortcuts, additionalShortcuts, sounds, muteOutput, retainAudio, retentionDays, recentContext
         case onboardingCompleted, updateFeed, updatePublicKey, automaticUpdates
+        case screenContext, screenContextASR, screenContextWriting, screenContextOCR, screenContextExcludedApps
+    }
+    /// Non-string exclusion entries are dropped rather than failing the file.
+    private struct LossyString: Decodable {
+        let value: String?
+        init(from decoder: Decoder) throws { value = try? decoder.singleValueContainer().decode(String.self) }
     }
     /// Unknown actions written by a newer build are skipped rather than failing the file.
     private struct LossyBinding: Decodable {
@@ -216,6 +232,14 @@ public struct DesktopOptions: Codable, Equatable {
         updateFeed = try c.decodeIfPresent(String.self, forKey: .updateFeed) ?? ""
         updatePublicKey = try c.decodeIfPresent(String.self, forKey: .updatePublicKey) ?? ""
         automaticUpdates = try c.decodeIfPresent(Bool.self, forKey: .automaticUpdates) ?? false
+        // Screen context fields decode leniently: a malformed value falls back to
+        // the privacy-safe default instead of making device.json unreadable.
+        screenContext = (try? c.decodeIfPresent(Bool.self, forKey: .screenContext)) ?? false
+        screenContextASR = (try? c.decodeIfPresent(Bool.self, forKey: .screenContextASR)) ?? true
+        screenContextWriting = (try? c.decodeIfPresent(Bool.self, forKey: .screenContextWriting)) ?? true
+        screenContextOCR = (try? c.decodeIfPresent(Bool.self, forKey: .screenContextOCR)) ?? false
+        let exclusions = (try? c.decodeIfPresent([LossyString].self, forKey: .screenContextExcludedApps)) ?? nil
+        screenContextExcludedApps = ScreenContextPolicy.sanitizedExclusions((exclusions ?? []).compactMap(\.value))
     }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -228,7 +252,12 @@ public struct DesktopOptions: Codable, Equatable {
         try c.encode(recentContext, forKey: .recentContext); try c.encode(onboardingCompleted, forKey: .onboardingCompleted)
         try c.encode(updateFeed, forKey: .updateFeed); try c.encode(updatePublicKey, forKey: .updatePublicKey)
         try c.encode(automaticUpdates, forKey: .automaticUpdates)
+        try c.encode(screenContext, forKey: .screenContext); try c.encode(screenContextASR, forKey: .screenContextASR)
+        try c.encode(screenContextWriting, forKey: .screenContextWriting); try c.encode(screenContextOCR, forKey: .screenContextOCR)
+        try c.encode(screenContextExcludedApps, forKey: .screenContextExcludedApps)
     }
+    /// Screen context fields are sanitized at decode and never throw here:
+    /// `DeviceSettings` validates on decode, so a throw would lose the whole file.
     public func validate() throws {
         try ShortcutBinding.validate(shortcuts)
         guard [0, 1, 7, 30, 90].contains(retentionDays) else { throw FeatureError("Choose a supported history retention period.") }

@@ -13,7 +13,9 @@ public enum SpeechClient {
         return text
     }
 
-    public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) async throws -> String {
+    /// `screenTerms` are temporary on-screen recognition hints with the lowest priority.
+    public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary,
+                                  screenTerms: [String] = []) async throws -> String {
         try profile.validateForInference()
         try QwenRequests.validateAudio(wav)
         // These Qwen HTTP models accept at most five minutes / 10 MB per request.
@@ -24,7 +26,7 @@ public enum SpeechClient {
             for chunk in chunks {
                 try Task.checkCancellation()
                 do {
-                    transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary))
+                    transcripts.append(try await transcribe(profile: profile, key: key, wav: WaveAudio.encode(chunk), vocabulary: vocabulary, screenTerms: screenTerms))
                 } catch SpeechRecognitionError.noSpeech {
                     // A silent chunk must not discard speech in the other chunks.
                     continue
@@ -34,28 +36,28 @@ public enum SpeechClient {
         }
         switch profile.adapter {
         case .whisper:
-            let request = try WhisperRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
+            let request = try WhisperRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
             return try WhisperRequests.parse(data)
         case .googleSpeech:
-            return try await GoogleSpeech.transcribe(profile: profile, credential: key, wav: wav, vocabulary: vocabulary)
+            return try await GoogleSpeech.transcribe(profile: profile, credential: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
         case .doubao:
-            return try await DoubaoSpeech.transcribe(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
+            return try await DoubaoSpeech.transcribe(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
         case .qwenChatSpeech:
-            let request = try QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
+            let request = try QwenRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
             return try QwenRequests.parseSpeech(data)
         case .qwenAudioHTTP:
-            let request = try AudioHTTPRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary)
+            let request = try AudioHTTPRequests.speech(profile: profile, key: key, wav: wav, vocabulary: vocabulary, screenTerms: screenTerms)
             let (data, response) = try await HTTPTransport().send(request)
             try ProviderFailure.check(data, response: response)
             return try AudioHTTPRequests.parse(data)
         case .qwenMessageWebSocket:
             let request = try MessageASRRequests.connection(profile: profile, key: key)
             let taskID = UUID().uuidString
-            let start = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID)
+            let start = try MessageASRRequests.start(profile: profile, vocabulary: vocabulary, taskID: taskID, screenTerms: screenTerms)
             try QwenRequests.validateAudio(wav)
             let socket = NativeASRWebSocket(request: request)
             return try await MessageASRSession.transcribe(socket: socket, start: start, wav: wav, taskID: taskID)
@@ -65,14 +67,15 @@ public enum SpeechClient {
 }
 
 public enum AudioHTTPRequests {
-    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) throws -> URLRequest {
+    public static func speech(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary,
+                              screenTerms: [String] = []) throws -> URLRequest {
         try profile.validateForInference()
         guard profile.adapter == .qwenAudioHTTP else { throw VoiceDraftError.message("This model does not use the Qwen Audio HTTP adapter.") }
         try QwenRequests.validateAudio(wav)
         var parameters = try profile.modelParameters()
         parameters["format"] = "wav"; parameters["sample_rate"] = "16000"
         try vocabulary.validate()
-        let words = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability).weighted
+        let words = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability, screenTerms: screenTerms).weighted
         if !words.isEmpty { parameters["vocabulary"] = words }
         let body: [String: Any] = ["input": ["messages": [["role": "user", "content": [
             ["type": "input_audio", "input_audio": ["data": "data:audio/wav;base64,\(wav.base64EncodedString())"]]
@@ -98,7 +101,8 @@ public enum MessageASRRequests {
         request.setValue("Bearer \(try QwenRequests.validKey(key, name: profile.name))", forHTTPHeaderField: "Authorization")
         return request
     }
-    public static func start(profile: ModelProfile, vocabulary: AppVocabulary, taskID: String, live: Bool = false) throws -> String {
+    public static func start(profile: ModelProfile, vocabulary: AppVocabulary, taskID: String, live: Bool = false,
+                             screenTerms: [String] = []) throws -> String {
         try profile.validateForInference()
         guard profile.adapter == .qwenMessageWebSocket else { throw VoiceDraftError.message("Choose a Message speech model.") }
         var parameters = try profile.modelParameters()
@@ -110,7 +114,7 @@ public enum MessageASRRequests {
             parameters["disfluency_removal_enabled"] = false
         }
         try vocabulary.validate()
-        let projection = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability)
+        let projection = VocabularyProjection.make(vocabulary, for: profile.vocabularyCapability, screenTerms: screenTerms)
         if !projection.weighted.isEmpty { parameters["vocabulary"] = projection.weighted }
         // Message ASR accepts a user domain word list as context (400 characters
         // per turn). Reinforce manual spellings here; automatic terms still
@@ -118,6 +122,13 @@ public enum MessageASRRequests {
         var contextTerms: [String] = [], contextSize = 0
         let manualTerms = Set(vocabulary.entries.filter { $0.enabled && $0.origin == .manual }.map { $0.normalized.text })
         for term in projection.terms where manualTerms.contains(term) {
+            let added = term.unicodeScalars.count + (contextTerms.isEmpty ? 0 : 2)
+            guard contextSize + added <= 400 else { continue }
+            contextTerms.append(term); contextSize += added
+        }
+        // On-screen terms are current-context evidence: they take whatever room
+        // manual terms leave. Automatic vocabulary is still not reinforced here.
+        for term in projection.screenTerms {
             let added = term.unicodeScalars.count + (contextTerms.isEmpty ? 0 : 2)
             guard contextSize + added <= 400 else { continue }
             contextTerms.append(term); contextSize += added

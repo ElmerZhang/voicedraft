@@ -7,12 +7,13 @@ public enum DoubaoWire {
         var length = UInt32(data.count).bigEndian
         result.append(Data(bytes: &length, count: 4)); result.append(data); return result
     }
-    public static func start(profile: ModelProfile, vocabulary: AppVocabulary) throws -> Data {
+    /// Hotwords hold vocabulary first, then on-screen terms, up to 100.
+    public static func start(profile: ModelProfile, vocabulary: AppVocabulary, screenTerms: [String] = []) throws -> Data {
         let extras = try profile.modelParameters()
         guard Set(extras.keys).isSubset(of: ["resource_id", "app_id", "language", "enable_itn", "enable_punc"]) else { throw FeatureError("Doubao options: resource_id, app_id, language, enable_itn, enable_punc.") }
         var request: [String: Any] = ["model_name": profile.model, "enable_itn": extras["enable_itn"] ?? true,
             "enable_punc": extras["enable_punc"] ?? true, "enable_ddc": false, "show_utterances": true, "result_type": "full"]
-        let words = VocabularyProjection.make(vocabulary, for: .context).terms
+        let words = VocabularyProjection.make(vocabulary, for: .context, screenTerms: screenTerms).terms
         if !words.isEmpty {
             let context = try JSONSerialization.data(withJSONObject: ["hotwords": words.prefix(100).map { ["word": $0] }])
             request["corpus"] = ["context": String(decoding: context, as: UTF8.self)]
@@ -79,24 +80,32 @@ public enum DoubaoSpeech {
         request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Api-Connect-Id")
         return request
     }
-    public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary) async throws -> String {
+    public static func transcribe(profile: ModelProfile, key: String, wav: Data, vocabulary: AppVocabulary,
+                                  screenTerms: [String] = []) async throws -> String {
         let pcm = try WaveAudio.decode(wav)
         let audio = AsyncThrowingStream<Data, Error> { continuation in
             // Historical audio is finite and already bounded; live capture uses the backpressure feed.
             for offset in stride(from: 0, to: pcm.count, by: 3200) { continuation.yield(Data(pcm[offset..<min(offset + 3200, pcm.count)])) }
             continuation.finish()
         }
-        return try await live(profile: profile, key: key, audio: audio, vocabulary: vocabulary, paced: true, onReady: {}, onUpdate: { _ in })
+        return try await live(profile: profile, key: key, audio: audio, vocabulary: vocabulary, paced: true,
+                              screenTerms: { screenTerms }, onReady: {}, onUpdate: { _ in })
     }
     public static func live(profile: ModelProfile, key: String, audio: AsyncThrowingStream<Data, Error>, vocabulary: AppVocabulary,
-                            paced: Bool = false, onReady: @escaping @Sendable () async throws -> Void,
+                            paced: Bool = false, screenTerms: @escaping @Sendable () async -> [String] = { [] },
+                            onReady: @escaping @Sendable () async throws -> Void,
                             onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
-        let start = try DoubaoWire.start(profile: profile, vocabulary: vocabulary)
+        // Configuration errors still throw before any socket opens.
+        _ = try DoubaoWire.start(profile: profile, vocabulary: vocabulary)
         let client = DoubaoConnection(request: try connection(profile: profile, key: key))
         return try await withTaskCancellationHandler {
             defer { client.cancel() }
             return try await withThrowingTaskGroup(of: String?.self) { group in
                 group.addTask {
+                    // The handshake is already in flight; await the gated terms provider, then build the frame.
+                    let terms = await screenTerms()
+                    try Task.checkCancellation()
+                    let start = try DoubaoWire.start(profile: profile, vocabulary: vocabulary, screenTerms: terms)
                     try await client.socket.send(.data(start))
                     try await onReady()
                     var pending = Data()

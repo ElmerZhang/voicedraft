@@ -95,11 +95,13 @@ public enum VocabularyLearning {
 public struct VocabularyDiscoveryTracker {
     private var observations: [String: UUID] = [:]
     public init() {}
-    public mutating func confirmed(_ terms: [String], takeID: UUID) -> [String] {
+    /// `excluding` holds `automaticTermKey` values (for example a take's on-screen
+    /// terms) that are neither observed nor promoted for this take.
+    public mutating func confirmed(_ terms: [String], takeID: UUID, excluding: Set<String> = []) -> [String] {
         var result: [String] = [], seen = Set<String>()
         for term in terms {
             let key = AppVocabulary.automaticTermKey(term)
-            guard VocabularyLearning.isTerm(term), seen.insert(key).inserted else { continue }
+            guard VocabularyLearning.isTerm(term), !excluding.contains(key), seen.insert(key).inserted else { continue }
             if let previous = observations[key], previous != takeID { result.append(term) }
             else if observations.count < 1_000 { observations[key] = takeID }
         }

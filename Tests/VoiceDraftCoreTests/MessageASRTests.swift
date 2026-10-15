@@ -196,3 +196,34 @@ final class MessageASRTests: XCTestCase {
         }
     }
 }
+
+// On-screen context terms in the Message start frame.
+extension MessageASRTests {
+    private func startPayload(_ vocabulary: AppVocabulary, screenTerms: [String]) throws -> (vocabulary: [String: Int]?, context: String?) {
+        let text = try MessageASRRequests.start(profile: profile(), vocabulary: vocabulary, taskID: "fixture", screenTerms: screenTerms)
+        let root = try JSONSerialization.jsonObject(with: Data(text.utf8)) as! [String: Any]
+        let payload = root["payload"] as! [String: Any]
+        let parameters = payload["parameters"] as! [String: Any]
+        let context = ((((payload["input"] as? [String: Any])?["context"] as? [[String: Any]])?.first?["content"] as? [[String: Any]])?.first?["text"]) as? String
+        return (parameters["vocabulary"] as? [String: Int], context)
+    }
+
+    func testScreenTermsUseWeightOneAndFollowManualContextWithoutReinforcingAutomaticTerms() throws {
+        var vocabulary = AppVocabulary(words: "ManualKit")
+        var automatic = VocabularyEntry(text: "AutoKit"); automatic.origin = .automatic
+        vocabulary.entries.append(automatic)
+        let result = try startPayload(vocabulary, screenTerms: ["ScreenKit", "manualkit", "SecondScreen"])
+        XCTAssertEqual(result.vocabulary, ["ManualKit": 3, "AutoKit": 2, "ScreenKit": 1, "SecondScreen": 1])
+        XCTAssertEqual(result.context, "ManualKit, ScreenKit, SecondScreen")
+        XCTAssertEqual(try startPayload(vocabulary, screenTerms: []).context, "ManualKit")
+    }
+
+    func testScreenContextTakesOnlyTheLeftoverOf400Scalars() throws {
+        let manual = String(repeating: "m", count: 380)
+        let result = try startPayload(AppVocabulary(words: manual), screenTerms: ["LongScreenTermValue1234", "Ok12"])
+        XCTAssertEqual(result.context, manual + ", Ok12")
+        XCTAssertEqual(result.vocabulary?["LongScreenTermValue1234"], 1, "weighted hints are independent of the context budget")
+        let screenOnly = try startPayload(AppVocabulary(), screenTerms: ["ScreenKit"])
+        XCTAssertEqual(screenOnly.context, "ScreenKit")
+    }
+}

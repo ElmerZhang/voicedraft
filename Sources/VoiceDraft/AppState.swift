@@ -104,7 +104,8 @@ final class AppState: ObservableObject {
     private var generation = UUID()
     private var target: InputTarget?
     private var runSettings: SharedSettings?
-    private var runMode: WritingMode = .polish
+    /// The running take's mode; the compact HUD shows it while recording.
+    @Published private(set) var runMode: WritingMode = .polish
     private var runSelection = ""
     private var runSpeechKey = ""
     private var runWritingKey = ""
@@ -819,12 +820,15 @@ extension AppState {
         showingOnboarding = false
     }
     func shortcutEvent(_ action: ShortcutAction, down: Bool) {
-        if action == .insertLast {
+        // A held Fn chord retargeted to a non-recording action still finishes
+        // its take on release, so that release takes the gesture path below.
+        let releasesTake = !down && heldAction == action
+        if action == .insertLast, !releasesTake {
             // Act on release; the modifiers are then awaited separately before pasting.
             if !down { insertLastResult() }
             return
         }
-        if action == .styleSelection {
+        if action == .styleSelection, !releasesTake {
             if down && !busy { chooseSelectionStyle?() }
             return
         }
@@ -842,11 +846,30 @@ extension AppState {
         switch effect {
         case .none: break
         case .start:
-            let mode: WritingMode = action == .translate ? .translate : action == .edit ? .edit : action == .ask ? .ask : .polish
-            toggle(mode: mode, external: true)
+            toggle(mode: action.recordingMode ?? .polish, external: true)
         case .finish:
             if phase == "starting" { finishWhenReady = true } else { finish() }
         }
+    }
+    /// The held Fn chord now selects `to` while the take started by `from` is
+    /// still held (see `FnChordTracker`). The held key always moves to `to`, so
+    /// Fn's release finishes the take. The mode changes only while the take is
+    /// starting or recording and `TakeRetargetPolicy` allows it; otherwise the
+    /// current mode stays and a refused switch explains itself in `status`.
+    /// Audio, screen context, HUD, gesture timing and `generation` continue.
+    /// A tap-locked take has no held key, so it never retargets.
+    func retargetShortcut(from: ShortcutAction, to: ShortcutAction) {
+        guard heldAction == from, from != to else { return }
+        heldAction = to
+        guard phase == "starting" || recording, let mode = to.recordingMode, mode != runMode else { return }
+        switch TakeRetargetPolicy.problem(to: to, selection: runSelection, writingKey: runWritingKey) {
+        case .needsSelection?: status = "Select text in the destination app before using Edit selection."; return
+        case .needsWritingKey?: status = "Add an API key for the writing model first."; return
+        case .notRecording?: return
+        case nil: break
+        }
+        runMode = mode; self.mode = mode
+        screenContext.retarget(take: generation, mode: mode)
     }
     /// Inserts the last result (`result`, from a recording or Studio) again into
     /// whichever input is focused now, through the normal insertion pipeline.

@@ -119,7 +119,7 @@
 "Use Fn alone" = "單獨使用 Fn";
 "Use default shortcut (%@)" = "使用預設快速鍵（%@）";
 "Press keys · Esc cancels" = "請按鍵 · Esc 取消";
-"Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn 可以單獨使用，也可以與 Shift、Control、Option 或 Command 組合：先按住修飾鍵，再按 Fn。macOS 保留了 🌐 與字母鍵的組合，因此不支援 Fn 加字母鍵。";
+"Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts." = "Fn 可以單獨使用，也可以與 Shift、Control、Option 或 Command 組合，修飾鍵在 Fn 之前或之後按下均可。按住 Fn 時，再按下修飾鍵會把目前的錄音切換到對應的快速鍵。macOS 保留了 🌐 與字母鍵的組合，因此不支援 Fn 加字母鍵。";
 "Restore default shortcuts" = "恢復預設快速鍵";
 "Add Control, Option or Command, or use Fn" = "請加上 Control、Option 或 Command，或使用 Fn";
 "Already used by %@" = "已被「%@」使用";

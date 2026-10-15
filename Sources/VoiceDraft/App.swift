@@ -113,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         DispatchQueue.main.async { [weak self] in self?.updateMainMenu() }
         shortcuts.onEvent = { [weak self] action, down in self?.state.shortcutEvent(action, down: down) }
+        shortcuts.onRetarget = { [weak self] from, to in self?.state.retargetShortcut(from: from, to: to) }
         escapeCancellation.onCancel = { [weak self] in
             guard let self else { return false }
             return self.state.handleEscape(hudVisible: self.hudShown)

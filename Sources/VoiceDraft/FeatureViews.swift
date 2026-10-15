@@ -111,7 +111,7 @@ struct ShortcutPreferences: View {
                     }
                 }
             }
-            Text(D("Fn works alone or with Shift, Control, Option or Command: hold the modifier, then press Fn. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts."))
+            Text(D("Fn works alone or with Shift, Control, Option or Command, pressed before or after Fn. While Fn is held, adding a modifier switches the recording to that shortcut. Fn with letter keys is not available because macOS reserves those 🌐 shortcuts."))
                 .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()

@@ -23,6 +23,37 @@ public enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
     /// device file) and accept at most five bindings, so newer actions are
     /// stored under a separate key that older builds ignore.
     static let legacy: Set<ShortcutAction> = [.dictate, .translate, .edit, .ask, .styleSelection]
+    /// The writing mode a take started or retargeted by this action uses; nil
+    /// for actions that never record (style selection, insert last result).
+    public var recordingMode: WritingMode? {
+        switch self {
+        case .dictate: return .polish
+        case .translate: return .translate
+        case .edit: return .edit
+        case .ask: return .ask
+        case .styleSelection, .insertLast: return nil
+        }
+    }
+}
+
+/// Whether a running take may switch to another recording action while its
+/// Fn chord is still held (see `FnChordTracker`). Mirrors the mode checks a
+/// take makes when it starts; the caller keeps the current mode on a problem.
+public enum TakeRetargetPolicy {
+    public enum Problem: Equatable {
+        /// The action does not record (style selection, insert last result).
+        case notRecording
+        /// Edit selection needs text selected when the take started.
+        case needsSelection
+        /// Non-verbatim modes need a writing-model key.
+        case needsWritingKey
+    }
+    public static func problem(to action: ShortcutAction, selection: String, writingKey: String) -> Problem? {
+        guard let mode = action.recordingMode else { return .notRecording }
+        if mode != .verbatim, writingKey.isEmpty { return .needsWritingKey }
+        if mode == .edit, selection.isEmpty { return .needsSelection }
+        return nil
+    }
 }
 
 public struct ShortcutBinding: Codable, Equatable, Identifiable {
@@ -110,26 +141,37 @@ public struct ShortcutBinding: Codable, Equatable, Identifiable {
     }
 }
 
-/// Turns Fn (Globe) `flagsChanged` observations into shortcut press and
-/// release events for bindings whose key is Fn, alone or in a chord.
+/// Turns Fn (Globe) `flagsChanged` observations into shortcut press, release
+/// and retarget events for bindings whose key is Fn, alone or in a chord.
 ///
 /// - Activation needs Fn held, no active chord, and `armed`. It picks the
-///   enabled Fn binding whose modifiers equal the held set exactly, so
-///   "hold Shift, then press Fn" and "press Fn, then add Shift" both select
-///   Fn-Shift (the latter only when no Fn-alone binding claimed the press).
-/// - An active chord stays down while Fn and the binding's own modifiers stay
-///   held; extra modifiers do not cancel it. Otherwise it is released.
-/// - Any release disarms until Fn is fully let go, so releasing Shift while
-///   still holding Fn never starts the Fn-alone action.
+///   enabled Fn binding whose modifiers equal the held set exactly, at Fn's
+///   press or when a modifier is added while Fn is held and nothing is active.
+/// - While Fn stays held, a modifier press that completes another enabled Fn
+///   binding exactly emits `.retarget(from:)` for it (no release or press), at
+///   any time during the hold. Modifier releases never emit anything, so
+///   letting go of Shift just before Fn keeps a promoted take. A set that
+///   matches nothing keeps the current action and never ends a take.
+/// - Only Fn's release sends the release, for whatever action is current.
+/// - A new activation needs Fn released and pressed again. `armed` is false
+///   only while Fn stays held after the active binding stopped being bound.
 public struct FnChordTracker: Equatable {
     public struct Event: Equatable {
+        public enum Kind: Equatable {
+            case down, up
+            /// The held chord now selects `action`; the take started by `from` continues.
+            case retarget(from: ShortcutAction)
+        }
         public let action: ShortcutAction
-        public let down: Bool
-        public init(_ action: ShortcutAction, down: Bool) { self.action = action; self.down = down }
+        public let kind: Kind
+        public init(_ action: ShortcutAction, down: Bool) { self.action = action; kind = down ? .down : .up }
+        public init(_ action: ShortcutAction, kind: Kind) { self.action = action; self.kind = kind }
+        public static func retarget(from: ShortcutAction, to: ShortcutAction) -> Self { .init(to, kind: .retarget(from: from)) }
     }
     public private(set) var active: ShortcutAction?
     public private(set) var armed = true
-    private var activeModifiers: UInt32 = 0
+    /// Modifiers held at the previous observation, to tell press edges from releases.
+    private var previous: UInt32 = 0
     public init() {}
 
     /// - Parameters:
@@ -138,19 +180,24 @@ public struct FnChordTracker: Equatable {
     ///   - bindings: all bindings; only enabled Fn bindings are considered.
     public mutating func observe(fnHeld: Bool, modifiers: UInt32, bindings: [ShortcutBinding]) -> [Event] {
         let held = modifiers & 15
-        var events: [Event] = []
+        // A press edge: the held set grew (strict superset of the previous one).
+        let pressedModifier = held != previous && held & previous == previous
+        previous = held
+        let match = bindings.first { $0.enabled && $0.isFn && $0.modifiers == held }
         if let action = active {
             let stillBound = bindings.contains { $0.action == action && $0.enabled && $0.isFn }
-            if fnHeld && stillBound && held & activeModifiers == activeModifiers { return [] }
-            events.append(Event(action, down: false))
-            active = nil; activeModifiers = 0; armed = false
+            if fnHeld && stillBound {
+                guard pressedModifier, let match, match.action != action else { return [] }
+                active = match.action
+                return [.retarget(from: action, to: match.action)]
+            }
+            active = nil; armed = !fnHeld
+            return [Event(action, down: false)]
         }
-        guard fnHeld else { armed = true; return events }
-        if armed, let binding = bindings.first(where: { $0.enabled && $0.isFn && $0.modifiers == held }) {
-            active = binding.action; activeModifiers = binding.modifiers
-            events.append(Event(binding.action, down: true))
-        }
-        return events
+        guard fnHeld else { armed = true; return [] }
+        guard armed, let match else { return [] }
+        active = match.action
+        return [Event(match.action, down: true)]
     }
 
     public mutating func reset() { self = Self() }

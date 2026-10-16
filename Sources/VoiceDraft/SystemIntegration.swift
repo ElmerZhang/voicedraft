@@ -43,45 +43,91 @@ enum TextInsertion {
     static func capture(ignoring shortcuts: [ShortcutBinding] = [], trackOpaqueFocus: Bool = false) -> InputTarget? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
+        return classify(app, ignoring: shortcuts, trackOpaqueFocus: trackOpaqueFocus, trace: nil)
+    }
+    /// The classification behind `capture` for one running app. With `trace`
+    /// nil (every production call) a failed guard returns nil; with a trace (the
+    /// `VOICEDRAFT_PROBE_INPUT` diagnostic only) each decision is reported as a
+    /// key/value pair and the failed guards are reported instead of stopping.
+    /// Traced values are roles, flags and lengths, never text content.
+    static func classify(_ app: NSRunningApplication, ignoring shortcuts: [ShortcutBinding] = [],
+                         trackOpaqueFocus: Bool = false, trace: ((String, String) -> Void)?) -> InputTarget? {
+        func report(_ key: String, _ value: @autoclosure () -> String) { trace?(key, value()) }
+        func describe(_ c: TextInputCapabilities?) -> String {
+            guard let c else { return "nil" }
+            return "role=\(c.role) capability=\(c.capability) enabled=\(c.enabled) secure=\(c.secure) "
+                + "canReplaceSelection=\(c.canReplaceSelection) canSetValue=\(c.canSetValue) "
+                + "canSetSelectionRange=\(c.canSetSelectionRange) acceptsInsertion=\(c.acceptsInsertion)"
+        }
         let root = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(root, 0.1)
         var (rawFocus, focused, editor) = resolveFocus(root)
-        if enableElectronAccessibility(app, root: root, candidate: editor ?? focused) {
+        report("resolveFocus.initial", "raw=\(rawFocus != nil) focused=\(focused != nil) editor=\(editor != nil)")
+        let electronRetried = enableElectronAccessibility(app, root: root, candidate: editor ?? focused)
+        report("electronAccessibility.enabledAndRetried", "\(electronRetried)")
+        if electronRetried {
             (rawFocus, focused, editor) = resolveFocus(root)
+            report("resolveFocus.afterElectron", "raw=\(rawFocus != nil) focused=\(focused != nil) editor=\(editor != nil)")
         }
-        guard rawFocus == nil || focused != nil else { return nil }
+        let focusResolved = rawFocus == nil || focused != nil
+        report("guard.rawFocusNilOrFocusedResolved", "\(focusResolved)")
+        guard focusResolved || trace != nil else { return nil }
         let window = uiElement(attribute(root, kAXFocusedWindowAttribute))
         // Warp's TTY surface does not consistently expose an AX text editor.
         // This is a narrow compatibility path: no browser/app-wide fallback,
         // no dialogs/buttons, and the window + exposed surface must stay focused.
         let standardWindow = window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole
         let modalWindow = window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true
+        report("capabilities.focused", describe(focused.map(capabilities)))
+        report("capabilities.editor", describe(editor.map(capabilities)))
+        report("window.present", "\(window != nil)")
+        report("standardWindow", "\(standardWindow)")
+        report("modalWindow", "\(modalWindow)")
         let terminalSurface = KeyboardSurfacePolicy.accepts(bundleIdentifier: app.bundleIdentifier,
             focused: focused.map(capabilities), editor: editor.map(capabilities),
             standardWindow: standardWindow, modalWindow: modalWindow)
+        report("KeyboardSurfacePolicy.accepts", "\(terminalSurface)")
         let candidate = editor ?? focused
         let paste = !terminalSurface && (candidate.map { capabilities($0).capability == .opaque }
             ?? (rawFocus == nil && app.bundleIdentifier == "com.tencent.xinWeChat"))
             ? nativePasteAvailability(root) : (present: false, enabled: false)
+        report("nativePasteAvailability", "present=\(paste.present) enabled=\(paste.enabled)")
         let hasSelection = !(candidate.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? "").isEmpty
             || (candidate.flatMap(selectedRange)?.length ?? 0) > 0
+        report("hasSelection", "\(hasSelection)")
         let genericOpaque = !hasSelection && KeyboardSurfacePolicy.acceptsOpaque(focused: candidate.map(capabilities),
             standardWindow: standardWindow, modalWindow: modalWindow, pasteEnabled: paste.enabled)
+        report("KeyboardSurfacePolicy.acceptsOpaque", "\(genericOpaque)")
         let weChatOpaque = KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: app.bundleIdentifier,
             focused: focused.map(capabilities), editor: editor.map(capabilities),
             standardWindow: standardWindow, modalWindow: modalWindow,
             windowTitle: window.flatMap { attribute($0, kAXTitleAttribute) as? String },
             pasteAvailable: paste.present)
+        report("KeyboardSurfacePolicy.acceptsOpaqueWeChat", "\(weChatOpaque)")
         let opaqueApplication = !terminalSurface && (genericOpaque || weChatOpaque)
         let element = editor ?? focused
         let range = element.flatMap(selectedRange)
         let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
         let secure = element.flatMap { attribute($0, kAXSubroleAttribute) as? String } == "AXSecureTextField"
         // Focus can change while a remote AX provider answers traversal/menu reads.
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              sameElement(rawFocus, uiElement(attribute(root, kAXFocusedUIElementAttribute))),
-              sameElement(window, uiElement(attribute(root, kAXFocusedWindowAttribute))) else { return nil }
+        let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+        // Short-circuits like a single guard unless traced, so production reads stay the same.
+        let sameFocus = (frontmost || trace != nil)
+            && sameElement(rawFocus, uiElement(attribute(root, kAXFocusedUIElementAttribute)))
+        let sameWindow = ((frontmost && sameFocus) || trace != nil)
+            && sameElement(window, uiElement(attribute(root, kAXFocusedWindowAttribute)))
+        report("guard.stillFrontmost", "\(frontmost)")
+        report("guard.sameFocusedElement", "\(sameFocus)")
+        report("guard.sameFocusedWindow", "\(sameWindow)")
+        guard (frontmost && sameFocus && sameWindow) || trace != nil else { return nil }
         let editable = terminalSurface || opaqueApplication || (editor.map { capabilities($0).acceptsInsertion } ?? false)
+        report("target.editable", "\(editable)")
+        report("target.keyboardSurface", "\(terminalSurface || opaqueApplication)")
+        report("target.opaqueApplication", "\(opaqueApplication)")
+        report("target.secure", "\(secure)")
+        report("target.selectionLength", "\(selection.utf16.count)")
+        report("target.range", range.map { "location=\($0.location) length=\($0.length)" } ?? "nil")
+        report("capture.wouldReturnTarget", "\(focusResolved && frontmost && sameFocus && sameWindow)")
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
                            element: element, window: window, range: range, selection: selection,
                            value: terminalSurface ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,

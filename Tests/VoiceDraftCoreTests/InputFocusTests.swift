@@ -119,6 +119,25 @@ final class InputFocusTests: XCTestCase {
         XCTAssertFalse(KeyboardSurfacePolicy.accepts(bundleIdentifier: "dev.warp.Warp-Stable", focused: canvas, editor: nil,
             standardWindow: false, modalWindow: false))
     }
+    /// Ghostty's surface as probed on 2026-10-16: an AXTextArea whose value is the
+    /// screen text, with no settable value or selection range, in a standard window.
+    func testGhosttyReadOnlyTextAreaUsesTheTerminalPath() {
+        let surface = TextInputCapabilities(role: "AXTextArea")
+        XCTAssertEqual(surface.capability, .opaque, "nothing settable: never a writable editor")
+        XCTAssertTrue(KeyboardSurfacePolicy.accepts(bundleIdentifier: "com.mitchellh.ghostty", focused: surface, editor: surface,
+            standardWindow: true, modalWindow: false))
+        XCTAssertFalse(KeyboardSurfacePolicy.accepts(bundleIdentifier: "com.mitchellh.ghostty", focused: surface, editor: surface,
+            standardWindow: false, modalWindow: false), "quick terminal panels and sheets stay out")
+        XCTAssertFalse(KeyboardSurfacePolicy.accepts(bundleIdentifier: "com.mitchellh.ghostty", focused: surface, editor: surface,
+            standardWindow: true, modalWindow: true))
+        for traits in [TextInputCapabilities(role: "AXTextField"), .init(role: "AXTextArea", canSetValue: true),
+                       .init(role: "AXTextArea", secure: true), .init(role: "AXButton")] {
+            XCTAssertFalse(KeyboardSurfacePolicy.accepts(bundleIdentifier: "com.mitchellh.ghostty", focused: traits,
+                editor: traits.isTextControl ? traits : nil, standardWindow: true, modalWindow: false))
+        }
+        XCTAssertFalse(KeyboardSurfacePolicy.accepts(bundleIdentifier: "com.apple.Terminal", focused: surface, editor: surface,
+            standardWindow: true, modalWindow: false), "only listed terminals use the path")
+    }
     func testWarpButtonsFormsDisabledAndSecureInputsDoNotUseTerminalFallback() {
         for traits in [TextInputCapabilities(role: "AXButton"), .init(role: "AXTextField"),
                        .init(role: "AXTextArea", canSetValue: true), .init(role: "AXGroup", enabled: false),

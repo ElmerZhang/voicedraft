@@ -63,6 +63,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var menuObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Diagnostic probe: isolated, runs before state, windows, hotkeys or the updater exist.
+        if let bundleIdentifier = ProcessInfo.processInfo.environment[InputFocusProbe.environmentKey] {
+            exit(InputFocusProbe.run(bundleIdentifier: bundleIdentifier))
+        }
         NSApp.setActivationPolicy(.regular)
         let previewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_PREVIEWS"]
         let onboardingPreviewDirectory = ProcessInfo.processInfo.environment["VOICEDRAFT_CAPTURE_ONBOARDING"]

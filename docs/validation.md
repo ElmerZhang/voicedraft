@@ -457,3 +457,23 @@ Every `Button`, `Menu`, `Toggle`, `Picker`, `onTapGesture`, overlay and `NSStatu
 - Synthetic verdicts. Skipped: "明天下午三点开会，记得把材料带上。", "Let's meet tomorrow afternoon and bring the slides.", "ok 那就这样 cancel 掉", "We can talk about it on the 2nd at 3pm.". Classified: "我在 warp 里跑了一下" (lowercase Latin in Han text), "Open the VoiceDraft settings and check them." (CamelCase), "Rename the user_id column before lunch." (snake_case), "Check the CRM numbers before lunch." (acronym), "请帮我看一下“飞书审批”这个流程" (quoted term), "明天跟王老师说一声" (name + 老师), "让张伟看一下这个" (NLTagger personal name), "用 qwen3 试试" and "We rented an H100 for the run." (letter+digit), "Ask Sarah Connor to review it" (title-case name), an `.editedDictation` sample and "明天开会，不对，改成后天开会" (corrections, always), Japanese and Korean sentences (uncovered scripts, always). A sample whose raw text says "warp" but whose final text is plain is classified.
 - NLTagger caveat: Chinese name tagging was verified on macOS 26 only. The minimum deployment target is macOS 13, where `.nameType` may return nothing for Chinese; bare Chinese names without another signal would then skip learning for that take.
 - Not verified by hand. Acceptance check: with discovery on, dictate a plain sentence such as "明天下午三点开会" and confirm no `vocabulary.learning` line is appended to `~/Library/Application Support/VoiceDraft/Usage/usage-YYYY-MM.jsonl`; then dictate a sentence naming a product, such as "我在 warp 里跑了一下", and confirm one line is appended.
+
+### Input focus probe — 2026-10-16
+
+- `swift build --disable-sandbox` completed with no warnings. `swift test --disable-sandbox`: **301 tests, 297 passed, 4 skipped, 0 failures**. `check-localizations.py`: 286 messages passed. `check-desktop-localizations.py` failed on usage strings (`Usage`, `Total usage`, `View more`) from concurrent uncommitted Usage work in the same tree, not from this change. No user-visible strings were added.
+- `TextInsertion.capture` now resolves the frontmost app and calls `TextInsertion.classify(_:ignoring:trackOpaqueFocus:trace:)`. With no trace the guards and AX reads are unchanged, including the short-circuit of the final focus-stability guard.
+- The probe was not run in development: the build shell is not Accessibility-trusted. Run it from the packaged app, which uses VoiceDraft's own grant, with the target app's input focused (it need not be frontmost):
+
+```sh
+open -n -a dist/VoiceDraft.app --stdout /tmp/probe.out --stderr /tmp/probe.err \
+  --env VOICEDRAFT_PROBE_INPUT=com.mitchellh.ghostty
+```
+
+- Exit codes: 0 after the report, 1 when the app is not running, 2 when VoiceDraft is not Accessibility-trusted. Output contains roles, flags, attribute names and lengths only, never text content.
+
+### Ghostty insertion — 2026-10-16
+
+- Symptom: dictation in Ghostty 1.3.1 never inserted; History recorded those takes with application VoiceDraft, so `TextInsertion.capture` had returned nil (the take fell back to the copy card).
+- Diagnosis with `VOICEDRAFT_PROBE_INPUT=com.mitchellh.ghostty` from the packaged app: the focused element is an `AXTextArea` with a 35,608-character value, selected range 0/0, value and selected-range not settable, no actions, in an `AXStandardWindow` that is not modal; `capabilities` therefore classified it as opaque, `KeyboardSurfacePolicy.accepts` returned false (Warp only), `nativePasteAvailability` found no AX Paste command, so `acceptsOpaque` was false and the target was not editable. Ghostty's source (`SurfaceView_AppKit.swift`, `MARK: Accessibility`) confirms the read-only `.textArea` role with no setters.
+- Fix: `KeyboardSurfacePolicy.terminalBundleIdentifiers` lists Warp and Ghostty; the existing read-only-text-area rule now accepts Ghostty's surface, so the take uses the keyboard-surface path (nil value, 300 ms clipboard grace, Paste sent to terminal). New `testGhosttyReadOnlyTextAreaUsesTheTerminalPath` covers the probed shape, non-standard and modal windows, form fields, writable or secure text areas and an unlisted terminal.
+- Acceptance check by hand: dictate into a Ghostty shell prompt and confirm the text arrives and the status reads Paste sent to terminal; a multi-line result may trigger Ghostty's own paste-protection dialog, which is Ghostty behaviour. Also confirm Warp still inserts.

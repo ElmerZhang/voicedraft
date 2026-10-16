@@ -498,3 +498,16 @@ open -n -a dist/VoiceDraft.app --stdout /tmp/probe.out --stderr /tmp/probe.err \
   - Ghostty and Warp report Paste sent to terminal with no card.
   - Finder with no window open, and any app with a toolbar button focused, both show the copy card without pasting.
   - Safari page with no field focused: a paste attempt plus the result card.
+
+### Microphone before handshake — 2026-10-16
+
+- Symptom: after the shortcut the HUD showed Opening microphone… for up to about a second and the first word was lost, because live adapters (Message WebSocket, Doubao) opened the microphone only in `onReady`, after the socket handshake, the 250 ms screen-term gate and `task-started`.
+- Change (architectural; the documented order "task-started → microphone" is replaced): `AppState.toggle` starts the live session (`liveSession`, an `async let`) and `beginLiveCapture` concurrently at t0. PCM queues in `LiveAudioFeed`, whose default buffer grew from 50 to 150 frames (15 s, the handshake start deadline); overflow still fails explicitly. `onReady` keeps its contract (after `task-started`) but only checks the take's generation. A microphone failure calls `fail` (which cancels the session) before the session is awaited; a session failure calls `fail` at once (cancelling the recorder, even while it is opening) unless the session was cancelled by the take ending. The screen-term gate is unchanged and now delays only the start frame. HTTP adapters are unchanged.
+- `swift build --disable-sandbox` completed with no warnings. `swift test --disable-sandbox`: **317 tests, 313 passed, 4 skipped, 0 failures**. `check-localizations.py`: 287 messages passed. `check-desktop-localizations.py`: 185 messages passed. No new strings. The app was not packaged or run in this change.
+- New synthetic tests (in-memory socket, no audio or credentials): `testFramesCapturedBeforeTaskStartedUploadAfterItInOrder` (PCM appended before `run-task` and while waiting for `task-started` is not uploaded early, then every byte is sent in order, followed by `finish-task` and the final text; `onReady` sees zero uploaded bytes); `testFeedFinishedBeforeTaskStartedStillUploadsAndReturnsFinalText` (a feed closed during the handshake still uploads its frames and partial tail, sends `finish-task` and returns the text); `testDefaultFeedBuffersTheFifteenSecondStartDeadline` (the default feed accepts 150 frames, the 151st fails with the explicit too-slow error and the 150 queued frames are still delivered). The existing `onReady`-after-`task-started` tests still pass.
+- Hand checks (not yet run; need a microphone and a Qwen or Doubao account):
+  - Press Fn and speak immediately: the first word is recognised; the HUD reaches Listening without waiting for the network.
+  - A very short take released during the handshake still returns text, or The recording was too short.
+  - Escape during the handshake cancels cleanly: the microphone indicator turns off and no error card appears.
+  - Doubao live recognition still works end to end.
+  - With the network blocked, the take fails with the connection error and the microphone indicator turns off.

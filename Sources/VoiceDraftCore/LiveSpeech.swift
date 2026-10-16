@@ -1,7 +1,9 @@
 import Foundation
 
-/// 100 ms, 16 kHz mono signed little-endian PCM frames. At most five seconds queue up.
-/// Backpressure is an explicit failure: never silently omit part of the user's speech.
+/// 100 ms, 16 kHz mono signed little-endian PCM frames. At most 15 seconds queue up: the
+/// microphone opens in parallel with the socket handshake, so everything captured before
+/// `task-started` waits here (up to the 15 s start deadline) and is uploaded in order.
+/// Overflow is an explicit failure: never silently omit part of the user's speech.
 public final class LiveAudioFeed: @unchecked Sendable {
     public let stream: AsyncThrowingStream<Data, Error>
     private let continuation: AsyncThrowingStream<Data, Error>.Continuation
@@ -11,7 +13,7 @@ public final class LiveAudioFeed: @unchecked Sendable {
     private var archive = Data()
     private let retainAudio: Bool
     public var archivedWAV: Data? { lock.withLock { retainAudio && !archive.isEmpty ? WaveAudio.encode(archive) : nil } }
-    public init(bufferedFrames: Int = 50, retainAudio: Bool = false) {
+    public init(bufferedFrames: Int = 150, retainAudio: Bool = false) {
         self.retainAudio = retainAudio
         var producer: AsyncThrowingStream<Data, Error>.Continuation!
         stream = AsyncThrowingStream(bufferingPolicy: .bufferingOldest(max(1, bufferedFrames))) { producer = $0 }
@@ -105,7 +107,8 @@ extension MessageASRSession {
     }
 
     /// `start` builds the run-task frame; it is awaited immediately before it is sent,
-    /// inside the start deadline, so `onReady` still follows `task-started`.
+    /// inside the start deadline, so `onReady` still follows `task-started`. `audio` may
+    /// already hold frames (or have finished) before then; they are uploaded in order.
     static func transcribeLive(socket: any ASRWebSocket, start: @escaping @Sendable () async throws -> String,
                                audio: AsyncThrowingStream<Data, Error>, taskID: String,
                                startTimeout: UInt64 = 15_000_000_000, finishTimeout: UInt64 = 30_000_000_000,

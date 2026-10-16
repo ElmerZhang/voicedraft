@@ -166,3 +166,15 @@
 "No new candidate terms were found on this screen. Existing vocabulary words are excluded." = "目前螢幕上沒有發現新的候選詞彙。詞庫中已有的詞彙已被排除。";
 "Screen · Accessibility" = "螢幕 · 輔助使用";
 "Screen · OCR" = "螢幕 · OCR";
+
+// Home activity calendar
+"Usage activity" = "使用統計";
+"Last 365 days" = "最近 365 天";
+"active days" = "活躍天數";
+"%d entries · %d min recorded" = "%d 筆記錄 · 錄音 %d 分鐘";
+"Based on saved history on this Mac. Deleted and expired entries are not included." = "根據本機儲存的歷史記錄，不包含已刪除或已到期的記錄。";
+"History is off. New activity will appear after you enable history." = "歷史記錄已關閉，開啟後才會記錄新的使用情況。";
+"Use a dictation shortcut to start filling your activity calendar." = "使用聽寫快捷鍵，開始記錄你的每日使用情況。";
+"Less" = "少";
+"More" = "多";
+"Used when you record with a shortcut or from the menu bar." = "透過快捷鍵或選單列錄音時使用。";

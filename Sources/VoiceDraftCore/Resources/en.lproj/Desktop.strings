@@ -166,3 +166,15 @@
 "No new candidate terms were found on this screen. Existing vocabulary words are excluded." = "No new candidate terms were found on this screen. Existing vocabulary words are excluded.";
 "Screen · Accessibility" = "Screen · Accessibility";
 "Screen · OCR" = "Screen · OCR";
+
+// Home activity calendar
+"Usage activity" = "Usage activity";
+"Last 365 days" = "Last 365 days";
+"active days" = "active days";
+"%d entries · %d min recorded" = "%d entries · %d min recorded";
+"Based on saved history on this Mac. Deleted and expired entries are not included." = "Based on saved history on this Mac. Deleted and expired entries are not included.";
+"History is off. New activity will appear after you enable history." = "History is off. New activity will appear after you enable history.";
+"Use a dictation shortcut to start filling your activity calendar." = "Use a dictation shortcut to start filling your activity calendar.";
+"Less" = "Less";
+"More" = "More";
+"Used when you record with a shortcut or from the menu bar." = "Used when you record with a shortcut or from the menu bar.";

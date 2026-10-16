@@ -166,3 +166,15 @@
 "No new candidate terms were found on this screen. Existing vocabulary words are excluded." = "この画面に新しい候補の用語は見つかりませんでした。既存の語彙の単語は除外されています。";
 "Screen · Accessibility" = "画面 · アクセシビリティ";
 "Screen · OCR" = "画面 · OCR";
+
+// Home activity calendar
+"Usage activity" = "利用状況";
+"Last 365 days" = "過去365日間";
+"active days" = "利用日数";
+"%d entries · %d min recorded" = "%d件 · 録音%d分";
+"Based on saved history on this Mac. Deleted and expired entries are not included." = "このMacに保存された履歴に基づきます。削除済み・保存期限切れの記録は含まれません。";
+"History is off. New activity will appear after you enable history." = "履歴はオフです。有効にすると、新しい利用状況が表示されます。";
+"Use a dictation shortcut to start filling your activity calendar." = "音声入力のショートカットを使うと、カレンダーに利用状況が記録されます。";
+"Less" = "少";
+"More" = "多";
+"Used when you record with a shortcut or from the menu bar." = "ショートカットまたはメニューバーから録音するときに使用します。";

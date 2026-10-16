@@ -9,7 +9,7 @@ struct UsageSummaryView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let summary = UsageSummary(history: history, now: context.date, vocabulary: vocabulary)
-            VDSurface(spacing: VD.Space.xl) {
+            VDSurface(padding: VD.Space.l, spacing: VD.Space.m) {
                 HStack {
                     Text(D("Usage activity")).font(VD.Font.cardTitle)
                     Spacer()
@@ -20,23 +20,32 @@ struct UsageSummaryView: View {
                         }.font(VD.Font.detail).padding(.vertical, VD.Space.s)
                             .padding(.horizontal, VD.Space.xs).contentShape(Rectangle())
                     }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent)
+                }.padding(.vertical, -VD.Space.xs)
+                // Yesterday and Total usage side by side when both fit, otherwise stacked.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: VD.Space.l) { periods(summary, divider: true) }
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: VD.Space.m) { periods(summary, divider: false) }
                 }
-                HStack(alignment: .top, spacing: VD.Space.xxl) {
-                    if let yesterday = summary.yesterday {
-                        metric(D("Yesterday"), metrics: yesterday.metrics)
-                        Divider()
-                    }
-                    metric(D("Total usage"), metrics: summary.metrics)
-                }.fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
                 Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
+    @ViewBuilder private func periods(_ summary: UsageSummary, divider: Bool) -> some View {
+        if let yesterday = summary.yesterday {
+            metric(D("Yesterday"), metrics: yesterday.metrics)
+            if divider { Divider() }
+        }
+        metric(D("Total usage"), metrics: summary.metrics)
+    }
+
     private func metric(_ title: String, metrics: UsageMetrics) -> some View {
-        VStack(alignment: .leading, spacing: VD.Space.l) {
-            Text(title).font(VD.Font.detail).foregroundStyle(.secondary)
-            UsageMetricsView(metrics: metrics)
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            Text(title).font(VD.Font.detail.weight(.semibold)).foregroundStyle(.secondary)
+            UsageMetricsView(metrics: metrics, compact: true)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -44,10 +53,12 @@ struct UsageSummaryView: View {
 /// The same five definitions are used for yesterday, all history and the calendar window.
 private struct UsageMetricsView: View {
     let metrics: UsageMetrics
+    /// Home's summary uses smaller icons and values with tighter rows than the Settings → Usage card.
+    var compact = false
     @Environment(\.locale) private var locale
 
     var body: some View {
-        VStack(spacing: VD.Space.l) {
+        VStack(spacing: compact ? 6 : VD.Space.l) {
             row("clock", title: D("Dictation time"), value: time(metrics.duration),
                 help: D("Time in saved voice transcripts. Typed tests and empty transcripts are excluded."))
             row("mic", title: D("Dictated words"), value: metrics.words.formatted(.number.locale(locale).notation(.compactName).precision(.fractionLength(0...1))),
@@ -64,12 +75,12 @@ private struct UsageMetricsView: View {
     }
 
     private func row(_ icon: String, title: String, value: String, help: String) -> some View {
-        HStack(spacing: VD.Space.m) {
-            Image(systemName: icon).resizable().scaledToFit().frame(width: 20, height: 20)
-                .frame(width: 24).accessibilityHidden(true)
-            Text(title).font(VD.Font.detail).foregroundStyle(.secondary)
+        HStack(spacing: compact ? VD.Space.s : VD.Space.m) {
+            Image(systemName: icon).resizable().scaledToFit().frame(width: compact ? 14 : 20, height: compact ? 14 : 20)
+                .frame(width: compact ? 18 : 24).accessibilityHidden(true)
+            Text(title).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: VD.Space.s)
-            Text(value).font(VD.Font.statValue).monospacedDigit().fixedSize()
+            Text(value).font(compact ? VD.Font.cardTitle : VD.Font.statValue).monospacedDigit().fixedSize()
         }.help(help).accessibilityElement(children: .combine).accessibilityHint(help)
     }
 

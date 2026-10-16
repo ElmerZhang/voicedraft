@@ -13,19 +13,26 @@ final class GlobalShortcuts {
     private var bindings: [ShortcutBinding] = []
     private var pressed: Set<ShortcutAction> = []
     private var fnChords = FnChordTracker()
-    var onEvent: ((ShortcutAction, Bool) -> Void)?
-    private func dispatch(_ action: ShortcutAction, down: Bool) {
+    /// Action, key down, and the key event's own time on the uptime clock
+    /// (`ShortcutEventClock`), which the tap-versus-hold gesture uses instead of
+    /// the time the event is processed.
+    var onEvent: ((ShortcutAction, Bool, TimeInterval) -> Void)?
+    private func dispatch(_ action: ShortcutAction, down: Bool, at time: TimeInterval) {
         if down { guard pressed.insert(action).inserted else { return } }
         else { guard pressed.remove(action) != nil else { return } }
-        onEvent?(action, down)
+        onEvent?(action, down, time)
     }
+    private static let timebase: (numer: UInt32, denom: UInt32) = {
+        var info = mach_timebase_info_data_t(); mach_timebase_info(&info)
+        return (info.numer, info.denom)
+    }()
     /// The held Fn chord switched actions mid-take. The pressed state moves to
     /// `to`, so Fn's later release (sent for `to`) is matched and deduped.
-    var onRetarget: ((ShortcutAction, ShortcutAction) -> Void)?
-    private func retarget(from: ShortcutAction, to: ShortcutAction) {
+    var onRetarget: ((ShortcutAction, ShortcutAction, TimeInterval) -> Void)?
+    private func retarget(from: ShortcutAction, to: ShortcutAction, at time: TimeInterval) {
         guard from != to, pressed.remove(from) != nil else { return }
         pressed.insert(to)
-        onRetarget?(from, to)
+        onRetarget?(from, to, time)
     }
     func uninstall() {
         pressed.removeAll(); fnChords.reset()
@@ -46,8 +53,12 @@ final class GlobalShortcuts {
                 var id = EventHotKeyID()
                 GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
                 let owner = Unmanaged<GlobalShortcuts>.fromOpaque(context).takeUnretainedValue()
+                // Carbon event time: seconds since boot on the systemUptime clock.
+                let time = ShortcutEventClock.uptime(seconds: GetEventTime(event), now: ProcessInfo.processInfo.systemUptime)
                 MainActor.assumeIsolated {
-                    if Int(id.id) < owner.bindings.count { owner.dispatch(owner.bindings[Int(id.id)].action, down: GetEventKind(event) == UInt32(kEventHotKeyPressed)) }
+                    if Int(id.id) < owner.bindings.count {
+                        owner.dispatch(owner.bindings[Int(id.id)].action, down: GetEventKind(event) == UInt32(kEventHotKeyPressed), at: time)
+                    }
                 }
                 return noErr
             }, 2, &specs, context, &handler)
@@ -77,13 +88,15 @@ final class GlobalShortcuts {
                             }
                             guard type == .flagsChanged else { return Unmanaged.passUnretained(event) }
                             let flags = event.flags
+                            let time = ShortcutEventClock.uptime(cgTimestamp: event.timestamp, timebase: GlobalShortcuts.timebase,
+                                                                 now: ProcessInfo.processInfo.systemUptime)
                             var modifiers: UInt32 = 0
                             for (flag, bit) in [(CGEventFlags.maskShift, UInt32(1)), (.maskControl, 2), (.maskAlternate, 4), (.maskCommand, 8)] where flags.contains(flag) { modifiers |= bit }
                             for change in owner.fnChords.observe(fnHeld: flags.contains(.maskSecondaryFn), modifiers: modifiers, bindings: owner.bindings) {
                                 switch change.kind {
-                                case .down: owner.dispatch(change.action, down: true)
-                                case .up: owner.dispatch(change.action, down: false)
-                                case .retarget(let from): owner.retarget(from: from, to: change.action)
+                                case .down: owner.dispatch(change.action, down: true, at: time)
+                                case .up: owner.dispatch(change.action, down: false, at: time)
+                                case .retarget(let from): owner.retarget(from: from, to: change.action, at: time)
                                 }
                             }
                             // Consume only Fn's own edges. Other modifier edges pass through

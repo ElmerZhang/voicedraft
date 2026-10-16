@@ -203,8 +203,44 @@ public struct FnChordTracker: Equatable {
     public mutating func reset() { self = Self() }
 }
 
+/// Key event times for `RecordingGesture`, in seconds on the uptime clock that
+/// `ProcessInfo.processInfo.systemUptime` reads (mach absolute time, sleep
+/// excluded). Carbon's `GetEventTime` already uses that clock (measured equal
+/// to `systemUptime` within a few milliseconds). `CGEvent.timestamp` is
+/// documented as nanoseconds since startup, but some systems report raw mach
+/// ticks, so both readings are tried and only one inside the plausible window
+/// is accepted. Synthetic events carry 0. Anything implausible falls back to
+/// the processing time, which is what the gesture used before event times.
+public enum ShortcutEventClock {
+    /// How far before processing a key event may plausibly have happened.
+    public static let maximumAge: TimeInterval = 30
+    /// Allowed clock skew of an event that appears to postdate its processing.
+    public static let futureTolerance: TimeInterval = 0.05
+
+    /// `seconds` is an event time already on the uptime clock (Carbon), or nil.
+    public static func uptime(seconds: TimeInterval?, now: TimeInterval) -> TimeInterval {
+        guard let seconds, plausible(seconds, now: now) else { return now }
+        return min(seconds, now)
+    }
+    /// `CGEvent.timestamp`; `timebase` is `mach_timebase_info` (numer, denom).
+    public static func uptime(cgTimestamp: UInt64, timebase: (numer: UInt32, denom: UInt32), now: TimeInterval) -> TimeInterval {
+        let nanoseconds = Double(cgTimestamp) / 1e9
+        if plausible(nanoseconds, now: now) { return min(nanoseconds, now) }
+        guard timebase.denom > 0 else { return now }
+        return uptime(seconds: nanoseconds * Double(timebase.numer) / Double(timebase.denom), now: now)
+    }
+    private static func plausible(_ seconds: TimeInterval, now: TimeInterval) -> Bool {
+        seconds > 0 && seconds <= now + futureTolerance && now - seconds <= maximumAge
+    }
+}
+
 /// A release can arrive while permission/network startup is still pending.
 /// The caller retains .finish until capture has actually started.
+///
+/// Times are key event times (`ShortcutEventClock`), never processing times:
+/// `toggle` does synchronous work on the main thread (focus capture, Keychain,
+/// screen context, HUD) before the queued release is processed, and a cold
+/// stall longer than the 0.6 s window would otherwise misread a tap as a hold.
 public struct RecordingGesture {
     public enum Effect: Equatable { case none, start, finish }
     private var downAt: TimeInterval?

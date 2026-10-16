@@ -188,7 +188,7 @@ private struct DesktopHomeView: View {
             Text(D("Speak, don't type.")).font(VD.Font.hero).tracking(-1.2)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             FnShortcutStatus(state: state)
-            UsageSummaryView(history: state.history) { state.openSettings("Usage") }
+            UsageSummaryView(history: state.history, vocabulary: state.settings.vocabulary) { state.openSettings("Usage") }
             Text(D("Shortcuts")).font(VD.Font.sectionTitle)
             ShortcutSummaryList(state: state)
                 .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
@@ -524,7 +524,7 @@ private struct DesktopSettingsView: View {
                         case "Models": ModelsView(state: state, showsHeading: false)
                         case "Sync": SyncView(state: state, showsHeading: false)
                         case "Personalization": DesktopPersonalizationView(state: state)
-                        case "Usage": UsageActivityView(history: state.history, keepHistory: state.device.keepHistory)
+                        case "Usage": UsageActivityView(history: state.history, vocabulary: state.settings.vocabulary, keepHistory: state.device.keepHistory)
                         case "About": about
                         case "Help": help
                         default: general

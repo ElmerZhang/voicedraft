@@ -183,3 +183,16 @@
 "Usage" = "Usage";
 "View more" = "자세히 보기";
 "Total usage" = "총 사용량";
+
+// Voice usage metrics
+"Dictation time" = "받아쓰기 시간";
+"Dictated words" = "받아쓴 단어";
+"Average speed" = "평균 속도";
+"Est. time saved" = "예상 절약 시간";
+"Time in saved voice transcripts. Typed tests and empty transcripts are excluded." = "저장된 음성 전사 시간입니다. 텍스트 테스트와 빈 전사는 제외합니다.";
+"Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words." = "생성된 답변이 아닌 원본 전사를 셉니다. 중국어와 일본어는 글자 단위, 다른 언어는 단어 단위입니다.";
+"Total dictated words divided by total dictation minutes. No recording means no speed estimate." = "총 글자·단어 수를 총 받아쓰기 시간(분)으로 나눕니다. 녹음이 없으면 속도를 추정하지 않습니다.";
+"Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured." = "분당 45개 글자·단어를 타이핑하는 시간을 기준으로 받아쓰기 시간을 뺍니다. 처리 및 편집 시간은 측정하지 않습니다.";
+"Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "현재 활성화된 어휘(별칭 포함)와 일치하는 받아쓴 글자·단어의 비율입니다. 중복은 한 번만 셉니다. 인식 정확도가 아닌 어휘 포함률이며, 어휘를 바꾸면 과거 통계도 갱신됩니다.";
+"How these are calculated" = "계산 방식";
+"Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "보관된 음성 기록을 사용합니다. 재처리한 녹음은 다시 계산하며 삭제되거나 만료된 기록은 제외합니다.";

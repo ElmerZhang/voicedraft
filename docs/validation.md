@@ -1,6 +1,13 @@
 # Validation record
 
 
+## 2026-10-16 · Typeless-inspired voice metrics
+
+- Replaced saved-entry/minute headline values with five metrics for yesterday, all retained history and the Usage calendar window: dictation time, original-transcript word/character units, weighted WPM, estimated savings against 45 units/minute typing, and Personalization as current enabled vocabulary coverage. No data displays a dash for rate metrics; yesterday remains hidden when it has no records. The Usage calculation disclosure states the estimate and retention/retry limitations. This does not claim Typeless's private formulas or measure recognition accuracy.
+- Seven new metric tests cover mixed Chinese/Japanese/Latin text, punctuation, emoji, apostrophes, duration-weighted speed, clamped savings, empty/invalid/typed records, generated-answer exclusion, full terms and phrases, overlap union, aliases/output spelling, disabled vocabulary, case/width normalization, punctuation-sensitive programming terms and shared summary/calendar calculations. `scripts/test-all.sh` passed **312 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go checks, local fixture integrations and all eight localization catalogs.
+- Built and signed `dist/VoiceDraft.app`. Synthetic light/dark and empty-state previews are under `dist/usage-metrics-light/`, `dist/usage-metrics-dark/`, and `dist/usage-metrics-empty/`. Captures were checked for layout, date-window scope and no-data dashes; the final icon bounds were checked in a recapture. No real audio/provider request was made and the system-installed app was not replaced.
+
+
 ## 2026-10-16 · Compact Home usage and Settings detail
 
 - Home now shows yesterday and all-retained-history totals (saved entries and recorded minutes); yesterday is omitted when empty, including first use. View more opens the new Settings → Usage tab. The 365-day heatmap and its details live there, with no main-sidebar statistics page.

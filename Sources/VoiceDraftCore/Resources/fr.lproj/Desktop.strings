@@ -183,3 +183,16 @@
 "Usage" = "Usage";
 "View more" = "Voir plus";
 "Total usage" = "Utilisation totale";
+
+// Voice usage metrics
+"Dictation time" = "Durée de dictée";
+"Dictated words" = "Mots dictés";
+"Average speed" = "Vitesse moyenne";
+"Est. time saved" = "Gain de temps estimé";
+"Time in saved voice transcripts. Typed tests and empty transcripts are excluded." = "Durée des transcriptions vocales enregistrées. Les tests saisis et les transcriptions vides sont exclus.";
+"Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words." = "Compte la transcription originale, pas les réponses générées. Le chinois et le japonais sont comptés par caractère, les autres langues par mot.";
+"Total dictated words divided by total dictation minutes. No recording means no speed estimate." = "Total des mots dictés divisé par la durée totale en minutes. Sans enregistrement, aucune vitesse estimée.";
+"Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured." = "Estimation basée sur une saisie de 45 mots par minute, moins la durée de dictée. Les temps de traitement et de correction ne sont pas mesurés.";
+"Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "Part des mots dictés correspondant au vocabulaire actuellement activé, alias inclus. Les chevauchements comptent une seule fois. Il s’agit de couverture lexicale, pas de précision de reconnaissance ; modifier le vocabulaire actualise les statistiques passées.";
+"How these are calculated" = "Méthode de calcul";
+"Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "Basé sur l’historique vocal conservé. Les enregistrements retraités sont recomptés ; les entrées supprimées ou expirées sont exclues.";

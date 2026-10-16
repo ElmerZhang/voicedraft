@@ -183,3 +183,16 @@
 "Usage" = "Usage";
 "View more" = "View more";
 "Total usage" = "Total usage";
+
+// Voice usage metrics
+"Dictation time" = "Dictation time";
+"Dictated words" = "Dictated words";
+"Average speed" = "Average speed";
+"Est. time saved" = "Est. time saved";
+"Time in saved voice transcripts. Typed tests and empty transcripts are excluded." = "Time in saved voice transcripts. Typed tests and empty transcripts are excluded.";
+"Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words." = "Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words.";
+"Total dictated words divided by total dictation minutes. No recording means no speed estimate." = "Total dictated words divided by total dictation minutes. No recording means no speed estimate.";
+"Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured." = "Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured.";
+"Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics.";
+"How these are calculated" = "How these are calculated";
+"Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded.";

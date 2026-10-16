@@ -183,3 +183,16 @@
 "Usage" = "Usage";
 "View more" = "詳しく見る";
 "Total usage" = "累計利用量";
+
+// Voice usage metrics
+"Dictation time" = "音声入力時間";
+"Dictated words" = "入力文字・単語";
+"Average speed" = "平均速度";
+"Est. time saved" = "推定短縮時間";
+"Time in saved voice transcripts. Typed tests and empty transcripts are excluded." = "保存された音声入力の時間です。文字入力のテストや空の転写は除外します。";
+"Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words." = "生成された回答ではなく元の転写を数えます。中国語と日本語は文字単位、その他は単語単位です。";
+"Total dictated words divided by total dictation minutes. No recording means no speed estimate." = "入力文字・単語の合計を音声入力の合計分数で割ります。録音がない場合は推定しません。";
+"Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured." = "毎分45文字・単語の入力を基準に音声入力時間を差し引きます。処理や編集の時間は計測していません。";
+"Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "現在有効な辞書（別名を含む）に一致する入力文字・単語の割合です。重複は一度だけ数えます。認識精度ではなく辞書のカバー率です。辞書の変更は過去の統計にも反映されます。";
+"How these are calculated" = "計算方法";
+"Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "保存された音声履歴を使用します。再処理した録音は再度数え、削除済みや期限切れの記録は除外します。";

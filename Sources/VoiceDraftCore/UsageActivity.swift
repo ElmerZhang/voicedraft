@@ -4,9 +4,11 @@ import Foundation
 public struct UsageSummary {
     public private(set) var totalCount = 0
     public private(set) var totalDuration: TimeInterval = 0
+    public private(set) var metrics = UsageMetrics()
     public private(set) var yesterday: UsageActivity.Day?
 
-    public init(history: [HistoryEntry], now: Date = Date(), calendar: Calendar = .current) {
+    public init(history: [HistoryEntry], now: Date = Date(), calendar: Calendar = .current, vocabulary: AppVocabulary = AppVocabulary()) {
+        let matcher = UsageVocabularyMatcher(vocabulary: vocabulary)
         let today = calendar.startOfDay(for: now)
         let previousDay = calendar.date(byAdding: .day, value: -1, to: today)!
         for entry in history {
@@ -15,10 +17,12 @@ public struct UsageSummary {
             let duration = entry.duration.isFinite ? max(0, entry.duration) : 0
             totalCount += 1
             totalDuration += duration
+            metrics.include(entry, matcher: matcher)
             if day == previousDay {
                 if yesterday == nil { yesterday = UsageActivity.Day(date: previousDay) }
                 yesterday?.count += 1
                 yesterday?.duration += duration
+                yesterday?.metrics.include(entry, matcher: matcher)
             }
         }
     }
@@ -31,6 +35,7 @@ public struct UsageActivity {
         public let date: Date
         public var count = 0
         public var duration: TimeInterval = 0
+        public var metrics = UsageMetrics()
 
         public var level: Int {
             switch count {
@@ -49,8 +54,12 @@ public struct UsageActivity {
     public var totalCount: Int { days.reduce(0) { $0 + $1.count } }
     public var activeDays: Int { days.filter { $0.count > 0 }.count }
     public var totalDuration: TimeInterval { days.reduce(0) { $0 + $1.duration } }
+    public var metrics: UsageMetrics {
+        days.reduce(into: UsageMetrics()) { $0.merge($1.metrics) }
+    }
 
-    public init(history: [HistoryEntry], now: Date = Date(), calendar: Calendar = .current) {
+    public init(history: [HistoryEntry], now: Date = Date(), calendar: Calendar = .current, vocabulary: AppVocabulary = AppVocabulary()) {
+        let matcher = UsageVocabularyMatcher(vocabulary: vocabulary)
         let today = calendar.startOfDay(for: now)
         let start = calendar.date(byAdding: .day, value: -364, to: today)!
         var totals: [Date: Day] = [:]
@@ -60,6 +69,7 @@ public struct UsageActivity {
             var day = totals[date] ?? Day(date: date)
             day.count += 1
             if entry.duration.isFinite { day.duration += max(0, entry.duration) }
+            day.metrics.include(entry, matcher: matcher)
             totals[date] = day
         }
         days = (0..<365).map { offset in

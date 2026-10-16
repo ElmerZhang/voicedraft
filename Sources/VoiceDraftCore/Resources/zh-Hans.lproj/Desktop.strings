@@ -183,3 +183,16 @@
 "Usage" = "Usage";
 "View more" = "查看更多";
 "Total usage" = "总使用量";
+
+// Voice usage metrics
+"Dictation time" = "听写时长";
+"Dictated words" = "输入字词";
+"Average speed" = "平均速度";
+"Est. time saved" = "预估节省时间";
+"Time in saved voice transcripts. Typed tests and empty transcripts are excluded." = "按保存的语音转录时长统计，不包含文字测试和空转录。";
+"Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words." = "统计原始转录，不计 AI 生成的回答。中文和日文按字计，其他语言按词计。";
+"Total dictated words divided by total dictation minutes. No recording means no speed estimate." = "总字词数除以总听写分钟数。没有录音数据时不估算速度。";
+"Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured." = "按每分钟打字 45 个字词估算，再减去听写时长；未计入处理和编辑耗时。";
+"Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "原始转录中命中当前启用词库（含别名）的字词占比，重叠命中只计一次。这表示词库覆盖率，并非识别准确率；修改词库会更新历史统计。";
+"How these are calculated" = "统计口径";
+"Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "统计基于保留的语音历史。重新处理的录音会再次计入；已删除或过期的记录不计入。";

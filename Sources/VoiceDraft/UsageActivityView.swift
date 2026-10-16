@@ -3,12 +3,12 @@ import VoiceDraftCore
 
 struct UsageSummaryView: View {
     let history: [HistoryEntry]
+    let vocabulary: AppVocabulary
     let viewMore: () -> Void
-    @Environment(\.locale) private var locale
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            let summary = UsageSummary(history: history, now: context.date)
+            let summary = UsageSummary(history: history, now: context.date, vocabulary: vocabulary)
             VDSurface(spacing: VD.Space.xl) {
                 HStack {
                     Text(D("Usage activity")).font(VD.Font.cardTitle)
@@ -23,59 +23,100 @@ struct UsageSummaryView: View {
                 }
                 HStack(alignment: .top, spacing: VD.Space.xxl) {
                     if let yesterday = summary.yesterday {
-                        metric(D("Yesterday"), count: yesterday.count, duration: yesterday.duration)
+                        metric(D("Yesterday"), metrics: yesterday.metrics)
                         Divider()
                     }
-                    metric(D("Total usage"), count: summary.totalCount, duration: summary.totalDuration)
+                    metric(D("Total usage"), metrics: summary.metrics)
                 }.fixedSize(horizontal: false, vertical: true)
                 Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
             }
         }
     }
 
-    private func metric(_ title: String, count: Int, duration: TimeInterval) -> some View {
-        VStack(alignment: .leading, spacing: VD.Space.s) {
+    private func metric(_ title: String, metrics: UsageMetrics) -> some View {
+        VStack(alignment: .leading, spacing: VD.Space.l) {
             Text(title).font(VD.Font.detail).foregroundStyle(.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: VD.Space.s) {
-                Text(count.formatted(.number.locale(locale))).font(VD.Font.pageTitle).monospacedDigit()
-                Text(D("saved entries")).font(VD.Font.detail).foregroundStyle(.secondary)
-            }
-            Text("\(Int(duration / 60).formatted(.number.locale(locale))) \(D("minutes recorded"))")
-                .font(VD.Font.detail).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity, alignment: .leading).accessibilityElement(children: .combine)
+            UsageMetricsView(metrics: metrics)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The same five definitions are used for yesterday, all history and the calendar window.
+private struct UsageMetricsView: View {
+    let metrics: UsageMetrics
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(spacing: VD.Space.l) {
+            row("clock", title: D("Dictation time"), value: time(metrics.duration),
+                help: D("Time in saved voice transcripts. Typed tests and empty transcripts are excluded."))
+            row("mic", title: D("Dictated words"), value: metrics.words.formatted(.number.locale(locale).notation(.compactName).precision(.fractionLength(0...1))),
+                help: D("Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words."))
+            row("bolt", title: D("Average speed"),
+                value: metrics.wordsPerMinute.map { "\($0.formatted(.number.locale(locale).precision(.fractionLength(0)))) WPM" } ?? "—",
+                help: D("Total dictated words divided by total dictation minutes. No recording means no speed estimate."))
+            row("hourglass", title: D("Est. time saved"), value: time(metrics.estimatedTimeSaved),
+                help: D("Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured."))
+            row("signature", title: D("Personalization"),
+                value: metrics.personalization.map { $0.formatted(.percent.locale(locale).precision(.fractionLength(1))) } ?? "—",
+                help: D("Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics."))
+        }
+    }
+
+    private func row(_ icon: String, title: String, value: String, help: String) -> some View {
+        HStack(spacing: VD.Space.m) {
+            Image(systemName: icon).resizable().scaledToFit().frame(width: 20, height: 20)
+                .frame(width: 24).accessibilityHidden(true)
+            Text(title).font(VD.Font.detail).foregroundStyle(.secondary)
+            Spacer(minLength: VD.Space.s)
+            Text(value).font(VD.Font.statValue).monospacedDigit().fixedSize()
+        }.help(help).accessibilityElement(children: .combine).accessibilityHint(help)
+    }
+
+    private func time(_ seconds: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        var calendar = Calendar.current
+        calendar.locale = locale
+        formatter.calendar = calendar
+        formatter.unitsStyle = .abbreviated
+        formatter.allowedUnits = seconds >= 3600 ? [.hour, .minute] : seconds >= 60 ? [.minute, .second] : [.second]
+        formatter.maximumUnitCount = 1
+        return formatter.string(from: seconds) ?? "—"
     }
 }
 
 struct UsageActivityView: View {
     let history: [HistoryEntry]
+    let vocabulary: AppVocabulary
     let keepHistory: Bool
-    @State private var hoveredDate: Date?
-    @Environment(\.locale) private var locale
 
     var body: some View {
         // Refresh the date window even when Usage stays open overnight.
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            let activity = UsageActivity(history: history, now: context.date)
+            let activity = UsageActivity(history: history, now: context.date, vocabulary: vocabulary)
             VDSurface(spacing: VD.Space.l) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(D("Usage activity")).font(VD.Font.sectionTitle)
                     Spacer()
                     Text(D("Last 365 days")).font(VD.Font.detail).foregroundStyle(.secondary)
                 }
-                HStack(spacing: VD.Space.xxl) {
-                    metric(activity.totalCount, label: D("saved entries"))
-                    metric(activity.activeDays, label: D("active days"))
-                    metric(Int(activity.totalDuration / 60), label: D("minutes recorded"))
-                }.padding(.bottom, VD.Space.s)
-                GeometryReader { geometry in
-                    let size = max(9, min(16, (geometry.size.width - 60) / CGFloat(activity.weeks.count) - 4))
-                    calendarGrid(activity, size: size)
-                }.frame(height: 164)
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: VD.Space.m) { dayDetail(activity); Spacer(); legend }
-                    VStack(alignment: .leading, spacing: VD.Space.s) { dayDetail(activity); legend }
-                }
+                UsageMetricsView(metrics: activity.metrics)
+                HStack(spacing: VD.Space.l) {
+                    Text("\(activity.totalCount) \(D("saved entries"))")
+                    Text("\(activity.activeDays) \(D("active days"))")
+                }.font(VD.Font.footnote).foregroundStyle(.secondary)
+                UsageCalendarView(activity: activity)
                 Divider()
+                DisclosureGroup(D("How these are calculated")) {
+                    VStack(alignment: .leading, spacing: VD.Space.s) {
+                        Text(D("Time in saved voice transcripts. Typed tests and empty transcripts are excluded."))
+                        Text(D("Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words."))
+                        Text(D("Total dictated words divided by total dictation minutes. No recording means no speed estimate."))
+                        Text(D("Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured."))
+                        Text(D("Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics."))
+                        Text(D("Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded."))
+                    }.padding(.top, VD.Space.s).fixedSize(horizontal: false, vertical: true)
+                }.font(VD.Font.footnote).foregroundStyle(.secondary)
                 Text(D("Based on saved history on this Mac. Deleted and expired entries are not included."))
                     .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if !keepHistory {
@@ -85,6 +126,26 @@ struct UsageActivityView: View {
                     Text(D("Use a dictation shortcut to start filling your activity calendar."))
                         .font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
+            }
+        }
+    }
+}
+
+/// Hover updates stay in this subtree, without recounting all history and vocabulary.
+private struct UsageCalendarView: View {
+    let activity: UsageActivity
+    @State private var hoveredDate: Date?
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: VD.Space.l) {
+            GeometryReader { geometry in
+                let size = max(9, min(16, (geometry.size.width - 60) / CGFloat(activity.weeks.count) - 4))
+                calendarGrid(activity, size: size)
+            }.frame(height: 164)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: VD.Space.m) { dayDetail(activity); Spacer(); legend }
+                VStack(alignment: .leading, spacing: VD.Space.s) { dayDetail(activity); legend }
             }
         }
     }
@@ -130,13 +191,6 @@ struct UsageActivityView: View {
                 }
             }.padding(.trailing, VD.Space.xl)
         }
-    }
-
-    private func metric(_ value: Int, label: String) -> some View {
-        VStack(alignment: .leading, spacing: VD.Space.xs) {
-            Text(value.formatted(.number.locale(locale))).font(VD.Font.statValue).monospacedDigit()
-            Text(label).font(VD.Font.detail).foregroundStyle(.secondary)
-        }.accessibilityElement(children: .combine)
     }
 
     private func dayDetail(_ activity: UsageActivity) -> some View {

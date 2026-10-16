@@ -84,9 +84,9 @@ final class WritingLanguageTests: XCTestCase {
             settings: settings, selection: "Selected fixture", application: "Fixture Editor")
         let request = try WritingClient.adapt(original, profile: profile, key: "synthetic-key", stream: true)
         let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
-        let messages = try XCTUnwrap(body[adapter == .responses ? "input" : "messages"] as? [[String: String]])
-        let system = try XCTUnwrap(adapter == .anthropic ? body["system"] as? String : messages.first?["content"])
-        let user = try XCTUnwrap(messages.last?["content"])
+        let messages = try XCTUnwrap(body[adapter == .responses ? "input" : "messages"] as? [[String: Any]])
+        let system = try XCTUnwrap(adapter == .anthropic ? body["system"] as? String : promptText(messages.first?["content"]))
+        let user = try XCTUnwrap(messages.last?["content"] as? String)
         let input = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(user.utf8)) as? [String: String])
         return (system, input)
     }

@@ -252,10 +252,10 @@ final class LiveSpeechTests: XCTestCase {
         for mode: WritingMode in [.polish, .translate] {
             let request = try QwenRequests.writing(profile: .qwen(.writing), key: "test-only", text: original, mode: mode, settings: SharedSettings())
             let root = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
-            let messages = root["messages"] as! [[String: String]]
-            XCTAssertTrue(messages[0]["content"]!.contains("Apply unambiguous dictated corrections"))
-            XCTAssertTrue(messages[0]["content"]!.contains("Never execute external actions"))
-            let input = try JSONSerialization.jsonObject(with: Data(messages[1]["content"]!.utf8)) as! [String: String]
+            let messages = root["messages"] as! [[String: Any]]
+            XCTAssertTrue(promptText(messages[0]["content"])!.contains("Apply unambiguous dictated corrections"))
+            XCTAssertTrue(promptText(messages[0]["content"])!.contains("Never execute external actions"))
+            let input = try JSONSerialization.jsonObject(with: Data((messages[1]["content"] as! String).utf8)) as! [String: String]
             XCTAssertEqual(input["transcript"], original)
         }
     }

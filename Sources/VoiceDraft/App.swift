@@ -253,6 +253,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
+                // Home again at the window's minimum width, where its first row is narrowest.
+                state.page = "Studio"
+                let defaultSize = window.contentLayoutRect.size
+                window.setContentSize(NSSize(width: 1080, height: defaultSize.height))
+                try await Task.sleep(nanoseconds: 600_000_000)
+                if let view = window.contentView {
+                    view.layoutSubtreeIfNeeded()
+                    if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                        view.cacheDisplay(in: view.bounds, to: bitmap)
+                        try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("studio-min-width.png"))
+                    }
+                }
+                window.setContentSize(defaultSize)
                 // The On-screen context section sits below the fold of the General tab; render it alone too.
                 let section = NSHostingView(rootView: ScreenContextPreferences(state: state, screenRecordingAllowed: true)
                     .padding(30).frame(width: 900).background(VD.Palette.canvas))
@@ -262,7 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     section.cacheDisplay(in: section.bounds, to: bitmap)
                     try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("settings-screen-context.png"))
                 }
-                print("Rendered three pages, seven settings tabs and the On-screen context section without accessing persisted data or Keychain.")
+                print("Rendered three pages, Home at minimum width, seven settings tabs and the On-screen context section without accessing persisted data or Keychain.")
             } catch { fputs("Preview capture failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

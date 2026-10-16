@@ -27,7 +27,6 @@ struct UsageSummaryView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     VStack(alignment: .leading, spacing: VD.Space.m) { periods(summary, divider: false) }
                 }
-                Spacer(minLength: 0)
                 Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

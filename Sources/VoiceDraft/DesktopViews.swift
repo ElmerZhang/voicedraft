@@ -226,7 +226,7 @@ private struct DesktopHomeView: View {
     }
 }
 
-/// Home's first row: two equal-width, equal-height columns when each column gets at least
+/// Home's first row: two equal-width, top-aligned columns (each offered the row height; the usage card keeps its own) when each column gets at least
 /// `minimumColumnWidth`; otherwise the subviews stack in order at full width. At the window's
 /// 1080pt minimum the content area is about 778pt, so the stacked fallback is a safety net.
 private struct HomeFirstRowLayout: Layout {

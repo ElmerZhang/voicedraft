@@ -101,7 +101,7 @@ final class AppState: ObservableObject {
     private var tick: Timer?
     private var syncTimer: Timer?
     private var task: Task<Void, Never>?
-    private var generation = UUID()
+    private(set) var generation = UUID()
     private var target: InputTarget?
     private var runSettings: SharedSettings?
     /// The running take's mode; the compact HUD shows it while recording.
@@ -525,7 +525,7 @@ final class AppState: ObservableObject {
         if device.features.recentContext { recentInputs.append(output, application: destination?.name ?? "VoiceDraft") }
         recordVocabularyUsage(output)
         saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
-        var delivery: TextInsertionOutcome?
+        var delivery: TextInsertionDelivery?
         defer { destination?.focusGuard?.stop() }
         // An Electron app enabled at capture may have built its tree since; its
         // fresh value and range are what the insertion receipt observes.
@@ -542,20 +542,15 @@ final class AppState: ObservableObject {
         } else if let destination, destination.editable, runAutoPaste, mode != .ask {
             status = "Inserting text…"
             do {
-                let outcome = try await TextInsertion.insert(output, into: destination) { [weak self] in
-                    guard let self, self.generation == id else { return }
-                    self.hideHUD?()
-                    if (mode == .polish || mode == .verbatim), configuration.vocabulary.learnFromCorrections {
-                        self.observeCorrections(to: output, in: destination, configuration: configuration)
-                    }
+                // Returns once Command-V is queued; the take goes idle below while
+                // the receipt window and clipboard restoration finish under the lease.
+                let sent = try await TextInsertion.send(output, into: destination)
+                guard generation == id else { return }
+                hideHUD?()
+                if (mode == .polish || mode == .verbatim), configuration.vocabulary.learnFromCorrections {
+                    observeCorrections(to: output, in: destination, configuration: configuration)
                 }
-                try Task.checkCancellation(); guard generation == id else { return }
-                delivery = outcome
-                switch outcome {
-                case .confirmed: status = "Text inserted"
-                case .sentToTerminal: status = "Paste sent to terminal"
-                case .sentWithoutConfirmation: status = "Paste sent · check the input field"
-                }
+                delivery = sent
             } catch {
                 try Task.checkCancellation(); guard generation == id else { return }
                 self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
@@ -565,6 +560,7 @@ final class AppState: ObservableObject {
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
         if delivery != nil { hudKind = .compact; hideHUD?() }
         else { hudText = output; hudKind = .result; showHUD?() }
+        if let delivery { awaitDeliveryOutcome(delivery, id: id) }
         if mode == .polish || mode == .verbatim {
             resultBeforeCorrection = output
             if let sample = VocabularyLearningSample(source: .dictation, before: raw, after: output) {
@@ -918,21 +914,31 @@ extension AppState {
                 return
             }
             do {
-                let outcome = try await TextInsertion.insert(text, into: destination) { [weak self] in
-                    guard let self, self.generation == id else { return }
-                    self.hideHUD?()
-                }
-                try Task.checkCancellation(); guard generation == id else { return }
-                switch outcome {
-                case .confirmed: status = "Text inserted"
-                case .sentToTerminal: status = "Paste sent to terminal"
-                case .sentWithoutConfirmation: status = "Paste sent · check the input field"
-                }
+                let sent = try await TextInsertion.send(text, into: destination)
+                guard generation == id else { return }
+                hideHUD?()
                 phase = "idle"; hudKind = .compact
+                awaitDeliveryOutcome(sent, id: id)
             } catch {
                 guard !(error is CancellationError) else { return }
                 reinsertFallback(text, id: id, error: error)
             }
+        }
+    }
+    /// Applies the final status once the background receipt window ends, unless a
+    /// newer run or a cancel has replaced the generation meanwhile.
+    private func awaitDeliveryOutcome(_ delivery: TextInsertionDelivery, id: UUID) {
+        Task { @MainActor [weak self] in
+            let outcome = await delivery.outcome.value
+            self?.applyDeliveryOutcome(outcome, id: id)
+        }
+    }
+    func applyDeliveryOutcome(_ outcome: TextInsertionOutcome, id: UUID) {
+        guard generation == id else { return }
+        switch outcome {
+        case .confirmed: status = "Text inserted"
+        case .sentToTerminal: status = "Paste sent to terminal"
+        case .sentWithoutConfirmation: status = "Paste sent · check the input field"
         }
     }
     private func reinsertFallback(_ text: String, id: UUID, error: Error) {

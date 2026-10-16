@@ -423,3 +423,16 @@ Every `Button`, `Menu`, `Toggle`, `Picker`, `onTapGesture`, overlay and `NSStatu
   8. **V8 Live adapter latency.** Compare Message and Doubao time-to-microphone with and without the feature; expect no measurable increase over the handshake.
   9. **Status menu extraction.** From another app, choose Extract words from this screen… and confirm Vocabulary opens with the review sheet for that app, that the item is disabled during a take, and that the sheet's source labels and empty states read correctly.
   10. **Learning exclusion.** Dictate a screen-only name twice in two takes with discovery on and confirm it is not added automatically.
+
+### Faster return after paste — 2026-10-16
+
+- `swift build --disable-sandbox` completed with no warnings. `swift test --disable-sandbox`: **286 tests, 282 passed, 4 skipped, 0 failures**. `check-localizations.py`: 286 messages passed. `check-desktop-localizations.py`: 161 messages passed. No user-visible strings were added.
+- `TextInsertion.insert` was split into `send`, which returns once Command-V is queued, and a background `TextInsertionDelivery.outcome` task that observes the receipt, restores the clipboard and releases the delivery lease. The take goes idle right after `send`; the final status arrives when the outcome resolves. This changes the earlier invariant that the receipt window keeps the workflow busy; `docs/architecture.md` records the new rule.
+- New `InsertionReceiptPolicyTests` fix the schedule: text fields poll the AX receipt 20 × 75 ms; keyboard surfaces use one 300 ms clipboard grace without AX observation. New `DeliveryOutcomeTests` check that a late outcome sets Text inserted, Paste sent to terminal or Paste sent · check the input field for the current run and is ignored after a cancel or newer run. `BusyShortcutNoticeTests` still pass. The lease wait, clipboard restoration and real AX receipts are not unit-tested because they need the general pasteboard and a live target.
+- Expected effect, from the usage log: median blocked time after release falls from about 3.2 s to about 1.7 s; Warp holds the temporary clipboard for 0.3 s instead of 1.5 s.
+- Pending acceptance checks by hand:
+  1. **TextEdit back-to-back.** Paste into TextEdit and start a new take immediately. The first paste is intact and the user's clipboard is restored afterwards.
+  2. **Warp.** A paste into Warp never pastes the old clipboard content.
+  3. **Insert last result during the window.** Press Control-Option-V within a second of a paste. It waits for the lease and then pastes the result, and the clipboard is restored.
+  4. **Escape after a take.** Press Escape right after a take. The pasted text and the restored clipboard are left alone.
+  5. **Home status.** Home reaches Text inserted or Paste sent to terminal a moment after the HUD closes.

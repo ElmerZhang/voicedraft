@@ -23,6 +23,12 @@ struct InputTarget {
 
 enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWithoutConfirmation }
 
+/// A queued paste. `outcome` resolves when the receipt window ends and the
+/// user's clipboard has been restored; the delivery lease is held until then.
+struct TextInsertionDelivery {
+    let outcome: Task<TextInsertionOutcome, Never>
+}
+
 @MainActor
 enum TextInsertion {
     private static var delivering = false
@@ -215,11 +221,27 @@ enum TextInsertion {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
-    static func insert(_ text: String, into target: InputTarget, onPasteSent: () -> Void) async throws -> TextInsertionOutcome {
+    /// Sends one Command-V into the original target and returns as soon as it is
+    /// queued. Every pre-post failure throws, releases the delivery lease and
+    /// restores the clipboard if it was already written. After posting, an
+    /// unstructured main-actor task (never a child of the caller, so cancelling the
+    /// take cannot shorten it) observes the receipt per `InsertionReceiptPolicy`,
+    /// restores the user's clipboard and releases the lease on every path.
+    static func send(_ text: String, into target: InputTarget) async throws -> TextInsertionDelivery {
         try Task.checkCancellation()
-        guard !delivering else { throw VoiceDraftError.message("Could not send the paste shortcut.") }
+        // A previous delivery's temporary text may still be on the clipboard. Wait
+        // for its lease before reading the snapshot, or that text would later be
+        // restored as the user's clipboard.
+        var waited = 0
+        while delivering {
+            guard waited < 40 else { throw VoiceDraftError.message("Could not send the paste shortcut.") }
+            try await Task.sleep(nanoseconds: 50_000_000)
+            try Task.checkCancellation()
+            waited += 1
+        }
         delivering = true
-        defer { delivering = false }
+        var handedOff = false
+        defer { if !handedOff { delivering = false } }
         guard AXIsProcessTrusted() else { throw VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here.") }
         guard !target.secure else { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
         let board = NSPasteboard.general
@@ -263,30 +285,36 @@ enum TextInsertion {
         board.clearContents()
         let supplied = board.writeObjects([item])
         let generation = board.changeCount
-        defer { previous.restore(board, ifGeneration: generation) }
-        guard supplied else { throw VoiceDraftError.message("Could not copy the result.") }
+        guard supplied else {
+            previous.restore(board, ifGeneration: generation)
+            throw VoiceDraftError.message("Could not copy the result.")
+        }
         target.focusGuard?.stop()
         down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
-        // UI completion does not need to wait for AX confirmation. Keep the
-        // clipboard alive below until the editor has had time to consume it.
-        onPasteSent()
-        // AX/event success only acknowledges delivery. Wait for the actual
-        // field update before claiming success, without retrying and duplicating text.
-        // Keep the clipboard available during cancellation as the paste is already queued.
-        for _ in 0..<20 {
-            await Task.detached { try? await Task.sleep(nanoseconds: 75_000_000) }.value
-            if !target.keyboardSurface, let original = current.element,
-               receipt.confirms(value: attribute(original, kAXValueAttribute) as? String,
-                                range: nsRange(selectedRange(original))) { return .confirmed }
+        handedOff = true
+        let policy = InsertionReceiptPolicy(keyboardSurface: target.keyboardSurface)
+        let element = policy.observesAccessibility ? current.element : nil
+        let keyboardSurface = target.keyboardSurface, opaqueApplication = target.opaqueApplication
+        let outcome = Task { @MainActor () -> TextInsertionOutcome in
+            // The paste is already queued: keep the clipboard available for the
+            // whole bounded window regardless of cancellation, then restore it.
+            defer { previous.restore(board, ifGeneration: generation); delivering = false }
+            // AX/event success only acknowledges delivery. Wait for the actual
+            // field update before claiming success, without retrying and duplicating text.
+            for _ in 0..<policy.attempts {
+                await Task.detached { try? await Task.sleep(nanoseconds: policy.intervalNanoseconds) }.value
+                if let element, receipt.confirms(value: attribute(element, kAXValueAttribute) as? String,
+                                                 range: nsRange(selectedRange(element))) { return .confirmed }
+            }
+            // Terminal echo is not an AX value/selection replacement. Keep the
+            // honest distinction between sending paste and observing inserted text.
+            if keyboardSurface && !opaqueApplication { return .sentToTerminal }
+            // A rich editor can accept paste without exposing an exact AX receipt.
+            // Missing confirmation is not a failed send: prompting Copy here can
+            // duplicate text that already arrived. Keep it distinct from confirmed.
+            return .sentWithoutConfirmation
         }
-        try Task.checkCancellation()
-        // Terminal echo is not an AX value/selection replacement. Keep the
-        // honest distinction between sending paste and observing inserted text.
-        if target.keyboardSurface && !target.opaqueApplication { return .sentToTerminal }
-        // A rich editor can accept paste without exposing an exact AX receipt.
-        // Missing confirmation is not a failed send: prompting Copy here can
-        // duplicate text that already arrived. Keep it distinct from confirmed.
-        return .sentWithoutConfirmation
+        return TextInsertionDelivery(outcome: outcome)
     }
     private static func nsRange(_ range: CFRange?) -> NSRange? {
         range.map { NSRange(location: $0.location, length: $0.length) }

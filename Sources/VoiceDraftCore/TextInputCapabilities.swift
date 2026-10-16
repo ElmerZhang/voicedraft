@@ -136,9 +136,16 @@ public enum KeyboardSurfacePolicy {
             && ["AXWindow", "AXGroup", "AXUnknown", "AXLayoutArea"].contains(focused.role)
     }
 
+    /// Terminals whose standard, nonmodal window exposes the TTY grid as a text
+    /// area without a writable value, or no editor at all. Ghostty's surface is an
+    /// `AXTextArea` whose value is the screen contents, with no settable value or
+    /// selection range and no AX Paste menu item, so it never qualifies as
+    /// writable or generic opaque input (probed 2026-10-16).
+    public static let terminalBundleIdentifiers: Set<String> = ["dev.warp.Warp-Stable", "com.mitchellh.ghostty"]
+
     public static func accepts(bundleIdentifier: String?, focused: TextInputCapabilities?, editor: TextInputCapabilities?,
                                standardWindow: Bool, modalWindow: Bool) -> Bool {
-        guard bundleIdentifier == "dev.warp.Warp-Stable", standardWindow, !modalWindow else { return false }
+        guard let bundleIdentifier, terminalBundleIdentifiers.contains(bundleIdentifier), standardWindow, !modalWindow else { return false }
         guard focused?.enabled != false, focused?.secure != true, editor?.enabled != false, editor?.secure != true else { return false }
         if let editor {
             // A terminal's read-only AX text area represents the output grid;

@@ -1,5 +1,12 @@
 # Validation record
 
+
+## 2026-10-16 · Home activity calendar
+
+- Replaced Home's input-testing workspace and old totals with a 365-day retained-history activity calendar, date/count/minute hover details, window totals and empty/history-off guidance. Shortcut help remains below it; Settings keeps device/model/permission controls. Removed Help's obsolete test-workspace link. No history migration, extra collection, model call or sync change.
+- Four new `UsageActivityTests` cover local-midnight/window boundaries, future exclusion, leap day, different week starts, DST, zero-duration entries, removal/empty state and density thresholds. `./scripts/test-all.sh` passed: **301 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go vet/build/race tests, synthetic loopback provider/sync integration and eight-language localization checks. An initial restricted run could not use clipboard/system language resources; the full run with local system access passed.
+- `./scripts/build-app.sh` produced `dist/VoiceDraft.app`; signature and Info.plist checks passed. Inspected isolated Chinese light/dark captures (`dist/activity-light/studio.png`, `dist/activity-dark/studio.png`) and the English empty state (`dist/activity-empty/studio.png`). Captures use synthetic or empty history, never the user's records. Packaged locally; did not install over `/Applications/VoiceDraft.app`, invoke real providers or record microphone audio.
+
 ## 2026-10-15 · Fn chord promotes the held take
 
 - **Request.** Fn then Shift should start Translate, as Typeless does, not only Shift then Fn.

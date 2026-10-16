@@ -166,3 +166,15 @@
 "No new candidate terms were found on this screen. Existing vocabulary words are excluded." = "이 화면에서 새로운 후보 용어를 찾지 못했습니다. 이미 있는 어휘 단어는 제외됩니다.";
 "Screen · Accessibility" = "화면 · 손쉬운 사용";
 "Screen · OCR" = "화면 · OCR";
+
+// Home activity calendar
+"Usage activity" = "사용 통계";
+"Last 365 days" = "최근 365일";
+"active days" = "사용한 일수";
+"%d entries · %d min recorded" = "기록 %d개 · 녹음 %d분";
+"Based on saved history on this Mac. Deleted and expired entries are not included." = "이 Mac에 저장된 기록을 기준으로 합니다. 삭제되거나 보관 기간이 지난 기록은 포함되지 않습니다.";
+"History is off. New activity will appear after you enable history." = "기록이 꺼져 있습니다. 기록을 켜면 새 활동이 표시됩니다.";
+"Use a dictation shortcut to start filling your activity calendar." = "받아쓰기 단축키를 사용하여 활동 달력을 채워 보세요.";
+"Less" = "적음";
+"More" = "많음";
+"Used when you record with a shortcut or from the menu bar." = "단축키나 메뉴 막대에서 녹음할 때 사용합니다.";

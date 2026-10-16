@@ -26,6 +26,14 @@ enum VD {
         /// Recording state.
         static let recording = adaptive(light: NSColor(red: 0.84, green: 0.25, blue: 0.22, alpha: 1), dark: NSColor(red: 0.95, green: 0.38, blue: 0.34, alpha: 1))
         static let success = Color(nsColor: .systemGreen)
+        /// Activity density: zero, 1–3, 4–7, 8–15, and 16+ saved entries.
+        static let activityLevels: [Color] = [
+            surface,
+            adaptive(light: NSColor(red: 0.75, green: 0.89, blue: 0.78, alpha: 1), dark: NSColor(red: 0.13, green: 0.29, blue: 0.20, alpha: 1)),
+            adaptive(light: NSColor(red: 0.44, green: 0.74, blue: 0.52, alpha: 1), dark: NSColor(red: 0.17, green: 0.46, blue: 0.28, alpha: 1)),
+            adaptive(light: NSColor(red: 0.22, green: 0.58, blue: 0.34, alpha: 1), dark: NSColor(red: 0.25, green: 0.66, blue: 0.38, alpha: 1)),
+            adaptive(light: NSColor(red: 0.12, green: 0.39, blue: 0.23, alpha: 1), dark: NSColor(red: 0.46, green: 0.84, blue: 0.53, alpha: 1))
+        ]
         static let warning = Color(nsColor: .systemOrange)
         static let danger = Color(nsColor: .systemRed)
         /// Icons and text drawn on `accent` or `recording` fills.
@@ -48,6 +56,7 @@ enum VD {
     }
 
     enum Radius {
+        static let activityCell: CGFloat = 3
         static let control: CGFloat = 8
         static let chip: CGFloat = 12
         static let card: CGFloat = 16

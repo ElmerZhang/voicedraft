@@ -166,3 +166,15 @@
 "No new candidate terms were found on this screen. Existing vocabulary words are excluded." = "No se encontraron términos candidatos nuevos en esta pantalla. Las palabras que ya están en el vocabulario se excluyen.";
 "Screen · Accessibility" = "Pantalla · Accesibilidad";
 "Screen · OCR" = "Pantalla · OCR";
+
+// Home activity calendar
+"Usage activity" = "Actividad de uso";
+"Last 365 days" = "Últimos 365 días";
+"active days" = "días activos";
+"%d entries · %d min recorded" = "%d entradas · %d min grabados";
+"Based on saved history on this Mac. Deleted and expired entries are not included." = "Basado en el historial guardado en este Mac. No incluye entradas eliminadas o caducadas.";
+"History is off. New activity will appear after you enable history." = "El historial está desactivado. Actívalo para ver la nueva actividad.";
+"Use a dictation shortcut to start filling your activity calendar." = "Usa un atajo de dictado para empezar a llenar tu calendario de actividad.";
+"Less" = "Menos";
+"More" = "Más";
+"Used when you record with a shortcut or from the menu bar." = "Se usa al grabar con un atajo o desde la barra de menús.";

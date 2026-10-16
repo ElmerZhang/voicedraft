@@ -188,25 +188,12 @@ private struct DesktopHomeView: View {
             Text(D("Speak, don't type.")).font(VD.Font.hero).tracking(-1.2)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             FnShortcutStatus(state: state)
-            HStack(alignment: .top, spacing: VD.Space.xl) {
-                ShortcutSummaryList(state: state)
-                    .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous).strokeBorder(VD.Palette.line))
-                    .padding(10).background { wash }
-                VDSurface(style: .shaded) {
-                    stat("clock", value: "\(Int(state.history.reduce(0) { $0 + $1.duration }) / 60)", label: D("minutes recorded"))
-                    stat("text.bubble", value: "\(state.history.count)", label: D("saved entries"))
-                    stat("book.closed", value: "\(state.settings.vocabulary.entries.filter(\.enabled).count)", label: D("active terms"))
-                    Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }.frame(width: 200).padding(.top, 10)
-            }
-            HStack(alignment: .firstTextBaseline) {
-                Text(D("Try it here")).font(VD.Font.sectionTitle)
-                Spacer()
-                Label(D("Your testing workspace"), systemImage: "slider.horizontal.3").font(VD.Font.detail).foregroundStyle(.secondary)
-            }.padding(.top, VD.Space.s)
-            StudioView(showsHeading: false, state: state)
+            UsageActivityView(history: state.history, keepHistory: state.device.keepHistory)
+            Text(D("Shortcuts")).font(VD.Font.sectionTitle)
+            ShortcutSummaryList(state: state)
+                .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous).strokeBorder(VD.Palette.line))
+                .padding(10).background { wash }
         }
     }
     /// Decorative tinted dot grid behind the shortcut card; adapts to the appearance.
@@ -221,15 +208,6 @@ private struct DesktopHomeView: View {
                 }
             }
         }.clipShape(RoundedRectangle(cornerRadius: VD.Radius.card + 10, style: .continuous)).accessibilityHidden(true)
-    }
-    private func stat(_ icon: String, value: String, label: String) -> some View {
-        HStack(spacing: VD.Space.m) {
-            Image(systemName: icon).font(.system(size: 18)).frame(width: 22).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(VD.Font.statValue)
-                Text(label).font(VD.Font.footnote).foregroundStyle(.secondary)
-            }
-        }.accessibilityElement(children: .combine)
     }
 }
 
@@ -589,7 +567,7 @@ private struct DesktopSettingsView: View {
             RecordingPreferences(state: state)
             ScreenContextPreferences(state: state, screenRecordingAllowed: screenRecordingAllowed)
             section(D("Audio"), icon: "mic") {
-                VDSettingRow(title: L("Input device"), detail: D("Used when you record with a shortcut or on Home.")) {
+                VDSettingRow(title: L("Input device"), detail: D("Used when you record with a shortcut or from the menu bar.")) {
                     HStack(spacing: VD.Space.xs) {
                         Picker(L("Input device"), selection: Binding(get: { state.device.inputDeviceID ?? "" }, set: { state.selectInputDevice($0) })) {
                             let defaultName = state.inputDevices.first { $0.id == state.defaultInputID }?.name
@@ -661,11 +639,6 @@ private struct DesktopSettingsView: View {
             VDSurface(padding: 0, spacing: 0) {
                 Text(D("Shortcuts")).font(VD.Font.cardTitle).padding([.horizontal, .top], 20).padding(.bottom, VD.Space.xs)
                 ShortcutSummaryList(state: state)
-            }
-            VDSurface(spacing: VD.Space.s) {
-                Text(D("Try it here")).font(VD.Font.cardTitle)
-                Text(L("Or type here to test your writing model.")).font(VD.Font.body).foregroundStyle(.secondary)
-                Button(D("Home")) { close(); state.page = "Studio" }.padding(.top, VD.Space.xs)
             }
             VDSurface(spacing: VD.Space.s) {
                 Text(L("Make room for your voice")).font(VD.Font.cardTitle)

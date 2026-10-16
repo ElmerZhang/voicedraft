@@ -58,6 +58,12 @@ final class AppState: ObservableObject {
     private var gesture = RecordingGesture()
     private var heldAction: ShortcutAction?
     private var finishWhenReady = false
+    /// Opt-in take timing diagnostics; nil in preview mode.
+    var takeDiagnostics: TakeDiagnosticsLog?
+    /// Timings of the current take for `takeDiagnostics`; recorded once when the take ends.
+    private(set) var takeTrace: TakeTrace?
+    /// The shortcut press that `toggle` is starting a take for: action, event time, processing time.
+    private var pendingPress: (action: ShortcutAction, event: TimeInterval, processed: TimeInterval)?
     private var recentInputs = RecentInputContext()
     private var player: AVAudioPlayer?
     private var playbackTask: Task<Void, Never>?
@@ -199,6 +205,7 @@ final class AppState: ObservableObject {
             let store = try LocalStore(); self.store = store
             usageLog = UsageLog(store: store)
             screenContext.diagnostics = ScreenContextDiagnosticsLog(store: store)
+            takeDiagnostics = TakeDiagnosticsLog(store: store)
             settings = try store.read("settings", fallback: SharedSettings())
             try settings.validate()
             device = try store.read("device", fallback: DeviceSettings())
@@ -352,15 +359,22 @@ final class AppState: ObservableObject {
     func toggle(mode override: WritingMode? = nil, external: Bool = false) {
         if recording { finish(); return }
         guard !busy else { return }
+        let started = ProcessInfo.processInfo.systemUptime
+        let press = pendingPress; pendingPress = nil
         stopCorrectionObservation()
         player?.stop(); playingAudioID = nil
         runAudio = nil; runRetainAudio = device.keepHistory && device.features.retainAudio
         if let override { mode = override }
         error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact; screenContextTermCount = nil
         generation = UUID(); let id = generation
+        takeTrace = TakeTrace(takeID: id, origin: press?.event ?? started, action: press?.action, mode: mode, external: external)
+        takeTrace?.pressDelay = press.map { $0.processed - $0.event }
         target?.focusGuard?.stop()
+        let captureStarted = ProcessInfo.processInfo.systemUptime
         target = external ? TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true) : nil
+        if external { takeTrace?.capture = ProcessInfo.processInfo.systemUptime - captureStarted }
         let targetBundleID = target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }
+        takeTrace?.bundleID = targetBundleID
         runMode = mode; runSettings = settings.resolved(for: targetBundleID);
         if device.features.recentContext { runSettings?.recentInputContext = recentInputs.text(application: target?.name ?? "VoiceDraft") }
         runAutoPaste = device.autoPaste; runExternal = external
@@ -388,6 +402,7 @@ final class AppState: ObservableObject {
         let inputDeviceID = device.inputDeviceID
         recordingDeviceName = ""; elapsed = 0; level = 0
         phase = "starting"; status = "Opening microphone…"
+        traceTake(id) { $0.starting = $0.since(ProcessInfo.processInfo.systemUptime) }
         showHUD?()
         if let speech = settings.speech, speech.adapter.isWebSocket {
             let feed = LiveAudioFeed(retainAudio: runRetainAudio), vocabulary = settings.vocabulary, speechKey = runSpeechKey
@@ -435,6 +450,7 @@ final class AppState: ObservableObject {
                     screenTerms: { await coordinator.asrTerms(take: id, until: screenGate) },
                     onReady: { [weak self] in
                         guard let self, await self.generation == id else { throw CancellationError() }
+                        await self.traceTake(id) { $0.taskStarted = $0.since(ProcessInfo.processInfo.systemUptime) }
                     }, onUpdate: { [weak self] text in
                         await self?.updateLiveTranscript(text, id: id)
                     }, usage: usage)
@@ -454,7 +470,8 @@ final class AppState: ObservableObject {
     }
     private func captureDidStart(_ input: AudioInputDevice, id: UUID) {
         recordingDeviceName = input.name; phase = "recording"; status = "Listening · speak naturally"
-        if finishWhenReady { finishWhenReady = false; finish(); return }
+        traceTake(id) { $0.microphone = $0.since(ProcessInfo.processInfo.systemUptime) }
+        if finishWhenReady { finishWhenReady = false; traceTake(id) { $0.finishWhenReady = true }; finish(); return }
         tick = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.generation == id, self.recording else { return }
@@ -577,6 +594,7 @@ final class AppState: ObservableObject {
         } else { status = "Your text is ready" }
         gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
+        recordTakeDiagnostics(id, audioSeconds: duration, outcome: "completed")
         let opaqueDelivery = destination?.opaqueApplication == true
         if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery) }
         else { hudText = output; hudKind = .result; showHUD?() }
@@ -597,6 +615,7 @@ final class AppState: ObservableObject {
         return true
     }
     func cancel() {
+        recordTakeDiagnostics(generation, audioSeconds: elapsed, outcome: "cancelled")
         target?.focusGuard?.stop()
         effects.end(sound: false); gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false; runAudio = nil
         player?.stop(); playingAudioID = nil
@@ -629,9 +648,13 @@ final class AppState: ObservableObject {
     }
     private func fail(_ error: Error, id: UUID) {
         guard generation == id else { return }
+        let noSpeech: Bool
+        if case SpeechRecognitionError.noSpeech = error { noSpeech = true } else { noSpeech = false }
+        recordTakeDiagnostics(id, audioSeconds: elapsed, outcome: noSpeech ? "noSpeech" : error is CancellationError ? "cancelled" : "failed",
+                              failure: error is CancellationError ? nil : error)
         target?.focusGuard?.stop()
         screenContext.end(take: id)
-        if case SpeechRecognitionError.noSpeech = error {
+        if noSpeech {
             cancel()
             self.error = ""; status = "Ready when you are"
             return
@@ -838,7 +861,11 @@ extension AppState {
         var options = device.features; options.onboardingCompleted = true; saveFeatures(options)
         showingOnboarding = false
     }
-    func shortcutEvent(_ action: ShortcutAction, down: Bool) {
+    /// `time` is the key event's own time on the uptime clock (`ShortcutEventClock`);
+    /// nil (synthetic callers) means now. Tap versus hold is decided on event times,
+    /// so a main-thread stall while the take starts cannot turn a tap into a hold.
+    func shortcutEvent(_ action: ShortcutAction, down: Bool, at time: TimeInterval? = nil) {
+        let now = ProcessInfo.processInfo.systemUptime, eventTime = time ?? now
         // A held Fn chord retargeted to a non-recording action still finishes
         // its take on release, so that release takes the gesture path below.
         let releasesTake = !down && heldAction == action
@@ -855,11 +882,17 @@ extension AppState {
         if down {
             guard heldAction == nil || heldAction == action else { return }
             heldAction = action
-            effect = gesture.press(at: ProcessInfo.processInfo.systemUptime, idle: !busy)
+            effect = gesture.press(at: eventTime, idle: !busy)
         } else {
             guard heldAction == action else { return }
-            effect = gesture.release(at: ProcessInfo.processInfo.systemUptime, active: recording || phase == "starting")
+            effect = gesture.release(at: eventTime, active: recording || phase == "starting")
             heldAction = nil
+            let locked = gesture.locked
+            traceTake(generation) { trace in
+                guard trace.releaseEffect == nil, trace.action != nil else { return }
+                trace.releaseDelay = now - eventTime; trace.held = trace.since(eventTime)
+                trace.releaseEffect = effect == .finish ? "finish" : "none"; trace.locked = locked
+            }
         }
         recordingLocked = gesture.locked
         switch effect {
@@ -868,7 +901,9 @@ extension AppState {
             // gesture; show the Processing capsule so the shortcut does not look dead.
             if down, phase == "processing" { status = "Still finishing the previous take…"; showHUD?() }
         case .start:
+            pendingPress = (action, eventTime, now)
             toggle(mode: action.recordingMode ?? .polish, external: true)
+            pendingPress = nil
         case .finish:
             if phase == "starting" { finishWhenReady = true } else { finish() }
         }
@@ -880,7 +915,7 @@ extension AppState {
     /// current mode stays and a refused switch explains itself in `status`.
     /// Audio, screen context, HUD, gesture timing and `generation` continue.
     /// A tap-locked take has no held key, so it never retargets.
-    func retargetShortcut(from: ShortcutAction, to: ShortcutAction) {
+    func retargetShortcut(from: ShortcutAction, to: ShortcutAction, at time: TimeInterval? = nil) {
         guard heldAction == from, from != to else { return }
         heldAction = to
         guard phase == "starting" || recording, let mode = to.recordingMode, mode != runMode else { return }
@@ -890,9 +925,9 @@ extension AppState {
         case .notRecording?: return
         case nil: break
         }
-        runMode = mode; self.mode = mode
+        runMode = mode; self.mode = mode; traceTake(generation) { $0.mode = mode }
         // The tap-versus-hold window restarts at the chord, so a quick release locks the promoted take.
-        gesture.retarget(at: ProcessInfo.processInfo.systemUptime)
+        gesture.retarget(at: time ?? ProcessInfo.processInfo.systemUptime)
         screenContext.retarget(take: generation, mode: mode)
     }
     /// Inserts the last result (`result`, from a recording or Studio) again into
@@ -1098,6 +1133,18 @@ extension AppState {
 }
 
 extension AppState {
+    /// Updates the trace of take `id`; ignored for any other take.
+    func traceTake(_ id: UUID, _ update: (inout TakeTrace) -> Void) {
+        guard var trace = takeTrace, trace.takeID == id else { return }
+        update(&trace); takeTrace = trace
+    }
+    /// Writes take `id`'s diagnostics line once (when enabled) and drops its trace.
+    func recordTakeDiagnostics(_ id: UUID, audioSeconds: Double?, outcome: String, failure: Error? = nil) {
+        guard let trace = takeTrace, trace.takeID == id else { return }
+        takeTrace = nil
+        takeDiagnostics?.record(trace.record(audioSeconds: audioSeconds, outcome: outcome, failure: failure))
+    }
+
     /// Times one inference call and appends its usage record, success or failure.
     /// The call's result or error passes through unchanged; logging never fails a take.
     func metered<T>(_ kind: ModelUsageKind, source: ModelUsageSource, profile: ModelProfile, mode: WritingMode? = nil, streamed: Bool = false,

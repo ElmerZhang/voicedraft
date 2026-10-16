@@ -37,6 +37,43 @@ final class FeatureTests: XCTestCase {
         XCTAssertEqual(gesture.press(at: 5, idle: false), .none)
         XCTAssertEqual(gesture.release(at: 6, active: false), .none)
     }
+    /// The cold-start bug: the release is processed after a main-thread stall,
+    /// but its event time (0.1 s after the press) still makes it a tap.
+    func testGestureUsesEventTimesNotProcessingTimes() {
+        var gesture = RecordingGesture()
+        let press = 1000.0
+        XCTAssertEqual(gesture.press(at: press, idle: true), .start)
+        // Processed at press + 0.9 s; the event happened at press + 0.1 s.
+        XCTAssertEqual(gesture.release(at: press + 0.1, active: true), .none)
+        XCTAssertTrue(gesture.locked)
+        // A genuine 0.8 s hold still finishes.
+        gesture.reset()
+        XCTAssertEqual(gesture.press(at: 2000, idle: true), .start)
+        XCTAssertEqual(gesture.release(at: 2000.8, active: true), .finish)
+        XCTAssertFalse(gesture.locked)
+        // A retarget restarts the window at its event time.
+        gesture.reset()
+        XCTAssertEqual(gesture.press(at: 3000, idle: true), .start)
+        gesture.retarget(at: 3000.7)
+        XCTAssertEqual(gesture.release(at: 3001.0, active: true), .none)
+        XCTAssertTrue(gesture.locked)
+    }
+    func testShortcutEventClockConvertsAndFallsBack() {
+        let now = 5000.0
+        // Carbon seconds on the uptime clock.
+        XCTAssertEqual(ShortcutEventClock.uptime(seconds: 4999.2, now: now), 4999.2)
+        XCTAssertEqual(ShortcutEventClock.uptime(seconds: nil, now: now), now)
+        XCTAssertEqual(ShortcutEventClock.uptime(seconds: 0, now: now), now, "synthetic events carry 0")
+        XCTAssertEqual(ShortcutEventClock.uptime(seconds: now - 31, now: now), now, "implausibly old")
+        XCTAssertEqual(ShortcutEventClock.uptime(seconds: now + 1, now: now), now, "in the future")
+        XCTAssertEqual(ShortcutEventClock.uptime(seconds: now + 0.01, now: now), now, "small skew is clamped")
+        // CGEvent nanoseconds.
+        XCTAssertEqual(ShortcutEventClock.uptime(cgTimestamp: 4_999_500_000_000, timebase: (125, 3), now: now), 4999.5, accuracy: 1e-6)
+        // Raw mach ticks (Apple silicon timebase 125/3): 4999.5 s = 119_988_000_000 ticks.
+        XCTAssertEqual(ShortcutEventClock.uptime(cgTimestamp: 119_988_000_000, timebase: (125, 3), now: now), 4999.5, accuracy: 1e-6)
+        XCTAssertEqual(ShortcutEventClock.uptime(cgTimestamp: 0, timebase: (125, 3), now: now), now)
+        XCTAssertEqual(ShortcutEventClock.uptime(cgTimestamp: 1_000_000_000, timebase: (1, 1), now: now), now)
+    }
     func testShortcutsRejectConflictsAndBareLetters() throws {
         try ShortcutBinding.validate(ShortcutBinding.defaults)
         try ShortcutBinding.validate([.init(.dictate, keyCode: 63, modifiers: 0)])

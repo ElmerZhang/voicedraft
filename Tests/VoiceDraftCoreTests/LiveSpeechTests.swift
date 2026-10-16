@@ -361,3 +361,68 @@ extension LiveSpeechTests {
         XCTAssertEqual(socket.state.sent, [])
     }
 }
+
+// Microphone before handshake: capture starts at t0, so PCM can precede `task-started`.
+extension LiveSpeechTests {
+    func testFramesCapturedBeforeTaskStartedUploadAfterItInOrder() async throws {
+        let socket = LiveFixtureSocket(), feed = LiveAudioFeed(), log = EventLog()
+        socket.acknowledge = false
+        let started = expectation(description: "run-task")
+        socket.onStart = { started.fulfill() }
+        socket.onFinish = {
+            socket.publish("result-generated", sentence: ["sentence_id": 1, "text": "First word kept.", "sentence_end": true])
+            socket.publish("task-finished")
+        }
+        // Captured during the handshake: before the session even sends run-task.
+        let early = Data((0..<9600).map { UInt8($0 % 251) })
+        try feed.append(early)
+        let operation = Task {
+            try await run(socket, feed: feed, ready: { log.append("ready \(socket.state.bytes.count)") })
+        }
+        await fulfillment(of: [started], timeout: 1)
+        // Still captured while waiting for task-started.
+        let late = Data((0..<4800).map { UInt8(($0 + 7) % 239) })
+        try feed.append(late)
+        XCTAssertTrue(socket.state.bytes.isEmpty, "Nothing is uploaded before task-started")
+        socket.publish("task-started")
+        try feed.finish()
+        let text = try await operation.value
+        XCTAssertEqual(text, "First word kept.")
+        XCTAssertEqual(log.all, ["ready 0"])
+        XCTAssertEqual(socket.state.sent, ["run-task", "audio", "audio", "audio", "audio", "audio", "finish-task"])
+        XCTAssertEqual(socket.state.bytes.reduce(Data(), +), early + late)
+        XCTAssertTrue(socket.state.closed)
+    }
+    func testFeedFinishedBeforeTaskStartedStillUploadsAndReturnsFinalText() async throws {
+        let socket = LiveFixtureSocket(), feed = LiveAudioFeed()
+        socket.acknowledge = false
+        let started = expectation(description: "run-task")
+        socket.onStart = { started.fulfill() }
+        socket.onFinish = {
+            socket.publish("result-generated", sentence: ["sentence_id": 1, "text": "Short take.", "sentence_end": true])
+            socket.publish("task-finished")
+        }
+        // The key was released during the handshake: capture stopped and flushed its tail.
+        let input = Data((0..<5000).map { UInt8($0 % 241) })
+        try feed.append(input); try feed.finish()
+        let operation = Task { try await run(socket, feed: feed) }
+        await fulfillment(of: [started], timeout: 1)
+        socket.publish("task-started")
+        let text = try await operation.value
+        XCTAssertEqual(text, "Short take.")
+        XCTAssertEqual(socket.state.sent, ["run-task", "audio", "audio", "finish-task"])
+        XCTAssertEqual(socket.state.bytes.map(\.count), [3200, 1800])
+        XCTAssertEqual(socket.state.bytes.reduce(Data(), +), input)
+    }
+    func testDefaultFeedBuffersTheFifteenSecondStartDeadline() async throws {
+        let feed = LiveAudioFeed()
+        for index in 0..<150 { try feed.append(Data(repeating: UInt8(index % 256), count: 3200)) }
+        XCTAssertThrowsError(try feed.append(Data(repeating: 9, count: 3200))) {
+            XCTAssertTrue($0.localizedDescription.contains("too slow"))
+        }
+        var frames = 0
+        do { for try await _ in feed.stream { frames += 1 }; XCTFail("Overflow must fail") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("too slow")) }
+        XCTAssertEqual(frames, 150)
+    }
+}

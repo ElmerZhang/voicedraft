@@ -394,18 +394,14 @@ final class AppState: ObservableObject {
             liveFeed = feed
             task = Task { [self] in
                 do {
-                    // The recording duration is final by the time the live call returns.
-                    let raw = try await metered(.speech, source: .dictationLiveSpeech, profile: speech, streamed: true, takeID: id, audioSeconds: elapsed) { usage in
-                        try await SpeechClient.transcribeLive(profile: speech, key: speechKey, audio: feed.stream, vocabulary: vocabulary,
-                            // Overlaps the socket handshake; never waits past t0 + 250 ms.
-                            screenTerms: { await coordinator.asrTerms(take: id, until: screenGate) },
-                            onReady: { [weak self] in
-                                guard let self else { throw CancellationError() }
-                                try await self.beginLiveCapture(id: id, inputID: inputDeviceID, feed: feed)
-                            }, onUpdate: { [weak self] text in
-                                await self?.updateLiveTranscript(text, id: id)
-                            }, usage: usage)
-                    }
+                    // The microphone opens at t0, in parallel with the socket handshake and the
+                    // screen-term gate. PCM captured before `task-started` queues in the feed
+                    // (15 s) and is uploaded in order once the session is ready.
+                    async let session = liveSession(speech: speech, key: speechKey, feed: feed, vocabulary: vocabulary,
+                                                    screenGate: screenGate, coordinator: coordinator, id: id)
+                    do { try await beginLiveCapture(id: id, inputID: inputDeviceID, feed: feed) }
+                    catch { fail(error, id: id); throw error }   // Cancels the session before it is awaited.
+                    let raw = try await session
                     try Task.checkCancellation(); guard generation == id else { return }
                     guard phase == "processing", elapsed >= 0.25 else {
                         throw VoiceDraftError.message("The recording was too short. Try again.")
@@ -424,6 +420,29 @@ final class AppState: ObservableObject {
                     captureDidStart(input, id: id)
                 } catch { fail(error, id: id) }
             }
+        }
+    }
+    /// The live socket session of take `id`. It runs concurrently with microphone startup;
+    /// `onReady` (after `task-started`) no longer starts capture, it only checks the take.
+    /// A session failure stops the take at once (including a recorder that is still opening).
+    private func liveSession(speech: ModelProfile, key speechKey: String, feed: LiveAudioFeed, vocabulary: AppVocabulary,
+                             screenGate: ContinuousClock.Instant, coordinator: ScreenContextCoordinator, id: UUID) async throws -> String {
+        do {
+            // The recording duration is final by the time the live call returns.
+            return try await metered(.speech, source: .dictationLiveSpeech, profile: speech, streamed: true, takeID: id, audioSeconds: elapsed) { usage in
+                try await SpeechClient.transcribeLive(profile: speech, key: speechKey, audio: feed.stream, vocabulary: vocabulary,
+                    // Overlaps the socket handshake; never waits past t0 + 250 ms. It delays only the start frame.
+                    screenTerms: { await coordinator.asrTerms(take: id, until: screenGate) },
+                    onReady: { [weak self] in
+                        guard let self, await self.generation == id else { throw CancellationError() }
+                    }, onUpdate: { [weak self] text in
+                        await self?.updateLiveTranscript(text, id: id)
+                    }, usage: usage)
+            }
+        } catch {
+            // A cancelled session belongs to a take that already failed or was cancelled.
+            if !Task.isCancelled, !(error is CancellationError) { fail(error, id: id) }
+            throw error
         }
     }
     private func beginLiveCapture(id: UUID, inputID: String?, feed: LiveAudioFeed) async throws {

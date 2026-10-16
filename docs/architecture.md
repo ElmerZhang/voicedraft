@@ -92,7 +92,7 @@ Capture binds an explicitly selected `AVCaptureDeviceInput` for each take, limit
 
 HTTP adapters retain the recorded-file path: `AVCaptureAudioFileOutput` produces mono 16 kHz 16-bit PCM WAV, with startup/finalization deadlines, user-only file permissions, and format validation before reading and uploading after stop. The recorded-WAV Message session remains available to core callers and tests.
 
-The Message adapter's microphone path is live. After `run-task` and `task-started`, a separate `LiveAudioRecorder` starts `AVCaptureAudioDataOutput`, configured to convert to mono 16 kHz signed 16-bit little-endian PCM. `PCM16Audio` validates the delivered sample format and byte count before upload; no raw live recording file is created. Capture runs on its own serial queue. A bounded `LiveAudioFeed` assembles 3,200-byte (100 ms) frames with at most five seconds buffered; overflow fails explicitly, rather than omitting speech. Stop drains queued capture callbacks, flushes the final partial frame, closes the feed, and sends `finish-task` only after all audio sends complete.
+The Message adapter's microphone path is live. Since 2026-10-16 the microphone opens at the shortcut (t0), in parallel with the socket handshake, instead of after `task-started` (the old order lost the first word). A separate `LiveAudioRecorder` starts `AVCaptureAudioDataOutput`, configured to convert to mono 16 kHz signed 16-bit little-endian PCM. `PCM16Audio` validates the delivered sample format and byte count before upload; no raw live recording file is created. Capture runs on its own serial queue. A bounded `LiveAudioFeed` assembles 3,200-byte (100 ms) frames with at most 15 seconds (150 frames, the handshake start deadline) buffered; PCM captured before `task-started` waits there and is uploaded in order once the session is ready, and a feed already closed during the handshake (a very short take) is still uploaded and followed by `finish-task`. Overflow fails explicitly, rather than omitting speech. `onReady` still runs after `task-started` (after the start frame for Doubao) but only checks that the take is current. A microphone failure fails the take and cancels the session; a session failure fails the take and cancels the recorder, even while it is still opening. Stop drains queued capture callbacks, flushes the final partial frame, closes the feed, and sends `finish-task` only after all audio sends complete.
 
 `MessageASRSession.transcribeLive` concurrently uploads PCM and receives events. `intermediate_result_enabled` is enabled; hypotheses replace previous text by sentence ID, finalized sentences supersede hypotheses, and heartbeats are ignored. Only finalized nonempty text after `task-finished` can reach writing/insertion. An unexpected task ID, unfinished nonempty hypothesis, premature task completion, capture failure, or interrupted upload cannot return partial success. Handshake/finalization/whole-session deadlines are 15/30/300 seconds. Cancellation and all exits close the socket and unblock sends/receives; app generation checks also reject late UI updates. There is no automatic network reconnection or audio retry. Native URLSession supplies TLS and rejects redirects. Tests inject an in-memory socket; provider availability, hardware capture and latency still require real-account validation.
 
@@ -196,10 +196,12 @@ t0  toggle(external:)  TextInsertion.capture, validation, then ScreenContextCoor
      │     ├─ partial collection every 0.1 s (enough text → OCR not needed)
      │     ├─ complete collection → writing snapshot + AX cache
      │     └─ needs OCR && OCR on && permitted → window lookup → capture → Vision (deadline t0 + 2 s) → cache
-     ├─ live adapters (Message WS, Doubao): socket handshake starts, then
+     ├─ live adapters (Message WS, Doubao): microphone opens at t0 (PCM queues in the feed, ≤ 15 s)
+     │     while the socket handshake starts, then
      │     await asrTerms(until: t0 + 250 ms) = complete walk if done, else partial + cached AX,
      │     plus OCR or cached OCR for the window, else []
-     │     → start frame → task-started → microphone (order unchanged)
+     │     → start frame → task-started → queued PCM drains in order (order changed 2026-10-16:
+     │       the gate delays only the start frame, never capture)
      └─ HTTP adapters: recorder starts immediately; at stop currentASRTerms() never waits
 deliverTranscript: writingContext() waits only until t0 + 2 s (normally already past)
 end of take: end(take:) cancels work (the walk stops at its next node), writes the

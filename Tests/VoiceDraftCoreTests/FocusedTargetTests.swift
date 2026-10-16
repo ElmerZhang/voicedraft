@@ -3,27 +3,56 @@ import XCTest
 
 final class FocusedTargetTests: XCTestCase {
     func testOpaqueIsDistinctFromDisabledSecureAndKnownNonInput() {
-        for role in ["AXGroup", "AXWebArea", "AXWindow", "AXTextArea", "AXSearchField"] {
-            XCTAssertEqual(TextInputCapabilities(role: role).capability, .opaque)
-            XCTAssertEqual(TextInputCapabilities(role: role, secure: true).capability, .notWritable)
-            XCTAssertEqual(TextInputCapabilities(role: role, enabled: false).capability, .notWritable)
-        }
-        for role in ["AXButton", "AXStaticText", "AXSlider", "AXLink", "AXMenuItem", ""] {
-            XCTAssertEqual(TextInputCapabilities(role: role, canSetValue: true).capability, .notWritable)
+        for role in ["AXGroup", "AXWebArea", "AXWindow", "AXTextArea", "AXSearchField", "AXCell", "AXUnknown",
+                     "AXLayoutArea", "AXScrollArea", "AXSplitGroup", "AXList", "AXOutline", "AXTable", "AXRow",
+                     "AXBrowser", "AXSheet", "AXDrawer", "AXDocument", "GPUICustomCanvas", ""] {
+            XCTAssertEqual(TextInputCapabilities(role: role).capability, .opaque, role)
+            XCTAssertEqual(TextInputCapabilities(role: role, secure: true).capability, .notWritable, role)
+            XCTAssertEqual(TextInputCapabilities(role: role, enabled: false).capability, .notWritable, role)
         }
         XCTAssertEqual(TextInputCapabilities(role: "AXSearchField", canSetValue: true).capability, .writable)
     }
 
-    func testOpaqueRequiresFocusedControlEnabledPasteAndNonmodalWindow() {
-        let container = TextInputCapabilities(role: "AXGroup")
-        XCTAssertTrue(KeyboardSurfacePolicy.acceptsOpaque(focused: container, standardWindow: true, modalWindow: false, pasteEnabled: true))
-        for target in [nil, TextInputCapabilities(role: "AXWindow"), TextInputCapabilities(role: "AXButton"),
-                       TextInputCapabilities(role: "AXGroup", enabled: false), TextInputCapabilities(role: "AXTextField", secure: true)] {
-            XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: target, standardWindow: true, modalWindow: false, pasteEnabled: true))
+    func testEveryDenylistedRoleIsKnownNonInput() {
+        XCTAssertEqual(TextInputCapabilities.nonInputRoles.count, 34)
+        for role in ["AXButton", "AXCheckBox", "AXRadioButton", "AXRadioGroup", "AXPopUpButton", "AXMenuButton",
+                     "AXMenuItem", "AXMenu", "AXMenuBar", "AXMenuBarItem", "AXSlider", "AXIncrementor",
+                     "AXProgressIndicator", "AXBusyIndicator", "AXLevelIndicator", "AXDisclosureTriangle",
+                     "AXColorWell", "AXScrollBar", "AXSplitter", "AXHandle", "AXGrowArea", "AXValueIndicator",
+                     "AXStaticText", "AXLink", "AXImage", "AXHeading", "AXToolbar", "AXTabGroup", "AXDockItem",
+                     "AXRuler", "AXRulerMarker", "AXHelpTag", "AXMatte", "AXRelevanceIndicator"] {
+            XCTAssertTrue(TextInputCapabilities.nonInputRoles.contains(role), role)
+            // Settable attributes never turn a known non-input into a target.
+            XCTAssertEqual(TextInputCapabilities(role: role, canSetValue: true).capability, .notWritable, role)
+            XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: .init(role: role), focusedWindow: true), role)
         }
-        XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: container, standardWindow: true, modalWindow: false, pasteEnabled: false))
-        XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: container, standardWindow: true, modalWindow: true, pasteEnabled: true))
-        XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: container, standardWindow: false, modalWindow: false, pasteEnabled: true))
+    }
+
+    func testOpaqueFocusIsPastedIntoWheneverAFocusedWindowExists() {
+        for focused in [TextInputCapabilities(role: "AXGroup"), .init(role: "AXWindow"), .init(role: "AXCell"),
+                        .init(role: "AXWebArea"), .init(role: "AXTextArea"), .init(role: "CustomRole")] {
+            XCTAssertTrue(KeyboardSurfacePolicy.acceptsOpaque(focused: focused, focusedWindow: true), focused.role)
+            XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: focused, focusedWindow: false), focused.role)
+        }
+        // No focused element at all: the focused window is the target; without one, nothing.
+        XCTAssertTrue(KeyboardSurfacePolicy.acceptsOpaque(focused: nil, focusedWindow: true))
+        XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: nil, focusedWindow: false))
+        for refused in [TextInputCapabilities(role: "AXButton"), .init(role: "AXGroup", enabled: false),
+                        .init(role: "AXTextField", secure: true), .init(role: "AXWindow", secure: true),
+                        .init(role: "AXTextField", canSetValue: true)] {
+            XCTAssertFalse(KeyboardSurfacePolicy.acceptsOpaque(focused: refused, focusedWindow: true), refused.role)
+        }
+    }
+
+    /// Herdr UI (GPUI) as probed on 2026-10-16: the focused element is its standard,
+    /// nonmodal AXWindow with no children, and its Edit > Paste item reports disabled.
+    /// Neither the window subrole nor the menu matters any more.
+    func testHerdrWindowOnlyFocusIsAccepted() {
+        let window = TextInputCapabilities(role: "AXWindow")
+        XCTAssertEqual(window.capability, .opaque)
+        XCTAssertFalse(KeyboardSurfacePolicy.accepts(bundleIdentifier: "so.pen.herdr-gpui", focused: window, editor: nil,
+            standardWindow: true, modalWindow: false), "not a listed terminal")
+        XCTAssertTrue(KeyboardSurfacePolicy.acceptsOpaque(focused: window, focusedWindow: true))
     }
 
     func testFindsFocusedDescendantButNeverUnfocusedEditor() {

@@ -278,6 +278,7 @@
 "The focused input changed. Copy the result when ready." = "Das fokussierte Eingabefeld hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
 "The text selection changed. Copy the result when ready." = "Die Textauswahl oder Cursorposition hat sich geändert. Kopiere das Ergebnis, wenn du bereit bist.";
 "Paste sent · check the input field" = "Einfügen gesendet · Eingabefeld prüfen";
+"Paste sent · copy here if nothing appeared" = "Einfügen gesendet · hier kopieren, falls nichts erschien";
 "Delete" = "Löschen";
 "Save" = "Speichern";
 "Insert last result" = "Letztes Ergebnis erneut einfügen";

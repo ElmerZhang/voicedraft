@@ -6,7 +6,7 @@ Baseline reviewed against the public [Typeless quickstart](https://www.typeless.
 
 | Capability | First release | Remaining work |
 | --- | --- | --- |
-| Global voice input on macOS | Shortcuts, compact recording capsule, and copy card when no editable input is focused | Broad compatibility QA; configurable shortcuts and hold-to-talk |
+| Global voice input on macOS | Shortcuts, compact recording capsule, and copy card when the focus is clearly not an input (paste unless proven otherwise, with a result card after unconfirmable pastes) | Broad compatibility QA; configurable shortcuts and hold-to-talk |
 | ASR | Catalog: Qwen3-ASR HTTP, Qwen Audio 3.0/3.1 HTTP, Qwen Audio 3.1 Message WebSocket | Real-account accuracy/latency evaluation; other Qwen protocol families |
 | Cleanup, filler/repetition removal, self-corrections | Qwen writing prompts | Regression corpus for Chinese, mixed language, numbers, names, ambiguity |
 | Structured paragraphs and lists | Qwen writing prompts | Per-editor formatting and list compatibility |

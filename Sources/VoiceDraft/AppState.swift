@@ -530,7 +530,7 @@ final class AppState: ObservableObject {
         // An Electron app enabled at capture may have built its tree since; its
         // fresh value and range are what the insertion receipt observes.
         if let pending = destination, ElectronAccessibilityPolicy.shouldRetryCapture(pending: pending.accessibilityPending,
-               editable: pending.editable, external: runExternal, autoPaste: runAutoPaste, ask: mode == .ask), insertionAuthorized,
+               writable: pending.writable, external: runExternal, autoPaste: runAutoPaste, ask: mode == .ask), insertionAuthorized,
            let refreshed = await TextInsertion.refreshPending(pending, ignoring: device.features.shortcuts, trackOpaqueFocus: true) {
             try Task.checkCancellation()
             guard generation == id else { refreshed.focusGuard?.stop(); throw CancellationError() }
@@ -546,7 +546,7 @@ final class AppState: ObservableObject {
                 // the receipt window and clipboard restoration finish under the lease.
                 let sent = try await TextInsertion.send(output, into: destination)
                 guard generation == id else { return }
-                hideHUD?()
+                if !destination.opaqueApplication { hideHUD?() }
                 if (mode == .polish || mode == .verbatim), configuration.vocabulary.learnFromCorrections {
                     observeCorrections(to: output, in: destination, configuration: configuration)
                 }
@@ -558,9 +558,10 @@ final class AppState: ObservableObject {
         } else { status = "Your text is ready" }
         gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
-        if delivery != nil { hudKind = .compact; hideHUD?() }
+        let opaqueDelivery = destination?.opaqueApplication == true
+        if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery) }
         else { hudText = output; hudKind = .result; showHUD?() }
-        if let delivery { awaitDeliveryOutcome(delivery, id: id) }
+        if let delivery { awaitDeliveryOutcome(delivery, id: id, opaque: opaqueDelivery) }
         if mode == .polish || mode == .verbatim {
             resultBeforeCorrection = output
             if let sample = VocabularyLearningSample(source: .dictation, before: raw, after: output) {
@@ -907,7 +908,7 @@ extension AppState {
             var destination = TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true)
             defer { destination?.focusGuard?.stop() }
             // A first enable can take a couple of seconds to build an Electron tree.
-            if let pending = destination, pending.accessibilityPending, !pending.editable,
+            if let pending = destination, pending.accessibilityPending, !pending.writable,
                let refreshed = await TextInsertion.refreshPending(pending, ignoring: device.features.shortcuts, trackOpaqueFocus: true) {
                 guard generation == id, !Task.isCancelled else { refreshed.focusGuard?.stop(); return }
                 pending.focusGuard?.stop(); destination = refreshed
@@ -919,9 +920,9 @@ extension AppState {
             do {
                 let sent = try await TextInsertion.send(text, into: destination)
                 guard generation == id else { return }
-                hideHUD?()
-                phase = "idle"; hudKind = .compact
-                awaitDeliveryOutcome(sent, id: id)
+                phase = "idle"
+                presentQueuedPaste(text, opaque: destination.opaqueApplication)
+                awaitDeliveryOutcome(sent, id: id, opaque: destination.opaqueApplication)
             } catch {
                 guard !(error is CancellationError) else { return }
                 reinsertFallback(text, id: id, error: error)
@@ -930,18 +931,33 @@ extension AppState {
     }
     /// Applies the final status once the background receipt window ends, unless a
     /// newer run or a cancel has replaced the generation meanwhile.
-    private func awaitDeliveryOutcome(_ delivery: TextInsertionDelivery, id: UUID) {
+    private func awaitDeliveryOutcome(_ delivery: TextInsertionDelivery, id: UUID, opaque: Bool) {
         Task { @MainActor [weak self] in
             let outcome = await delivery.outcome.value
-            self?.applyDeliveryOutcome(outcome, id: id)
+            self?.applyDeliveryOutcome(outcome, id: id, opaque: opaque)
         }
     }
-    func applyDeliveryOutcome(_ outcome: TextInsertionOutcome, id: UUID) {
+    /// Status and header of the result card left up after a paste into an
+    /// opaque target, where nothing can confirm that the text arrived.
+    static let opaquePasteStatus: LocalizedMessage = "Paste sent · copy here if nothing appeared"
+    /// True while the HUD shows the fallback card of an opaque paste.
+    var hudPasteSent: Bool { hudKind == .result && status == Self.opaquePasteStatus }
+    /// Called once Command-V is queued. A writable editor or terminal hides the
+    /// HUD; an opaque target (paste unless proven otherwise) keeps the result
+    /// card up so the user can copy if the paste went nowhere. The card closes on
+    /// Escape, its close button, Copy, or the next take.
+    func presentQueuedPaste(_ text: String, opaque: Bool) {
+        guard opaque else { hudKind = .compact; hideHUD?(); return }
+        status = Self.opaquePasteStatus
+        hudText = text; hudCopied = false; hudKind = .result; showHUD?()
+    }
+    func applyDeliveryOutcome(_ outcome: TextInsertionOutcome, id: UUID, opaque: Bool = false) {
         guard generation == id else { return }
         switch outcome {
         case .confirmed: status = "Text inserted"
         case .sentToTerminal: status = "Paste sent to terminal"
-        case .sentWithoutConfirmation: status = "Paste sent · check the input field"
+        // An opaque paste cannot be observed; its card's status stays in place.
+        case .sentWithoutConfirmation: status = opaque ? Self.opaquePasteStatus : "Paste sent · check the input field"
         }
     }
     private func reinsertFallback(_ text: String, id: UUID, error: Error) {

@@ -4,6 +4,8 @@ public enum TextInputCapability: Equatable { case writable, notWritable, opaque 
 
 /// A focused editor can accept a paste even when AX cannot replace its text.
 /// Chromium's editable web fields expose a writable selection range in that case.
+/// Classification follows "paste unless there is evidence the focus is not an
+/// input": see `capability` and `nonInputRoles`.
 public struct TextInputCapabilities {
     public var role: String
     public var enabled: Bool
@@ -24,13 +26,28 @@ public struct TextInputCapabilities {
         capability == .writable
     }
 
+    /// Roles that are known not to be text inputs. A focus on one of these is
+    /// `.notWritable`; every other role (windows, groups, web areas, cells, lists,
+    /// custom roles) is `.opaque` and receives a Command-V with a fallback card.
+    /// Reviewable denylist: add a role only when focus on it is never an input.
+    public static let nonInputRoles: Set<String> = [
+        "AXButton", "AXCheckBox", "AXRadioButton", "AXRadioGroup", "AXPopUpButton", "AXMenuButton",
+        "AXMenuItem", "AXMenu", "AXMenuBar", "AXMenuBarItem", "AXSlider", "AXIncrementor",
+        "AXProgressIndicator", "AXBusyIndicator", "AXLevelIndicator", "AXDisclosureTriangle",
+        "AXColorWell", "AXScrollBar", "AXSplitter", "AXHandle", "AXGrowArea", "AXValueIndicator",
+        "AXStaticText", "AXLink", "AXImage", "AXHeading", "AXToolbar", "AXTabGroup", "AXDockItem",
+        "AXRuler", "AXRulerMarker", "AXHelpTag", "AXMatte", "AXRelevanceIndicator",
+    ]
+
+    /// Paste unless there is evidence the focus is not an input: disabled or
+    /// secure focus and known non-input roles refuse; text roles with a settable
+    /// value, selected text or selection range are writable; everything else is opaque.
     public var capability: TextInputCapability {
         guard enabled, !secure else { return .notWritable }
         if isTextControl {
             return canReplaceSelection || canSetValue || canSetSelectionRange ? .writable : .opaque
         }
-        return ["AXGroup", "AXUnknown", "AXLayoutArea", "AXWebArea", "AXScrollArea",
-                "AXWindow", "AXSplitGroup", "AXList", "AXOutline", "AXTable"].contains(role) ? .opaque : .notWritable
+        return Self.nonInputRoles.contains(role) ? .notWritable : .opaque
     }
 
     public var isTextControl: Bool { ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role) }
@@ -116,31 +133,23 @@ public enum InputSelectionPolicy {
 }
 
 public enum KeyboardSurfacePolicy {
-    /// A generic opaque target needs an actual focused control and an enabled
-    /// native Paste command. Window-only compatibility stays separately scoped.
-    public static func acceptsOpaque(focused: TextInputCapabilities?, standardWindow: Bool,
-                                     modalWindow: Bool, pasteEnabled: Bool) -> Bool {
-        guard let focused, focused.capability == .opaque, focused.role != "AXWindow",
-              standardWindow, !modalWindow, pasteEnabled else { return false }
-        return true
-    }
-    /// WeChat 4.x can expose only the main window and its standard controls.
-    /// Require its native Paste command as an additional input signal.
-    public static func acceptsOpaqueWeChat(bundleIdentifier: String?, focused: TextInputCapabilities?,
-                                          editor: TextInputCapabilities?, standardWindow: Bool,
-                                          modalWindow: Bool, windowTitle: String?, pasteAvailable: Bool) -> Bool {
-        guard bundleIdentifier == "com.tencent.xinWeChat", standardWindow, !modalWindow,
-              ["Weixin", "WeChat", "微信"].contains(windowTitle ?? ""), editor == nil, pasteAvailable else { return false }
+    /// An opaque focus (a window, group, web area, custom role or a text role
+    /// without settable AX text) receives Command-V whenever the app has a
+    /// focused window. With no focused element at all (`focused` nil) the
+    /// focused window itself is the target. No focused window: not editable.
+    /// The fallback result card is the safety net when the paste goes nowhere.
+    public static func acceptsOpaque(focused: TextInputCapabilities?, focusedWindow: Bool) -> Bool {
+        guard focusedWindow else { return false }
         guard let focused else { return true }
-        return focused.enabled && !focused.secure
-            && ["AXWindow", "AXGroup", "AXUnknown", "AXLayoutArea"].contains(focused.role)
+        return focused.capability == .opaque
     }
 
     /// Terminals whose standard, nonmodal window exposes the TTY grid as a text
     /// area without a writable value, or no editor at all. Ghostty's surface is an
     /// `AXTextArea` whose value is the screen contents, with no settable value or
-    /// selection range and no AX Paste menu item, so it never qualifies as
-    /// writable or generic opaque input (probed 2026-10-16).
+    /// selection range (probed 2026-10-16). Such a surface would also be pasted
+    /// into as generic opaque input; this allowlist is kept only because it yields
+    /// the more precise "Paste sent to terminal" outcome.
     public static let terminalBundleIdentifiers: Set<String> = ["dev.warp.Warp-Stable", "com.mitchellh.ghostty"]
 
     public static func accepts(bundleIdentifier: String?, focused: TextInputCapabilities?, editor: TextInputCapabilities?,

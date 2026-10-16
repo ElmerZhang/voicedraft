@@ -20,25 +20,27 @@ final class ElectronAccessibilityTests: XCTestCase {
         XCTAssertFalse(Policy.shouldEnable(manualAccessibilitySettable: true, focusedCapability: .writable))
     }
 
-    func testPendingOnlyForEnabledNonEditableCaptures() {
-        XCTAssertTrue(Policy.capturePending(enabled: true, editable: false))
-        XCTAssertFalse(Policy.capturePending(enabled: true, editable: true))
-        XCTAssertFalse(Policy.capturePending(enabled: false, editable: false))
+    /// Opaque focus is editable now, but a just-enabled Electron app whose focus is
+    /// not yet a writable editor (a cold Slack window) still waits for its composer.
+    func testPendingOnlyForEnabledCapturesWithoutAWritableEditor() {
+        XCTAssertTrue(Policy.capturePending(enabled: true, writable: false))
+        XCTAssertFalse(Policy.capturePending(enabled: true, writable: true))
+        XCTAssertFalse(Policy.capturePending(enabled: false, writable: false))
     }
 
     func testRetryOnlyForPendingAutomaticExternalInsertion() {
-        XCTAssertTrue(Policy.shouldRetryCapture(pending: true, editable: false, external: true, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: false, editable: false, external: true, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, editable: true, external: true, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, editable: false, external: false, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, editable: false, external: true, autoPaste: false, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, editable: false, external: true, autoPaste: true, ask: true))
+        XCTAssertTrue(Policy.shouldRetryCapture(pending: true, writable: false, external: true, autoPaste: true, ask: false))
+        XCTAssertFalse(Policy.shouldRetryCapture(pending: false, writable: false, external: true, autoPaste: true, ask: false))
+        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: true, external: true, autoPaste: true, ask: false))
+        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: false, external: false, autoPaste: true, ask: false))
+        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: false, external: true, autoPaste: false, ask: false))
+        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: false, external: true, autoPaste: true, ask: true))
     }
 
-    func testRefreshedTargetMustStayInSameProcessAndBeEditable() {
-        XCTAssertTrue(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 10, refreshedEditable: true))
-        XCTAssertFalse(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 11, refreshedEditable: true))
-        XCTAssertFalse(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 10, refreshedEditable: false))
+    func testRefreshedTargetMustStayInSameProcessAndBeWritable() {
+        XCTAssertTrue(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 10, refreshedWritable: true))
+        XCTAssertFalse(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 11, refreshedWritable: true))
+        XCTAssertFalse(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 10, refreshedWritable: false))
     }
 
     func testRetryDeadlineCountsFromEnable() {

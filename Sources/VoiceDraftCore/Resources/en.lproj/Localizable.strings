@@ -278,6 +278,7 @@
 "The focused input changed. Copy the result when ready." = "The focused input changed. Copy the result when ready.";
 "The text selection changed. Copy the result when ready." = "The text selection changed. Copy the result when ready.";
 "Paste sent · check the input field" = "Paste sent · check the input field";
+"Paste sent · copy here if nothing appeared" = "Paste sent · copy here if nothing appeared";
 "Delete" = "Delete";
 "Save" = "Save";
 "Insert last result" = "Insert last result";

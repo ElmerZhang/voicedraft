@@ -19,6 +19,8 @@ struct InputTarget {
     /// VoiceDraft enabled this app's Electron accessibility tree, which may not
     /// have been built yet; a later capture can still find the editor.
     var accessibilityPending = false
+    /// A writable AX editor (not an opaque or terminal keyboard surface).
+    var writable: Bool { editable && !keyboardSurface }
 }
 
 enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWithoutConfirmation }
@@ -73,9 +75,7 @@ enum TextInsertion {
         report("guard.rawFocusNilOrFocusedResolved", "\(focusResolved)")
         guard focusResolved || trace != nil else { return nil }
         let window = uiElement(attribute(root, kAXFocusedWindowAttribute))
-        // Warp's TTY surface does not consistently expose an AX text editor.
-        // This is a narrow compatibility path: no browser/app-wide fallback,
-        // no dialogs/buttons, and the window + exposed surface must stay focused.
+        // Terminal allowlist (Warp, Ghostty): reported as "Paste sent to terminal".
         let standardWindow = window.flatMap { attribute($0, kAXSubroleAttribute) as? String } == kAXStandardWindowSubrole
         let modalWindow = window.flatMap { attribute($0, kAXModalAttribute) as? Bool } == true
         report("capabilities.focused", describe(focused.map(capabilities)))
@@ -87,29 +87,18 @@ enum TextInsertion {
             focused: focused.map(capabilities), editor: editor.map(capabilities),
             standardWindow: standardWindow, modalWindow: modalWindow)
         report("KeyboardSurfacePolicy.accepts", "\(terminalSurface)")
+        // Paste unless there is evidence the focus is not an input: an opaque
+        // focus, or no focused element at all, is pasted into when a focused
+        // window exists. Opaque targets are insertion-only: no selection or value.
         let candidate = editor ?? focused
-        let paste = !terminalSurface && (candidate.map { capabilities($0).capability == .opaque }
-            ?? (rawFocus == nil && app.bundleIdentifier == "com.tencent.xinWeChat"))
-            ? nativePasteAvailability(root) : (present: false, enabled: false)
-        report("nativePasteAvailability", "present=\(paste.present) enabled=\(paste.enabled)")
-        let hasSelection = !(candidate.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? "").isEmpty
-            || (candidate.flatMap(selectedRange)?.length ?? 0) > 0
-        report("hasSelection", "\(hasSelection)")
-        let genericOpaque = !hasSelection && KeyboardSurfacePolicy.acceptsOpaque(focused: candidate.map(capabilities),
-            standardWindow: standardWindow, modalWindow: modalWindow, pasteEnabled: paste.enabled)
-        report("KeyboardSurfacePolicy.acceptsOpaque", "\(genericOpaque)")
-        let weChatOpaque = KeyboardSurfacePolicy.acceptsOpaqueWeChat(bundleIdentifier: app.bundleIdentifier,
-            focused: focused.map(capabilities), editor: editor.map(capabilities),
-            standardWindow: standardWindow, modalWindow: modalWindow,
-            windowTitle: window.flatMap { attribute($0, kAXTitleAttribute) as? String },
-            pasteAvailable: paste.present)
-        report("KeyboardSurfacePolicy.acceptsOpaqueWeChat", "\(weChatOpaque)")
-        let opaqueApplication = !terminalSurface && (genericOpaque || weChatOpaque)
+        let opaqueApplication = !terminalSurface && KeyboardSurfacePolicy.acceptsOpaque(
+            focused: candidate.map(capabilities), focusedWindow: window != nil)
+        report("KeyboardSurfacePolicy.acceptsOpaque", "\(opaqueApplication)")
         let element = editor ?? focused
         let range = element.flatMap(selectedRange)
-        let selection = element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
+        let selection = opaqueApplication ? "" : element.flatMap { attribute($0, kAXSelectedTextAttribute) as? String } ?? ""
         let secure = element.flatMap { attribute($0, kAXSubroleAttribute) as? String } == "AXSecureTextField"
-        // Focus can change while a remote AX provider answers traversal/menu reads.
+        // Focus can change while a remote AX provider answers traversal reads.
         let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         // Short-circuits like a single guard unless traced, so production reads stay the same.
         let sameFocus = (frontmost || trace != nil)
@@ -120,7 +109,8 @@ enum TextInsertion {
         report("guard.sameFocusedElement", "\(sameFocus)")
         report("guard.sameFocusedWindow", "\(sameWindow)")
         guard (frontmost && sameFocus && sameWindow) || trace != nil else { return nil }
-        let editable = terminalSurface || opaqueApplication || (editor.map { capabilities($0).acceptsInsertion } ?? false)
+        let writable = editor.map { capabilities($0).acceptsInsertion } ?? false
+        let editable = terminalSurface || opaqueApplication || writable
         report("target.editable", "\(editable)")
         report("target.keyboardSurface", "\(terminalSurface || opaqueApplication)")
         report("target.opaqueApplication", "\(opaqueApplication)")
@@ -130,13 +120,13 @@ enum TextInsertion {
         report("capture.wouldReturnTarget", "\(focusResolved && frontmost && sameFocus && sameWindow)")
         return InputTarget(pid: app.processIdentifier, name: app.localizedName ?? "App",
                            element: element, window: window, range: range, selection: selection,
-                           value: terminalSurface ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,
+                           value: terminalSurface || opaqueApplication ? nil : editor.flatMap { attribute($0, kAXValueAttribute) as? String }, secure: secure,
                            editable: editable,
                            keyboardSurface: terminalSurface || opaqueApplication,
                            opaqueApplication: opaqueApplication,
                            focusGuard: opaqueApplication && trackOpaqueFocus ? OpaqueInputFocusGuard(ignoring: shortcuts) : nil,
                            accessibilityPending: ElectronAccessibilityPolicy.capturePending(
-                               enabled: electronEnabled[app.processIdentifier] != nil, editable: editable))
+                               enabled: electronEnabled[app.processIdentifier] != nil, writable: writable || terminalSurface))
     }
     /// Explicit focus, its resolved focus target and the editor ancestor.
     private static func resolveFocus(_ root: AXUIElement) -> (raw: AXUIElement?, focused: AXUIElement?, editor: AXUIElement?) {
@@ -178,9 +168,10 @@ enum TextInsertion {
         } while ProcessInfo.processInfo.systemUptime < deadline
         return true
     }
-    /// Re-captures a pending Electron target until its editor appears, the app
-    /// changes, or the bounded retry window ends. Returns a same-process editable
-    /// target, or nil to keep the copy-card path. Stops guards it does not return.
+    /// Re-captures a pending Electron target until a writable editor appears, the
+    /// app changes, or the bounded retry window ends. Returns a same-process
+    /// writable target, or nil to keep the original target (an opaque fallback
+    /// paste, or the copy card when it is not editable). Stops guards it does not return.
     static func refreshPending(_ target: InputTarget, ignoring shortcuts: [ShortcutBinding],
                                trackOpaqueFocus: Bool) async -> InputTarget? {
         let deadline = ElectronAccessibilityPolicy.retryDeadline(enabledAt: electronEnabled[target.pid]?.at,
@@ -188,7 +179,7 @@ enum TextInsertion {
         while true {
             let refreshed = capture(ignoring: shortcuts, trackOpaqueFocus: trackOpaqueFocus)
             if let refreshed, ElectronAccessibilityPolicy.acceptsRefreshed(originalPID: target.pid,
-                   refreshedPID: refreshed.pid, refreshedEditable: refreshed.editable) { return refreshed }
+                   refreshedPID: refreshed.pid, refreshedWritable: refreshed.writable) { return refreshed }
             refreshed?.focusGuard?.stop()
             guard refreshed?.pid == target.pid || refreshed == nil,
                   NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid,
@@ -208,30 +199,6 @@ enum TextInsertion {
             AXUIElementSetMessagingTimeout(root, 0.1)
             _ = AXUIElementSetAttributeValue(root, ElectronAccessibilityPolicy.attribute as CFString, kCFBooleanFalse)
         }
-    }
-    private static func nativePasteAvailability(_ root: AXUIElement) -> (present: Bool, enabled: Bool) {
-        guard let menuBar = uiElement(attribute(root, kAXMenuBarAttribute)) else { return (false, false) }
-        var level = [menuBar], remaining = 160
-        let deadline = ProcessInfo.processInfo.systemUptime + 0.5
-        // Menu bar → top-level item → menu → command. No chat-tree traversal.
-        for _ in 0..<4 {
-            var next: [AXUIElement] = []
-            for item in level {
-                remaining -= 1
-                guard remaining >= 0, ProcessInfo.processInfo.systemUptime < deadline else { return (false, false) }
-                let command = attribute(item, kAXMenuItemCmdCharAttribute) as? String
-                let identifier = attribute(item, kAXIdentifierAttribute) as? String
-                let modifiers = (attribute(item, kAXMenuItemCmdModifiersAttribute) as? NSNumber)?.intValue
-                if (command?.lowercased() == "v" && modifiers == 0) || identifier == "paste:" {
-                    // Enabled depends on the old clipboard contents, not just focus.
-                    // The dictation supplies its own text immediately before pasting.
-                    return (true, attribute(item, kAXEnabledAttribute) as? Bool == true)
-                }
-                next += children(item).prefix(max(0, remaining - next.count))
-            }
-            level = next
-        }
-        return (false, false)
     }
     private static func uiElement(_ value: CFTypeRef?) -> AXUIElement? {
         guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }

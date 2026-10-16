@@ -23,17 +23,19 @@ public enum ElectronAccessibilityPolicy {
         manualAccessibilitySettable && focusedCapability != .writable
     }
 
-    /// A capture from an app VoiceDraft enabled may predate its tree, so a
-    /// non-editable result can still become editable later.
-    public static func capturePending(enabled: Bool, editable: Bool) -> Bool {
-        enabled && !editable
+    /// A capture from an app VoiceDraft just enabled may predate its tree, so a
+    /// focus that is not yet a writable editor can still become one. Opaque
+    /// focus is editable (pasted with a fallback card) but still pending here,
+    /// so a cold Slack waits for its composer instead of pasting into its window.
+    public static func capturePending(enabled: Bool, writable: Bool) -> Bool {
+        enabled && !writable
     }
 
-    /// Repeat the capture before inserting only for a pending, non-editable
-    /// target whose result would otherwise have been inserted automatically.
-    public static func shouldRetryCapture(pending: Bool, editable: Bool, external: Bool,
+    /// Repeat the capture before inserting only for a pending target that is
+    /// not a writable editor and whose result would be inserted automatically.
+    public static func shouldRetryCapture(pending: Bool, writable: Bool, external: Bool,
                                           autoPaste: Bool, ask: Bool) -> Bool {
-        pending && !editable && external && autoPaste && !ask
+        pending && !writable && external && autoPaste && !ask
     }
 
     /// The retry window counts from the enable, so a capture long after the
@@ -42,8 +44,10 @@ public enum ElectronAccessibilityPolicy {
         max(now, (enabledAt ?? now) + retryWindowSeconds)
     }
 
-    /// A refreshed capture replaces the original only in the same process.
-    public static func acceptsRefreshed(originalPID: Int32, refreshedPID: Int32, refreshedEditable: Bool) -> Bool {
-        originalPID == refreshedPID && refreshedEditable
+    /// A refreshed capture replaces the original only in the same process and
+    /// only once it is a writable editor; otherwise the original opaque target
+    /// (if any) gets the fallback paste after the window ends.
+    public static func acceptsRefreshed(originalPID: Int32, refreshedPID: Int32, refreshedWritable: Bool) -> Bool {
+        originalPID == refreshedPID && refreshedWritable
     }
 }

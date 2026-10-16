@@ -29,4 +29,41 @@ final class DeliveryOutcomeTests: XCTestCase {
             XCTAssertEqual(state.status, "Cancelled", "a late receipt must not overwrite a newer run's status")
         }
     }
+
+    /// Paste unless proven otherwise: an opaque target cannot confirm the paste,
+    /// so the result card stays up as the copy fallback and keeps its status.
+    func testOpaquePasteKeepsTheResultCardAndItsStatus() async {
+        await MainActor.run {
+            let state = AppState(preview: true)
+            var shown = 0, hidden = 0
+            state.showHUD = { shown += 1 }; state.hideHUD = { hidden += 1 }
+            let id = state.generation
+            state.presentQueuedPaste("Synthetic dictation", opaque: true)
+            XCTAssertEqual(state.hudKind, .result)
+            XCTAssertEqual(state.hudText, "Synthetic dictation")
+            XCTAssertEqual(state.status, "Paste sent · copy here if nothing appeared")
+            XCTAssertTrue(state.hudPasteSent)
+            XCTAssertEqual(shown, 1); XCTAssertEqual(hidden, 0)
+            state.applyDeliveryOutcome(.sentWithoutConfirmation, id: id, opaque: true)
+            XCTAssertEqual(state.status, "Paste sent · copy here if nothing appeared")
+            XCTAssertTrue(state.hudPasteSent)
+            XCTAssertTrue(state.handleEscape(hudVisible: true), "Escape closes the card")
+            XCTAssertEqual(hidden, 1)
+        }
+    }
+
+    func testWritableOrTerminalPasteHidesTheHUD() async {
+        await MainActor.run {
+            let state = AppState(preview: true)
+            var shown = 0, hidden = 0
+            state.showHUD = { shown += 1 }; state.hideHUD = { hidden += 1 }
+            let id = state.generation
+            state.presentQueuedPaste("Synthetic dictation", opaque: false)
+            XCTAssertEqual(state.hudKind, .compact)
+            XCTAssertFalse(state.hudPasteSent)
+            XCTAssertEqual(shown, 0); XCTAssertEqual(hidden, 1)
+            state.applyDeliveryOutcome(.sentWithoutConfirmation, id: id, opaque: false)
+            XCTAssertEqual(state.status, "Paste sent · check the input field")
+        }
+    }
 }

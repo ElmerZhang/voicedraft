@@ -278,6 +278,7 @@
 "The focused input changed. Copy the result when ready." = "焦点所在的输入框已改变。准备好后可复制结果。";
 "The text selection changed. Copy the result when ready." = "选中的文字或光标位置已改变。准备好后可复制结果。";
 "Paste sent · check the input field" = "已发送粘贴，请查看输入框";
+"Paste sent · copy here if nothing appeared" = "已发送粘贴 · 如未出现，可在此复制";
 "Delete" = "删除";
 "Save" = "保存";
 "Insert last result" = "重新插入上一段";

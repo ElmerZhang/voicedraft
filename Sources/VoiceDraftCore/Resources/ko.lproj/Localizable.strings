@@ -278,6 +278,7 @@
 "The focused input changed. Copy the result when ready." = "입력 대상이 변경되었습니다. 준비되면 결과를 복사하세요.";
 "The text selection changed. Copy the result when ready." = "선택 영역 또는 커서 위치가 변경되었습니다. 준비되면 결과를 복사하세요.";
 "Paste sent · check the input field" = "붙여넣기를 전송했습니다. 입력란을 확인하세요";
+"Paste sent · copy here if nothing appeared" = "붙여넣기를 전송했습니다 · 나타나지 않으면 여기서 복사하세요";
 "Delete" = "삭제";
 "Save" = "저장";
 "Insert last result" = "마지막 결과 다시 삽입";

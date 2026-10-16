@@ -278,6 +278,7 @@
 "The focused input changed. Copy the result when ready." = "入力先が変わりました。準備ができたら結果をコピーしてください。";
 "The text selection changed. Copy the result when ready." = "選択範囲またはカーソル位置が変わりました。準備ができたら結果をコピーしてください。";
 "Paste sent · check the input field" = "貼り付けを送信しました。入力欄を確認してください";
+"Paste sent · copy here if nothing appeared" = "貼り付けを送信しました · 表示されない場合はここでコピー";
 "Delete" = "削除";
 "Save" = "保存";
 "Insert last result" = "前回の結果を再挿入";

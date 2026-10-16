@@ -141,7 +141,9 @@ struct RecordingHUD: View {
                 Image(systemName: failure ? "exclamationmark.circle.fill" : "doc.on.clipboard")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(failure ? VD.Palette.warning : VD.Palette.accent)
-                Text(failure ? D("Could not finish") : D("Result ready")).font(.system(size: 16, weight: .semibold))
+                // After a paste into an opaque target the header says it was sent and offers Copy.
+                Text(failure ? D("Could not finish") : state.hudPasteSent ? L(state.status) : D("Result ready"))
+                    .font(.system(size: 16, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
                 Spacer()
                 VDIconButton(systemName: "xmark", label: D("Dismiss"), tint: .white.opacity(0.6)) { state.dismissHUD() }
                     .padding(.trailing, -6)

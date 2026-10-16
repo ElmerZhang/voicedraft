@@ -738,8 +738,11 @@ final class AppState: ObservableObject {
     private func learnVocabulary(from sample: VocabularyLearningSample, configuration: SharedSettings, excluding: Set<String> = []) {
         let corrections = configuration.vocabulary.learnFromCorrections && settings.vocabulary.learnFromCorrections
         let discovery = configuration.vocabulary.discoverFromDictation && settings.vocabulary.discoverFromDictation && sample.source == .dictation
+        let correction = corrections && (sample.source == .editedDictation || sample.hasSpokenCorrection)
+        // Corrections are never prefiltered; discovery-only takes skip the model call
+        // (and its usage-log line) when the local prefilter finds nothing term-like.
         guard !preview, configuration.vocabulary.enabled, settings.vocabulary.enabled,
-              discovery || (corrections && (sample.source == .editedDictation || sample.hasSpokenCorrection)),
+              correction || (discovery && VocabularyLearningPrefilter.shouldClassify(sample)),
               let profile = configuration.writing, settings.writing == profile else { return }
         vocabularyLearningTask?.cancel()
         let id = UUID(), takeID = generation; vocabularyLearningID = id

@@ -31,8 +31,26 @@ public enum ProviderFailure {
         }
         return .message("Model request failed (HTTP \(status)). \(hint)\(details(code: code, requestID: requestID))")
     }
+    static let webSocketKey = "Speech task failed. Check the model, API key region, and advanced parameters.{0}"
     static func webSocket(_ header: [String: Any], taskID: String) -> VoiceDraftError {
         .message("Speech task failed. Check the model, API key region, and advanced parameters.\(details(code: header["error_code"] as? String, requestID: taskID))")
+    }
+    /// English, language-independent description of a provider failure for the usage log: the HTTP
+    /// status or task failure plus the recognized provider code and UUID request ID. Nil for other messages.
+    static func logDescription(_ message: LocalizedMessage) -> String? {
+        var parts: [String]
+        var detailArguments = message.arguments
+        if message.key.hasPrefix(httpKeyPrefix), let status = detailArguments.first {
+            parts = ["Model request failed (HTTP \(status))."]; detailArguments.removeFirst()
+        } else if message.key == webSocketKey {
+            parts = ["Speech task failed."]
+        } else { return nil }
+        let tokens = detailArguments
+            .flatMap { $0.split(whereSeparator: { !($0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0))) }) }
+            .map { String($0).trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
+        if let code = tokens.first(where: codes.contains) { parts.append("code=\(code)") }
+        if let id = tokens.lazy.compactMap(UUID.init(uuidString:)).first { parts.append("requestID=\(id.uuidString)") }
+        return parts.joined(separator: " ")
     }
     private static func details(code: String?, requestID: String?) -> String {
         var result = ""

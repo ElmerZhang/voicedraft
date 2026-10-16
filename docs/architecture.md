@@ -293,6 +293,7 @@ Record schema `v: 1` (`ModelUsageRecord`):
 | `audioSeconds` | Recording duration for speech calls (live: final take duration; History retry: stored duration) |
 | `latencyMs` | Wall time from call start to result or error |
 | `outcome`, `failure` | `ok` or `failed`; failure is only `http:<status>`, `timeout`, `cancelled`, `network` or `other` |
+| `failureMessage` | Failed calls only (absent on success; added 2026-10-16, still `v: 1`). Which error it was (`ModelUsageFailure.message`), at most 300 characters: a `VoiceDraftError`'s English message key with `{n}` placeholders (never its arguments or the localized text); for `ProviderFailure`, `Model request failed (HTTP <status>).` or `Speech task failed.` plus `code=<recognized provider code>` and `requestID=<UUID>` when present; a `FeatureError`'s message; a `URLError`'s code name and system description (for example `timedOut: The request timed out.`); `noSpeech`; otherwise the Swift type name (for example `CancellationError`). Never transcript, result or audio data, credentials, file paths or a provider's own error text |
 | `takeID` | Run generation shared by a take's speech, writing and learning calls |
 | `usage`, `usageAvailable` | `ProviderUsage` when the provider reported counts; failed calls usually have none |
 
@@ -332,6 +333,14 @@ Monthly totals per model:
 jq -s 'group_by(.adapter + " " + .model) | map({adapter: .[0].adapter, model: .[0].model, calls: length,
   input: (map(.usage.inputTokens // 0) | add), output: (map(.usage.outputTokens // 0) | add),
   audioSeconds: (map(.audioSeconds // 0) | add)})' ~/Library/Application\ Support/VoiceDraft/Usage/usage-2026-10.jsonl
+```
+
+Failures by call site and error:
+
+```sh
+jq -s 'map(select(.outcome == "failed")) | group_by(.source + " " + (.failureMessage // .failure))
+  | map({source: .[0].source, failure: .[0].failure, failureMessage: .[0].failureMessage, calls: length})' \
+  ~/Library/Application\ Support/VoiceDraft/Usage/usage-2026-10.jsonl
 ```
 
 ## Device shortcut migration

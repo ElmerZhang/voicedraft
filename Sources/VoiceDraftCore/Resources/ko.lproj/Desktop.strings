@@ -183,6 +183,7 @@
 "Usage" = "Usage";
 "View more" = "자세히 보기";
 "Total usage" = "총 사용량";
+"Yesterday · %1$@ dictated · %2$@ words · %3$@ saved" = "어제 · 받아쓰기 %1$@ · %2$@ 단어 · %3$@ 절약";
 
 // Voice usage metrics
 "Dictation time" = "받아쓰기 시간";

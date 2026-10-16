@@ -135,8 +135,8 @@ extension Notification.Name {
 private struct ShortcutSummaryList: View {
     @ObservedObject var state: AppState
     var rowPadding: CGFloat = 20
-    /// Vertical padding of each shortcut row; Home uses a tighter value than Settings.
-    var rowVerticalPadding: CGFloat = VD.Space.l
+    /// Home's compact form: single-line 40pt rows with the title only; Settings keeps the title and its detail line.
+    var compact = false
     private var bindings: [ShortcutBinding] {
         [ShortcutAction.dictate, .translate, .edit, .ask, .insertLast].compactMap { action in
             state.device.features.shortcuts.first { $0.action == action && $0.enabled }
@@ -154,13 +154,17 @@ private struct ShortcutSummaryList: View {
             ForEach(Array(bindings.enumerated()), id: \.element.id) { index, binding in
                 if index > 0 { Divider().padding(.horizontal, rowPadding) }
                 HStack(spacing: VD.Space.l) {
-                    VStack(alignment: .leading, spacing: rowVerticalPadding < VD.Space.l ? 2 : VD.Space.xs) {
-                        Text(title(binding.action)).font(VD.Font.cardTitle)
-                        Text(detail(binding.action)).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if compact {
+                        Text(title(binding.action)).font(.system(size: 15, weight: .medium)).lineLimit(1)
+                    } else {
+                        VStack(alignment: .leading, spacing: VD.Space.xs) {
+                            Text(title(binding.action)).font(VD.Font.cardTitle)
+                            Text(detail(binding.action)).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     Spacer(minLength: VD.Space.s)
                     VDKeyCaps(label: binding.label, size: 13)
-                }.padding(.horizontal, rowPadding).padding(.vertical, rowVerticalPadding)
+                }.frame(minHeight: compact ? 40 : nil).padding(.horizontal, rowPadding).padding(.vertical, compact ? 0 : VD.Space.l)
                     .accessibilityElement(children: .combine)
             }
         }
@@ -199,14 +203,15 @@ private struct DesktopHomeView: View {
         }
     }
     /// The shortcut card inside its decorative wash; the usage card's vertical padding matches the wash's 10pt inset.
+    /// A 12pt caption, then one 40pt row per enabled shortcut (title and key caps, no detail line).
     private var shortcuts: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(D("Shortcuts")).font(VD.Font.cardTitle)
-                .padding(.horizontal, VD.Space.l).padding(.top, VD.Space.l).padding(.bottom, VD.Space.xs)
-            ShortcutSummaryList(state: state, rowPadding: VD.Space.l, rowVerticalPadding: 10)
-            Spacer(minLength: VD.Space.xs)
+            Text(D("Shortcuts")).font(VD.Font.detail.weight(.semibold)).foregroundStyle(.secondary)
+                .padding(.horizontal, VD.Space.l).padding(.top, VD.Space.l).padding(.bottom, VD.Space.s)
+            ShortcutSummaryList(state: state, rowPadding: VD.Space.l, compact: true)
+                .padding(.bottom, VD.Space.s)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous).strokeBorder(VD.Palette.line))
         .padding(10).background { wash }
@@ -226,7 +231,7 @@ private struct DesktopHomeView: View {
     }
 }
 
-/// Home's first row: two equal-width, top-aligned columns (each offered the row height; the usage card keeps its own) when each column gets at least
+/// Home's first row: two equal-width, top-aligned columns (each card keeps its own height) when each column gets at least
 /// `minimumColumnWidth`; otherwise the subviews stack in order at full width. At the window's
 /// 1080pt minimum the content area is about 778pt, so the stacked fallback is a safety net.
 private struct HomeFirstRowLayout: Layout {
@@ -254,7 +259,7 @@ private struct HomeFirstRowLayout: Layout {
         if let column = columnWidth(bounds.width, count: subviews.count) {
             for (index, subview) in subviews.enumerated() {
                 subview.place(at: CGPoint(x: bounds.minX + CGFloat(index) * (column + spacing), y: bounds.minY),
-                              proposal: ProposedViewSize(width: column, height: bounds.height))
+                              proposal: ProposedViewSize(width: column, height: nil))
             }
             return
         }

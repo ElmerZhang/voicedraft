@@ -183,6 +183,7 @@
 "Usage" = "Usage";
 "View more" = "查看更多";
 "Total usage" = "總使用量";
+"Yesterday · %1$@ dictated · %2$@ words · %3$@ saved" = "昨天 · 聽寫 %1$@ · %2$@ 字詞 · 節省 %3$@";
 
 // Voice usage metrics
 "Dictation time" = "聽寫時長";

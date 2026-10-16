@@ -183,6 +183,7 @@
 "Usage" = "Usage";
 "View more" = "詳しく見る";
 "Total usage" = "累計利用量";
+"Yesterday · %1$@ dictated · %2$@ words · %3$@ saved" = "昨日 · 音声入力 %1$@ · %2$@ 語 · %3$@ 短縮";
 
 // Voice usage metrics
 "Dictation time" = "音声入力時間";

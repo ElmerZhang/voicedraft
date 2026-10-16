@@ -1,15 +1,18 @@
 import SwiftUI
 import VoiceDraftCore
 
+/// Home's summary: four Total-usage tiles, one Yesterday line (omitted when empty) and a footnote.
+/// Personalization stays in Settings → Usage.
 struct UsageSummaryView: View {
     let history: [HistoryEntry]
     let vocabulary: AppVocabulary
     let viewMore: () -> Void
+    @Environment(\.locale) private var locale
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let summary = UsageSummary(history: history, now: context.date, vocabulary: vocabulary)
-            VDSurface(padding: VD.Space.l, spacing: VD.Space.m) {
+            VDSurface(padding: VD.Space.l, spacing: 0) {
                 HStack {
                     Text(D("Usage activity")).font(VD.Font.cardTitle)
                     Spacer()
@@ -20,70 +23,86 @@ struct UsageSummaryView: View {
                         }.font(VD.Font.detail).padding(.vertical, VD.Space.s)
                             .padding(.horizontal, VD.Space.xs).contentShape(Rectangle())
                     }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent)
-                }.padding(.vertical, -VD.Space.xs)
-                // Yesterday and Total usage side by side when both fit, otherwise stacked.
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: VD.Space.l) { periods(summary, divider: true) }
-                        .fixedSize(horizontal: false, vertical: true)
-                    VStack(alignment: .leading, spacing: VD.Space.m) { periods(summary, divider: false) }
+                }.padding(.vertical, -VD.Space.xs).padding(.bottom, 10)
+                tiles(summary.metrics)
+                if let yesterday = summary.yesterday {
+                    yesterdayLine(yesterday.metrics).padding(.top, 14)
                 }
-                Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 10)
             }
         }
     }
 
-    @ViewBuilder private func periods(_ summary: UsageSummary, divider: Bool) -> some View {
-        if let yesterday = summary.yesterday {
-            metric(D("Yesterday"), metrics: yesterday.metrics)
-            if divider { Divider() }
+    private func tiles(_ metrics: UsageMetrics) -> some View {
+        let format = UsageFormat(locale: locale)
+        return Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 14) {
+            GridRow {
+                tile(Text(format.time(metrics.duration)), title: D("Dictation time"))
+                tile(Text(format.words(metrics.words)), title: D("Dictated words"))
+            }
+            GridRow {
+                tile(speed(metrics, format: format), title: D("Average speed"))
+                tile(Text(format.time(metrics.estimatedTimeSaved)), title: D("Est. time saved"))
+            }
         }
-        metric(D("Total usage"), metrics: summary.metrics)
     }
 
-    private func metric(_ title: String, metrics: UsageMetrics) -> some View {
-        VStack(alignment: .leading, spacing: VD.Space.s) {
-            Text(title).font(VD.Font.detail.weight(.semibold)).foregroundStyle(.secondary)
-            UsageMetricsView(metrics: metrics, compact: true)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+    private func tile(_ value: Text, title: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            value.font(Self.tileValue).lineLimit(1).fixedSize()
+            Text(title).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, alignment: .leading).accessibilityElement(children: .combine)
     }
+
+    /// The number at tile size followed by a smaller "WPM" unit.
+    private func speed(_ metrics: UsageMetrics, format: UsageFormat) -> Text {
+        guard let value = format.speedNumber(metrics) else { return Text(verbatim: "—") }
+        var number = AttributedString(value)
+        number.font = Self.tileValue
+        var unit = AttributedString(" WPM")
+        unit.font = VD.Font.cardTitle
+        return Text(number + unit)
+    }
+
+    /// "Yesterday · 10m dictated · …" at 12pt secondary with the values in 12pt semibold primary.
+    private func yesterdayLine(_ metrics: UsageMetrics) -> some View {
+        let format = UsageFormat(locale: locale)
+        let values = [format.time(metrics.duration), format.words(metrics.words), format.time(metrics.estimatedTimeSaved)]
+        // Format with sentinels, then swap each sentinel for its emphasized value.
+        let marker = "\u{1}"
+        let template = String(format: D("Yesterday · %1$@ dictated · %2$@ words · %3$@ saved"),
+                              marker + "0", marker + "1", marker + "2")
+        var line = AttributedString()
+        for (index, part) in template.components(separatedBy: marker).enumerated() {
+            guard index > 0, let slot = part.first?.wholeNumberValue, values.indices.contains(slot) else {
+                line += AttributedString(part); continue
+            }
+            var value = AttributedString(values[slot])
+            value.font = VD.Font.detail.weight(.semibold)
+            value.foregroundColor = VD.Palette.ink
+            line += value + AttributedString(String(part.dropFirst()))
+        }
+        return Text(line).font(VD.Font.detail).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private static let tileValue = SwiftUI.Font.system(size: 26, weight: .semibold).monospacedDigit()
 }
 
-/// The same five definitions are used for yesterday, all history and the calendar window.
-private struct UsageMetricsView: View {
-    let metrics: UsageMetrics
-    /// Home's summary uses smaller icons and values with tighter rows than the Settings → Usage card.
-    var compact = false
-    @Environment(\.locale) private var locale
+/// Shared value formatting for Home's summary and the Settings → Usage card.
+private struct UsageFormat {
+    let locale: Locale
 
-    var body: some View {
-        VStack(spacing: compact ? 6 : VD.Space.l) {
-            row("clock", title: D("Dictation time"), value: time(metrics.duration),
-                help: D("Time in saved voice transcripts. Typed tests and empty transcripts are excluded."))
-            row("mic", title: D("Dictated words"), value: metrics.words.formatted(.number.locale(locale).notation(.compactName).precision(.fractionLength(0...1))),
-                help: D("Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words."))
-            row("bolt", title: D("Average speed"),
-                value: metrics.wordsPerMinute.map { "\($0.formatted(.number.locale(locale).precision(.fractionLength(0)))) WPM" } ?? "—",
-                help: D("Total dictated words divided by total dictation minutes. No recording means no speed estimate."))
-            row("hourglass", title: D("Est. time saved"), value: time(metrics.estimatedTimeSaved),
-                help: D("Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured."))
-            row("signature", title: D("Personalization"),
-                value: metrics.personalization.map { $0.formatted(.percent.locale(locale).precision(.fractionLength(1))) } ?? "—",
-                help: D("Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics."))
-        }
+    func words(_ count: Int) -> String {
+        count.formatted(.number.locale(locale).notation(.compactName).precision(.fractionLength(0...1)))
     }
 
-    private func row(_ icon: String, title: String, value: String, help: String) -> some View {
-        HStack(spacing: compact ? VD.Space.s : VD.Space.m) {
-            Image(systemName: icon).resizable().scaledToFit().frame(width: compact ? 14 : 20, height: compact ? 14 : 20)
-                .frame(width: compact ? 18 : 24).accessibilityHidden(true)
-            Text(title).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: VD.Space.s)
-            Text(value).font(compact ? VD.Font.cardTitle : VD.Font.statValue).monospacedDigit().fixedSize()
-        }.help(help).accessibilityElement(children: .combine).accessibilityHint(help)
+    func speedNumber(_ metrics: UsageMetrics) -> String? {
+        metrics.wordsPerMinute.map { $0.formatted(.number.locale(locale).precision(.fractionLength(0))) }
     }
 
-    private func time(_ seconds: TimeInterval) -> String {
+    func time(_ seconds: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
         var calendar = Calendar.current
         calendar.locale = locale
@@ -93,6 +112,41 @@ private struct UsageMetricsView: View {
         formatter.maximumUnitCount = 1
         return formatter.string(from: seconds) ?? "—"
     }
+}
+
+/// The same five definitions are used for yesterday, all history and the calendar window.
+private struct UsageMetricsView: View {
+    let metrics: UsageMetrics
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(spacing: VD.Space.l) {
+            row("clock", title: D("Dictation time"), value: format.time(metrics.duration),
+                help: D("Time in saved voice transcripts. Typed tests and empty transcripts are excluded."))
+            row("mic", title: D("Dictated words"), value: format.words(metrics.words),
+                help: D("Counts the original transcript, not generated answers. Chinese and Japanese characters count individually; other languages count words."))
+            row("bolt", title: D("Average speed"),
+                value: format.speedNumber(metrics).map { "\($0) WPM" } ?? "—",
+                help: D("Total dictated words divided by total dictation minutes. No recording means no speed estimate."))
+            row("hourglass", title: D("Est. time saved"), value: format.time(metrics.estimatedTimeSaved),
+                help: D("Estimated against typing 45 words per minute, minus dictation time. Processing and editing time are not measured."))
+            row("signature", title: D("Personalization"),
+                value: metrics.personalization.map { $0.formatted(.percent.locale(locale).precision(.fractionLength(1))) } ?? "—",
+                help: D("Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics."))
+        }
+    }
+
+    private func row(_ icon: String, title: String, value: String, help: String) -> some View {
+        HStack(spacing: VD.Space.m) {
+            Image(systemName: icon).resizable().scaledToFit().frame(width: 20, height: 20)
+                .frame(width: 24).accessibilityHidden(true)
+            Text(title).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: VD.Space.s)
+            Text(value).font(VD.Font.statValue).monospacedDigit().fixedSize()
+        }.help(help).accessibilityElement(children: .combine).accessibilityHint(help)
+    }
+
+    private var format: UsageFormat { UsageFormat(locale: locale) }
 }
 
 struct UsageActivityView: View {

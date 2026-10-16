@@ -183,6 +183,7 @@
 "Usage" = "Usage";
 "View more" = "Mehr anzeigen";
 "Total usage" = "Gesamtnutzung";
+"Yesterday · %1$@ dictated · %2$@ words · %3$@ saved" = "Gestern · %1$@ diktiert · %2$@ Wörter · %3$@ gespart";
 
 // Voice usage metrics
 "Dictation time" = "Diktierzeit";

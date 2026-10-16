@@ -188,7 +188,7 @@ private struct DesktopHomeView: View {
             Text(D("Speak, don't type.")).font(VD.Font.hero).tracking(-1.2)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             FnShortcutStatus(state: state)
-            UsageActivityView(history: state.history, keepHistory: state.device.keepHistory)
+            UsageSummaryView(history: state.history) { state.openSettings("Usage") }
             Text(D("Shortcuts")).font(VD.Font.sectionTitle)
             ShortcutSummaryList(state: state)
                 .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
@@ -493,7 +493,7 @@ private struct DesktopSettingsView: View {
     @State private var accessibilityAllowed: Bool?
     @State private var screenRecordingAllowed: Bool?
     private let tabs = [("Settings", "gearshape"), ("Personalization", "pencil.and.outline"), ("Models", "cpu"),
-                        ("Sync", "arrow.triangle.2.circlepath"), ("About", "info.circle"), ("Help", "questionmark.circle")]
+                        ("Usage", "chart.bar"), ("Sync", "arrow.triangle.2.circlepath"), ("About", "info.circle"), ("Help", "questionmark.circle")]
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: VD.Space.xs) {
@@ -524,6 +524,7 @@ private struct DesktopSettingsView: View {
                         case "Models": ModelsView(state: state, showsHeading: false)
                         case "Sync": SyncView(state: state, showsHeading: false)
                         case "Personalization": DesktopPersonalizationView(state: state)
+                        case "Usage": UsageActivityView(history: state.history, keepHistory: state.device.keepHistory)
                         case "About": about
                         case "Help": help
                         default: general

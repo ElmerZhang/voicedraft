@@ -1,6 +1,13 @@
 # Validation record
 
 
+## 2026-10-16 · Compact Home usage and Settings detail
+
+- Home now shows yesterday and all-retained-history totals (saved entries and recorded minutes); yesterday is omitted when empty, including first use. View more opens the new Settings → Usage tab. The 365-day heatmap and its details live there, with no main-sidebar statistics page.
+- Seven usage tests passed, including three new checks for all-history totals older than a year, local yesterday boundaries, first-use/empty/older-only history and DST midnight rollover. Full `scripts/test-all.sh`: **304 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go vet/build/race tests, synthetic transport fixtures and localization checks.
+- Packaged `dist/VoiceDraft.app` and verified its signature/Info.plist. Isolated light/dark captures are in `dist/usage-summary-light/` and `dist/usage-summary-dark/`; the no-yesterday state is in `dist/usage-summary-empty/`. Preview state is synthetic and does not access real history or providers. Not installed over the system app. Concurrent input-focus diagnostic edits remain separate from this change.
+
+
 ## 2026-10-16 · Home activity calendar
 
 - Replaced Home's input-testing workspace and old totals with a 365-day retained-history activity calendar, date/count/minute hover details, window totals and empty/history-off guidance. Shortcut help remains below it; Settings keeps device/model/permission controls. Removed Help's obsolete test-workspace link. No history migration, extra collection, model call or sync change.

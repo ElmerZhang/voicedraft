@@ -18,7 +18,7 @@ def read(code):
 base = read('en')
 for code in ['zh-Hans', 'zh-Hant', 'ja', 'ko', 'de', 'fr', 'es']:
     assert read(code).keys() == base.keys(), f'Mismatched desktop keys: {code}'
-used = {'Personalization', 'Settings', 'About', 'Help'}
+used = {'Personalization', 'Settings', 'Usage', 'About', 'Help'}
 for path in (root / 'Sources').rglob('*.swift'):
     used.update(re.findall(r'\bD\("([^"\n]+)"\)', path.read_text()))
 assert not used - base.keys(), f'Missing desktop messages: {used - base.keys()}'

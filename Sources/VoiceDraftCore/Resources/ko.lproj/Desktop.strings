@@ -178,3 +178,8 @@
 "Less" = "적음";
 "More" = "많음";
 "Used when you record with a shortcut or from the menu bar." = "단축키나 메뉴 막대에서 녹음할 때 사용합니다.";
+
+// Compact Home usage and Settings detail
+"Usage" = "Usage";
+"View more" = "자세히 보기";
+"Total usage" = "총 사용량";

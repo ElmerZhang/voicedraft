@@ -39,10 +39,10 @@ The floating recording panel does not take keyboard focus. If the original field
 
 ## Pages
 
-- **Home**: a GitHub-style calendar for the last 365 days, showing daily saved-entry counts and recorded minutes on hover, plus totals for saved entries, active days and recorded minutes. Statistics use retained history on this Mac; deleted/expired entries are excluded and disabling history pauses new activity. Enabled shortcuts appear below the calendar. The input-testing workspace has been removed.
+- **Home**: a compact summary of yesterday's usage (hidden when there are no records for yesterday) and total usage across all retained local history. **View more** opens **Settings → Usage**, which contains the 365-day activity calendar and daily details. Deleted/expired history is excluded, and disabling history pauses new activity. Enabled shortcuts remain below the summary.
 - **History**: records grouped by day, search, dictation/question filters, original transcript details, copy, deletion, and the local-history toggle.
 - **Vocabulary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
-- **Settings** (sidebar or **Command-comma**): an overlay with shortcuts, recording, on-screen context, audio, language, general and update preferences, plus Personalization, Models, Sync, About, and Help tabs. Models and Sync are settings tabs, not pages. Save writing style and translation target in Personalization.
+- **Settings** (sidebar or **Command-comma**): an overlay with shortcuts, recording, on-screen context, audio, language, general and update preferences, plus Personalization, Models, Usage, Sync, About, and Help tabs. Models and Sync are settings tabs, not pages. Save writing style and translation target in Personalization.
 
 The interface follows the system light or dark appearance; the recording HUD is always dark. The shared visual language is defined in [docs/design.md](docs/design.md).
 

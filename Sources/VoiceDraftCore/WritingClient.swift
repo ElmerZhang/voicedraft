@@ -18,7 +18,7 @@ public enum WritingClient {
         switch profile.adapter {
         case .anthropic:
             body.removeValue(forKey: "messages")
-            body["system"] = messages.filter { $0["role"] as? String == "system" }.compactMap { $0["content"] as? String }.joined(separator: "\n")
+            body["system"] = messages.filter { $0["role"] as? String == "system" }.map { text(of: $0["content"] as Any) }.joined(separator: "\n")
             body["messages"] = messages.filter { $0["role"] as? String != "system" }
             if body["max_tokens"] == nil { body["max_tokens"] = 4096 }
             request.setValue(nil, forHTTPHeaderField: "Authorization")
@@ -27,10 +27,17 @@ public enum WritingClient {
         case .responses:
             body.removeValue(forKey: "messages")
             body["input"] = messages.map { message -> [String: Any] in
-                ["role": message["role"] as? String ?? "user", "content": message["content"] as? String ?? ""]
+                ["role": message["role"] as? String ?? "user", "content": text(of: message["content"] as Any)]
             }
             body["store"] = false
         case .qwenChatWriting, .chatCompletions:
+            // Only Bailian receives the cache-marked block array; generic servers get the plain string.
+            if profile.adapter == .chatCompletions {
+                body["messages"] = messages.map { message -> [String: Any] in
+                    guard message["content"] is [Any] else { return message }
+                    var flat = message; flat["content"] = text(of: message["content"] as Any); return flat
+                }
+            }
             if stream, includeUsage, body["stream_options"] == nil,
                (try? QwenRequests.extras(profile.extraJSON))?["stream_options"] == nil {
                 body["stream_options"] = ["include_usage": true]
@@ -41,6 +48,15 @@ public enum WritingClient {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         request.setValue(stream ? "text/event-stream" : "application/json", forHTTPHeaderField: "Accept")
         return (request, addedStreamUsage)
+    }
+
+    /// Text of a prompt message's content: a plain string, or text blocks (such as the cache-marked
+    /// system blocks) concatenated in order; the writing prompt's block A ends with its own newline.
+    /// Non-text blocks are ignored.
+    static func text(of content: Any) -> String {
+        if let string = content as? String { return string }
+        guard let blocks = content as? [[String: Any]] else { return "" }
+        return blocks.compactMap { $0["text"] as? String }.joined()
     }
 
     /// `usage` receives the provider's reported token counts once, when the response carries them.

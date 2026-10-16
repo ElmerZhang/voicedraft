@@ -101,8 +101,8 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try QwenRequests.writing(profile: profile, key: "key", text: "Shorten", mode: .edit, settings: settings))
         let request = try QwenRequests.writing(profile: profile, key: "writing-key", text: "Shorten", mode: .edit, settings: settings, selection: "A long message")
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
-        let messages = body["messages"] as! [[String: String]]
-        let input = try JSONSerialization.jsonObject(with: Data(messages[1]["content"]!.utf8)) as! [String: String]
+        let messages = body["messages"] as! [[String: Any]]
+        let input = try JSONSerialization.jsonObject(with: Data((messages[1]["content"] as! String).utf8)) as! [String: String]
         XCTAssertEqual(input["selected_text"], "A long message")
         XCTAssertEqual(input["transcript"], "Shorten")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer writing-key")
@@ -119,9 +119,9 @@ final class CoreTests: XCTestCase {
             let request = try QwenRequests.writing(profile: .qwen(.writing), key: "test-only", text: "A test transcript",
                                                    mode: mode, settings: settings, selection: "Selected fixture")
             let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
-            let messages = try XCTUnwrap(body["messages"] as? [[String: String]])
-            XCTAssertEqual(messages.map { $0["role"] }, ["system", "user"])
-            let system = try XCTUnwrap(messages.first?["content"])
+            let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+            XCTAssertEqual(messages.map { $0["role"] as? String }, ["system", "user"])
+            let system = try XCTUnwrap(promptText(messages.first?["content"]))
             let cleansDictation = mode == .polish || mode == .translate
             XCTAssertEqual(system.contains("Dictation cleanup rules:"), cleansDictation, "\(mode)")
             XCTAssertEqual(system.contains("Cleaned: 帮我把这个 Commit 丢掉吧，没用了。"), cleansDictation, "\(mode)")
@@ -142,10 +142,10 @@ final class CoreTests: XCTestCase {
             let request = try QwenRequests.writing(profile: .qwen(.writing), key: "test-only", text: original,
                                                    mode: mode, settings: SharedSettings(), application: "Fixture Editor")
             let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
-            let messages = try XCTUnwrap(body["messages"] as? [[String: String]])
-            let system = try XCTUnwrap(messages.first?["content"])
+            let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+            let system = try XCTUnwrap(promptText(messages.first?["content"]))
             XCTAssertFalse(system.contains("FIXTURE_ONLY_9482"))
-            let input = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(messages.last?["content"]).utf8)) as? [String: String])
+            let input = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(messages.last?["content"] as? String).utf8)) as? [String: String])
             XCTAssertEqual(input, ["transcript": original, "selected_text": "", "application": "Fixture Editor"])
         }
     }

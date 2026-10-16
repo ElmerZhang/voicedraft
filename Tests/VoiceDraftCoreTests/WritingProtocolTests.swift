@@ -1,5 +1,4 @@
 import XCTest
-import CryptoKit
 @testable import VoiceDraftCore
 
 final class WritingProtocolTests: XCTestCase {
@@ -85,24 +84,15 @@ extension WritingProtocolTests {
         let body = try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as! [String: Any]
         let list = body["messages"] as! [[String: Any]]
         let user = try JSONSerialization.jsonObject(with: Data((list[1]["content"] as! String).utf8)) as! [String: Any]
-        return (list[0]["content"] as! String, user)
+        return (try XCTUnwrap(promptText(list[0]["content"])), user)
     }
 
-    func testWithoutScreenContextPromptsAreByteIdenticalToBeforeTheFeature() throws {
-        // SHA-256 of the system prompt recorded at 33354a3 (before on-screen context).
-        let recorded: [WritingMode: String] = [
-            .verbatim: "dc8c492ea8c5e28eb3968eca175701f170426bb2be0a37f9606e38ae673fc9d3",
-            .polish: "1ae5b155c3e9efabe01b49a3abde13651de57fc9dd43b8d7124e3093436e81cf",
-            .translate: "3f6bdaf76be5221e41ca447b7424c1b06215b15324e0d2a3fcea4db0478fcdfe",
-            .edit: "323e94d64d7883b05173059ed978777a79b92728af3098d3e7288a9e2a92d66a",
-            .ask: "f4b14b0257cf1f4549ab814a222e8c46b5177251981597f05903c063c9dfa60e"
-        ]
+    func testEmptyScreenContextAddsNoPayloadAndKeepsThePrompt() throws {
         for mode in WritingMode.allCases {
-            for screen in [nil, ScreenWritingContext(source: .accessibility, excerpt: "", terms: [])] {
-                let result = try messages(mode, screen: screen)
-                XCTAssertEqual(SHA256.hash(data: Data(result.system.utf8)).map { String(format: "%02x", $0) }.joined(), recorded[mode], mode.rawValue)
-                XCTAssertEqual(Set(result.user.keys), ["transcript", "selected_text", "application"])
-            }
+            let none = try messages(mode, screen: nil)
+            let empty = try messages(mode, screen: ScreenWritingContext(source: .accessibility, excerpt: "", terms: []))
+            XCTAssertEqual(none.system, empty.system, mode.rawValue)
+            XCTAssertEqual(Set(empty.user.keys), ["transcript", "selected_text", "application"])
         }
     }
 
@@ -119,8 +109,10 @@ extension WritingProtocolTests {
         let translate = try messages(.translate, screen: screen)
         XCTAssertTrue(translate.system.contains(QwenRequests.screenContextRule))
         XCTAssertFalse(translate.system.contains("on-screen context, writing preferences"), "the language policy is Polish-only")
+        // The rule lives in the cached block, so it is present (and inert) without screen context.
         let plain = try messages(.polish, screen: nil)
-        XCTAssertFalse(plain.system.contains("On-screen context")); XCTAssertFalse(plain.system.contains("on-screen context"))
+        XCTAssertTrue(plain.system.contains(QwenRequests.screenContextRule))
+        XCTAssertNil(plain.user["on_screen_context_reference_only"])
 
         for adapter in [ModelAdapter.anthropic, .responses] {
             let original = try QwenRequests.writing(profile: profile(adapter), key: "k", text: "hello", mode: .polish, settings: SharedSettings(), screenContext: screen)
@@ -139,5 +131,114 @@ extension WritingProtocolTests {
         let payload = edit.user["on_screen_context_reference_only"] as? [String: Any]
         XCTAssertEqual(payload?["excerpt"] as? String, ""); XCTAssertEqual(payload?["terms"] as? [String], ["ZetaKit"])
         XCTAssertTrue(edit.system.contains(QwenRequests.screenContextRule))
+    }
+}
+
+// Explicit prompt cache (Bailian `cache_control`).
+extension WritingProtocolTests {
+    private func blocks(_ request: URLRequest) throws -> [[String: Any]] {
+        try XCTUnwrap(try writingMessages(request).system["content"] as? [[String: Any]])
+    }
+
+    private func cachedPrefix(_ mode: WritingMode, settings: SharedSettings = SharedSettings(), text: String = "hello",
+                              application: String = "", screen: ScreenWritingContext? = nil) throws -> (a: String, b: String) {
+        let request = try QwenRequests.writing(profile: .qwen(.writing), key: "k", text: text, mode: mode, settings: settings,
+                                               selection: "sel", application: application, screenContext: screen)
+        let content = try blocks(request)
+        return (try XCTUnwrap(content[0]["text"] as? String), try XCTUnwrap(content[1]["text"] as? String))
+    }
+
+    func testQwenWritingSystemMessageHasCacheMarkedPrefixAndPlainSuffix() throws {
+        for mode in WritingMode.allCases {
+            let request = try QwenRequests.writing(profile: .qwen(.writing), key: "k", text: "hello", mode: mode,
+                                                   settings: SharedSettings(), selection: "sel")
+            let content = try blocks(request)
+            XCTAssertEqual(content.count, 2, mode.rawValue)
+            XCTAssertEqual(content.map { $0["type"] as? String }, ["text", "text"])
+            XCTAssertEqual(content[0]["cache_control"] as? [String: String], ["type": "ephemeral"], mode.rawValue)
+            XCTAssertNil(content[1]["cache_control"], mode.rawValue)
+            XCTAssertTrue(try writingMessages(request).user["content"] is String)
+        }
+    }
+
+    func testCachedPrefixIsStableAcrossTakeVariablesAndDiffersByMode() throws {
+        var other = SharedSettings()
+        other.stylePrompt = "FIXTURE_STYLE_7731"
+        other.vocabulary = AppVocabulary(words: "FixtureKit")
+        other.recentInputContext = "FIXTURE_RECENT_4410"
+        let screen = ScreenWritingContext(source: .ocr, excerpt: "FIXTURE_SCREEN_2209", terms: ["ZetaKit"])
+        let first = try cachedPrefix(.polish)
+        let second = try cachedPrefix(.polish, settings: other, text: "a different transcript", application: "Fixture Editor", screen: screen)
+        XCTAssertEqual(first.a, second.a)
+        XCTAssertNotEqual(first.b, second.b)
+        XCTAssertTrue(second.b.contains("FIXTURE_STYLE_7731")); XCTAssertTrue(second.b.contains("FixtureKit"))
+        for marker in ["FIXTURE_STYLE_7731", "FixtureKit", "FIXTURE_RECENT_4410", "FIXTURE_SCREEN_2209", "Fixture Editor", "a different transcript"] {
+            XCTAssertFalse(second.a.contains(marker), marker)
+        }
+        XCTAssertNotEqual(try cachedPrefix(.translate).a, first.a)
+        XCTAssertTrue(first.b.hasSuffix("Return only the polished text with the original language mix preserved."))
+    }
+
+    func testCachedPrefixAlwaysCarriesScreenContextRule() throws {
+        for mode in WritingMode.allCases {
+            XCTAssertTrue(try cachedPrefix(mode).a.hasSuffix(QwenRequests.screenContextRule + "\n"), mode.rawValue)
+        }
+        XCTAssertTrue(try cachedPrefix(.polish).a.contains("from the app, recent context, on-screen context, writing preferences,"))
+    }
+
+    func testOnlyQwenAdapterKeepsCacheMarker() throws {
+        for adapter in [ModelAdapter.chatCompletions, .anthropic, .responses, .qwenChatWriting] {
+            let original = try QwenRequests.writing(profile: profile(adapter), key: "k", text: "hello", mode: .polish, settings: SharedSettings())
+            let unadapted = try blocks(original)
+            let full = try XCTUnwrap(promptText(unadapted))
+            let request = try WritingClient.adapt(original, profile: profile(adapter), key: "k", stream: true)
+            let raw = String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self)
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+            let messages = try XCTUnwrap(body[adapter == .responses ? "input" : "messages"] as? [[String: Any]])
+            switch adapter {
+            case .qwenChatWriting:
+                let content = try XCTUnwrap(messages[0]["content"] as? [[String: Any]])
+                XCTAssertEqual(content[0]["cache_control"] as? [String: String], ["type": "ephemeral"])
+                XCTAssertEqual(content.count, 2)
+                XCTAssertTrue(messages[1]["content"] is String)
+            case .anthropic:
+                XCTAssertEqual(body["system"] as? String, full)
+                XCTAssertEqual(messages.count, 1); XCTAssertTrue(messages[0]["content"] is String)
+            default:
+                XCTAssertEqual(messages[0]["content"] as? String, full, adapter.rawValue)
+                XCTAssertTrue(messages[1]["content"] is String, adapter.rawValue)
+            }
+            if adapter != .qwenChatWriting { XCTAssertFalse(raw.contains("cache_control"), adapter.rawValue) }
+            XCTAssertTrue(full.contains("You are a careful voice writing assistant.")); XCTAssertTrue(full.contains("Final Polish check"))
+            if adapter == .chatCompletions || adapter == .qwenChatWriting {
+                XCTAssertEqual((body["stream_options"] as? [String: Any])?["include_usage"] as? Bool, true, adapter.rawValue)
+            } else {
+                XCTAssertNil(body["stream_options"], adapter.rawValue)
+            }
+        }
+    }
+
+    func testVocabularyLearningKeepsPlainStringSystemMessage() throws {
+        let sample = try XCTUnwrap(VocabularyLearningSample(source: .dictation, before: "herdr", after: "Herdr"))
+        for adapter in [ModelAdapter.qwenChatWriting, .chatCompletions] {
+            let original = try QwenRequests.vocabularyLearning(profile: profile(adapter), key: "k", sample: sample)
+            for request in [original, try WritingClient.adapt(original, profile: profile(adapter), key: "k", stream: false)] {
+                let messages = try XCTUnwrap((try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])?["messages"] as? [[String: Any]])
+                XCTAssertTrue(messages[0]["content"] is String, adapter.rawValue)
+                XCTAssertFalse(String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self).contains("cache_control"))
+            }
+        }
+    }
+
+    func testCacheCreationAndHitTokensReachUsage() throws {
+        let body = #"{"choices":[{"message":{"content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2300,"completion_tokens":5,"total_tokens":2305,"prompt_tokens_details":{"cached_tokens":2100,"cache_creation_input_tokens":2150}}}"#
+        let usage = try XCTUnwrap(ProviderUsage.parse(writing: Data(body.utf8), adapter: .qwenChatWriting))
+        XCTAssertEqual(usage.cachedInputTokens, 2100)
+        XCTAssertEqual(usage.raw["prompt_tokens_details.cache_creation_input_tokens"], 2150)
+        var stream = WritingStream(adapter: .qwenChatWriting)
+        try stream.consume(event: "", data: #"{"choices":[{"delta":{"content":"hi"},"finish_reason":"stop"}]}"#)
+        try stream.consume(event: "", data: #"{"choices":[],"usage":{"prompt_tokens":2300,"completion_tokens":5,"prompt_tokens_details":{"cache_creation_input_tokens":2150}}}"#)
+        XCTAssertEqual(stream.usage?.raw["prompt_tokens_details.cache_creation_input_tokens"], 2150)
+        XCTAssertNil(stream.usage?.cachedInputTokens)
     }
 }

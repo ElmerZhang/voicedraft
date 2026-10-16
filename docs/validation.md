@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-16 · Explicit prompt cache for Qwen writing
+
+- The writing system message is now two text blocks. The static block, which depends only on mode and Translate target language, carries Bailian's `cache_control: {"type": "ephemeral"}` marker; preferences and vocabulary follow in an unmarked block. Only the Qwen chat writing adapter sends the array; Chat Completions, Anthropic and Responses receive one flattened string with no marker. The on-screen context rule is now always in the static block, so the old "byte-identical to before on-screen context" hash test was replaced by tests for cache-block stability.
+- New tests cover the two-block shape and marker for every mode, static-block equality across transcript, vocabulary, style, application, recent context and screen context, a different static block for Translate, the always-present screen rule, per-adapter flattening with no `cache_control` and unchanged `stream_options`, plain-string vocabulary learning, and cache creation/hit tokens in usage. `swift test --disable-sandbox` passed **330 tests, 0 failures, 4 skipped**; `scripts/test-all.sh` passed **330 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go checks and fixture integrations. The Go fixture server needed no change. No real provider request was made.
+- Pending hand check: after the next few Polish dictations with a Qwen writing profile, the usage log should show `prompt_tokens_details.cache_creation_input_tokens` in `raw` on the first call, and `cachedInputTokens` near the static block size (about 2,100 tokens) on calls within 5 minutes.
+
 ## 2026-10-16 · Typeless-inspired voice metrics
 
 - Replaced saved-entry/minute headline values with five metrics for yesterday, all retained history and the Usage calendar window: dictation time, original-transcript word/character units, weighted WPM, estimated savings against 45 units/minute typing, and Personalization as current enabled vocabulary coverage. No data displays a dash for rate metrics; yesterday remains hidden when it has no records. The Usage calculation disclosure states the estimate and retention/retry limitations. This does not claim Typeless's private formulas or measure recognition accuracy.

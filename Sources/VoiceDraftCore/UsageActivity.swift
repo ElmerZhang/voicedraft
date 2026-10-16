@@ -1,5 +1,29 @@
 import Foundation
 
+/// Compact Home totals over all retained history, with yesterday omitted when empty.
+public struct UsageSummary {
+    public private(set) var totalCount = 0
+    public private(set) var totalDuration: TimeInterval = 0
+    public private(set) var yesterday: UsageActivity.Day?
+
+    public init(history: [HistoryEntry], now: Date = Date(), calendar: Calendar = .current) {
+        let today = calendar.startOfDay(for: now)
+        let previousDay = calendar.date(byAdding: .day, value: -1, to: today)!
+        for entry in history {
+            let day = calendar.startOfDay(for: entry.date)
+            guard day <= today else { continue }
+            let duration = entry.duration.isFinite ? max(0, entry.duration) : 0
+            totalCount += 1
+            totalDuration += duration
+            if day == previousDay {
+                if yesterday == nil { yesterday = UsageActivity.Day(date: previousDay) }
+                yesterday?.count += 1
+                yesterday?.duration += duration
+            }
+        }
+    }
+}
+
 /// A calendar projection of retained local history, not a lifetime usage ledger.
 public struct UsageActivity {
     public struct Day: Identifiable {

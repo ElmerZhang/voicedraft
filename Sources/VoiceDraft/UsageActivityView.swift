@@ -1,6 +1,51 @@
 import SwiftUI
 import VoiceDraftCore
 
+struct UsageSummaryView: View {
+    let history: [HistoryEntry]
+    let viewMore: () -> Void
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let summary = UsageSummary(history: history, now: context.date)
+            VDSurface(spacing: VD.Space.xl) {
+                HStack {
+                    Text(D("Usage activity")).font(VD.Font.cardTitle)
+                    Spacer()
+                    Button(action: viewMore) {
+                        HStack(spacing: VD.Space.xs) {
+                            Text(D("View more"))
+                            Image(systemName: "arrow.up.right").accessibilityHidden(true)
+                        }.font(VD.Font.detail).padding(.vertical, VD.Space.s)
+                            .padding(.horizontal, VD.Space.xs).contentShape(Rectangle())
+                    }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent)
+                }
+                HStack(alignment: .top, spacing: VD.Space.xxl) {
+                    if let yesterday = summary.yesterday {
+                        metric(D("Yesterday"), count: yesterday.count, duration: yesterday.duration)
+                        Divider()
+                    }
+                    metric(D("Total usage"), count: summary.totalCount, duration: summary.totalDuration)
+                }.fixedSize(horizontal: false, vertical: true)
+                Text(D("Based on history on this Mac.")).font(VD.Font.footnote).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func metric(_ title: String, count: Int, duration: TimeInterval) -> some View {
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            Text(title).font(VD.Font.detail).foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: VD.Space.s) {
+                Text(count.formatted(.number.locale(locale))).font(VD.Font.pageTitle).monospacedDigit()
+                Text(D("saved entries")).font(VD.Font.detail).foregroundStyle(.secondary)
+            }
+            Text("\(Int(duration / 60).formatted(.number.locale(locale))) \(D("minutes recorded"))")
+                .font(VD.Font.detail).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading).accessibilityElement(children: .combine)
+    }
+}
+
 struct UsageActivityView: View {
     let history: [HistoryEntry]
     let keepHistory: Bool
@@ -8,7 +53,7 @@ struct UsageActivityView: View {
     @Environment(\.locale) private var locale
 
     var body: some View {
-        // Refresh the date window even when Home stays open overnight.
+        // Refresh the date window even when Usage stays open overnight.
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let activity = UsageActivity(history: history, now: context.date)
             VDSurface(spacing: VD.Space.l) {

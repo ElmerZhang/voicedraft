@@ -15,6 +15,39 @@ final class UsageActivityTests: XCTestCase {
         return entry
     }
 
+    func testSummaryIncludesOlderHistoryAndOnlyLocalYesterday() {
+        let summary = UsageSummary(history: [
+            entry("2024-01-01T00:00:00Z", duration: 60),
+            entry("2026-10-14T16:00:00Z", duration: 15), // Yesterday begins locally.
+            entry("2026-10-15T15:59:59Z", duration: 45),
+            entry("2026-10-15T16:00:00Z", duration: 120), // Today begins locally.
+            entry("2026-10-16T16:00:00Z", duration: 500) // Tomorrow excluded.
+        ], now: date("2026-10-16T04:00:00Z"), calendar: calendar())
+        XCTAssertEqual(summary.totalCount, 4)
+        XCTAssertEqual(summary.totalDuration, 240)
+        XCTAssertEqual(summary.yesterday?.count, 2)
+        XCTAssertEqual(summary.yesterday?.duration, 60)
+    }
+
+    func testSummaryHidesYesterdayForFirstUseEmptyOrOlderHistoryOnly() {
+        let now = date("2026-10-16T04:00:00Z")
+        for history in [[], [entry("2026-10-16T03:00:00Z")], [entry("2026-10-13T03:00:00Z")]] {
+            let summary = UsageSummary(history: history, now: now, calendar: calendar())
+            XCTAssertNil(summary.yesterday)
+            XCTAssertEqual(summary.totalCount, history.count)
+        }
+    }
+
+    func testSummaryYesterdayAcrossDSTAndMidnightRollover() {
+        let history = [entry("2026-03-08T08:00:00Z"), entry("2026-03-09T06:59:59Z")]
+        let calendar = calendar("America/Los_Angeles")
+        let before = UsageSummary(history: history, now: date("2026-03-09T06:59:59Z"), calendar: calendar)
+        XCTAssertNil(before.yesterday)
+        let after = UsageSummary(history: history, now: date("2026-03-09T07:00:00Z"), calendar: calendar)
+        XCTAssertEqual(after.yesterday?.count, 2)
+        XCTAssertEqual(after.totalCount, 2)
+    }
+
     func testLocalDayAggregationAndWindowBoundaries() {
         let activity = UsageActivity(history: [
             entry("2025-10-16T15:59:59Z"), // Before first local day.

@@ -178,3 +178,8 @@
 "Less" = "Less";
 "More" = "More";
 "Used when you record with a shortcut or from the menu bar." = "Used when you record with a shortcut or from the menu bar.";
+
+// Compact Home usage and Settings detail
+"Usage" = "Usage";
+"View more" = "View more";
+"Total usage" = "Total usage";

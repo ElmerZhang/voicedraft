@@ -234,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 let captures: [(name: String, page: String, tab: String?)] = [
                     ("studio", "Studio", nil), ("history", "History", nil), ("vocabulary", "Vocabulary", nil),
                     ("settings", "Settings", "Settings"), ("personalization", "Settings", "Personalization"),
-                    ("models", "Settings", "Models"), ("sync", "Settings", "Sync"), ("about", "Settings", "About"), ("help", "Settings", "Help")
+                    ("models", "Settings", "Models"), ("usage", "Settings", "Usage"), ("sync", "Settings", "Sync"), ("about", "Settings", "About"), ("help", "Settings", "Help")
                 ]
                 for (name, page, tab) in captures {
                     if let tab {
@@ -258,7 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     section.cacheDisplay(in: section.bounds, to: bitmap)
                     try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("settings-screen-context.png"))
                 }
-                print("Rendered three pages, six settings tabs and the On-screen context section without accessing persisted data or Keychain.")
+                print("Rendered three pages, seven settings tabs and the On-screen context section without accessing persisted data or Keychain.")
             } catch { fputs("Preview capture failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

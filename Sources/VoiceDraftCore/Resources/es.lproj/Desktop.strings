@@ -178,3 +178,8 @@
 "Less" = "Menos";
 "More" = "Más";
 "Used when you record with a shortcut or from the menu bar." = "Se usa al grabar con un atajo o desde la barra de menús.";
+
+// Compact Home usage and Settings detail
+"Usage" = "Usage";
+"View more" = "Ver más";
+"Total usage" = "Uso total";

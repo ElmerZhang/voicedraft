@@ -135,6 +135,8 @@ extension Notification.Name {
 private struct ShortcutSummaryList: View {
     @ObservedObject var state: AppState
     var rowPadding: CGFloat = 20
+    /// Vertical padding of each shortcut row; Home uses a tighter value than Settings.
+    var rowVerticalPadding: CGFloat = VD.Space.l
     private var bindings: [ShortcutBinding] {
         [ShortcutAction.dictate, .translate, .edit, .ask, .insertLast].compactMap { action in
             state.device.features.shortcuts.first { $0.action == action && $0.enabled }
@@ -152,13 +154,13 @@ private struct ShortcutSummaryList: View {
             ForEach(Array(bindings.enumerated()), id: \.element.id) { index, binding in
                 if index > 0 { Divider().padding(.horizontal, rowPadding) }
                 HStack(spacing: VD.Space.l) {
-                    VStack(alignment: .leading, spacing: VD.Space.xs) {
+                    VStack(alignment: .leading, spacing: rowVerticalPadding < VD.Space.l ? 2 : VD.Space.xs) {
                         Text(title(binding.action)).font(VD.Font.cardTitle)
                         Text(detail(binding.action)).font(VD.Font.detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: VD.Space.s)
                     VDKeyCaps(label: binding.label, size: 13)
-                }.padding(.horizontal, rowPadding).padding(.vertical, VD.Space.l)
+                }.padding(.horizontal, rowPadding).padding(.vertical, rowVerticalPadding)
                     .accessibilityElement(children: .combine)
             }
         }
@@ -188,13 +190,26 @@ private struct DesktopHomeView: View {
             Text(D("Speak, don't type.")).font(VD.Font.hero).tracking(-1.2)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             FnShortcutStatus(state: state)
-            UsageSummaryView(history: state.history, vocabulary: state.settings.vocabulary) { state.openSettings("Usage") }
-            Text(D("Shortcuts")).font(VD.Font.sectionTitle)
-            ShortcutSummaryList(state: state)
-                .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous).strokeBorder(VD.Palette.line))
-                .padding(10).background { wash }
+            // Shortcuts on the left, usage on the right; stacked in that order when too narrow.
+            HomeFirstRowLayout(spacing: VD.Space.l) {
+                shortcuts
+                UsageSummaryView(history: state.history, vocabulary: state.settings.vocabulary) { state.openSettings("Usage") }
+                    .padding(.vertical, 10)
+            }
         }
+    }
+    /// The shortcut card inside its decorative wash; the usage card's vertical padding matches the wash's 10pt inset.
+    private var shortcuts: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(D("Shortcuts")).font(VD.Font.cardTitle)
+                .padding(.horizontal, VD.Space.l).padding(.top, VD.Space.l).padding(.bottom, VD.Space.xs)
+            ShortcutSummaryList(state: state, rowPadding: VD.Space.l, rowVerticalPadding: 10)
+            Spacer(minLength: VD.Space.xs)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(VD.Palette.elevated, in: RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: VD.Radius.card, style: .continuous).strokeBorder(VD.Palette.line))
+        .padding(10).background { wash }
     }
     /// Decorative tinted dot grid behind the shortcut card; adapts to the appearance.
     private var wash: some View {
@@ -208,6 +223,47 @@ private struct DesktopHomeView: View {
                 }
             }
         }.clipShape(RoundedRectangle(cornerRadius: VD.Radius.card + 10, style: .continuous)).accessibilityHidden(true)
+    }
+}
+
+/// Home's first row: two equal-width, top-aligned columns (each offered the row height; the usage card keeps its own) when each column gets at least
+/// `minimumColumnWidth`; otherwise the subviews stack in order at full width. At the window's
+/// 1080pt minimum the content area is about 778pt, so the stacked fallback is a safety net.
+private struct HomeFirstRowLayout: Layout {
+    var spacing: CGFloat
+    var minimumColumnWidth: CGFloat = 340
+
+    private func columnWidth(_ width: CGFloat, count: Int) -> CGFloat? {
+        guard count > 1 else { return nil }
+        let column = (width - spacing * CGFloat(count - 1)) / CGFloat(count)
+        return column >= minimumColumnWidth ? column : nil
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let count = subviews.count
+        let width = proposal.width ?? minimumColumnWidth * CGFloat(count) + spacing * CGFloat(max(0, count - 1))
+        if let column = columnWidth(width, count: count) {
+            let height = subviews.map { $0.sizeThatFits(ProposedViewSize(width: column, height: nil)).height }.max() ?? 0
+            return CGSize(width: width, height: height)
+        }
+        let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+        return CGSize(width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(0, count - 1)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        if let column = columnWidth(bounds.width, count: subviews.count) {
+            for (index, subview) in subviews.enumerated() {
+                subview.place(at: CGPoint(x: bounds.minX + CGFloat(index) * (column + spacing), y: bounds.minY),
+                              proposal: ProposedViewSize(width: column, height: bounds.height))
+            }
+            return
+        }
+        var y = bounds.minY
+        for subview in subviews {
+            let height = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)).height
+            subview.place(at: CGPoint(x: bounds.minX, y: y), proposal: ProposedViewSize(width: bounds.width, height: height))
+            y += height + spacing
+        }
     }
 }
 

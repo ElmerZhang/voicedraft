@@ -174,6 +174,8 @@ public struct ModelUsageRecord: Codable, Equatable, Sendable {
     public var latencyMs: Int
     public var outcome: ModelUsageOutcome
     public var failure: String?
+    /// Failed calls only: a short, language-independent error description (`ModelUsageFailure.message`).
+    public var failureMessage: String?
     public var takeID: UUID?
     public var usage: ProviderUsage?
     public var usageAvailable: Bool
@@ -191,12 +193,52 @@ public struct ModelUsageRecord: Codable, Equatable, Sendable {
         self.latencyMs = max(0, latencyMs)
         outcome = failure == nil ? .ok : .failed
         self.failure = failure.map(ModelUsageFailure.category)
+        failureMessage = failure.map(ModelUsageFailure.message)
         self.takeID = takeID; self.usage = usage; usageAvailable = usage != nil
     }
 }
 
-/// Short failure categories; a provider's own error message is never logged.
+/// Short failure categories and descriptions; a provider's own error message is never logged.
 public enum ModelUsageFailure {
+    public static let maximumMessageLength = 300
+
+    /// Which error a failed call hit, in English where the app controls the text, capped at 300
+    /// characters: a `VoiceDraftError`'s message key (placeholders, never arguments), a
+    /// `ProviderFailure`'s status, recognized code and request ID, a `FeatureError`'s message, a
+    /// `URLError`'s code name and description, `noSpeech`, or else the error's type name.
+    /// Never transcript text, audio, credentials or file paths.
+    public static func message(_ error: Error) -> String {
+        let message: String
+        if let error = error as? VoiceDraftError, case .message(let text) = error {
+            message = ProviderFailure.logDescription(text) ?? text.key
+        } else if let error = error as? FeatureError {
+            message = error.message
+        } else if let error = error as? URLError {
+            message = "\(urlCodeName(error.code)): \(error.localizedDescription)"
+        } else if let error = error as? SpeechRecognitionError, case .noSpeech = error {
+            message = "noSpeech"
+        } else {
+            message = String(describing: type(of: error))
+        }
+        return String(message.prefix(maximumMessageLength))
+    }
+
+    static func urlCodeName(_ code: URLError.Code) -> String {
+        let names: [URLError.Code: String] = [
+            .cancelled: "cancelled", .timedOut: "timedOut", .notConnectedToInternet: "notConnectedToInternet",
+            .networkConnectionLost: "networkConnectionLost", .cannotFindHost: "cannotFindHost",
+            .cannotConnectToHost: "cannotConnectToHost", .dnsLookupFailed: "dnsLookupFailed",
+            .badServerResponse: "badServerResponse", .badURL: "badURL", .unsupportedURL: "unsupportedURL",
+            .secureConnectionFailed: "secureConnectionFailed", .serverCertificateUntrusted: "serverCertificateUntrusted",
+            .serverCertificateHasBadDate: "serverCertificateHasBadDate", .clientCertificateRejected: "clientCertificateRejected",
+            .httpTooManyRedirects: "httpTooManyRedirects", .redirectToNonExistentLocation: "redirectToNonExistentLocation",
+            .resourceUnavailable: "resourceUnavailable", .zeroByteResource: "zeroByteResource",
+            .cannotDecodeContentData: "cannotDecodeContentData", .cannotParseResponse: "cannotParseResponse",
+            .dataLengthExceedsMaximum: "dataLengthExceedsMaximum", .userAuthenticationRequired: "userAuthenticationRequired",
+            .dataNotAllowed: "dataNotAllowed", .appTransportSecurityRequiresSecureConnection: "appTransportSecurityRequiresSecureConnection"
+        ]
+        return names[code] ?? "URLError(\(code.rawValue))"
+    }
     public static func category(_ error: Error) -> String {
         if error is CancellationError { return "cancelled" }
         if let error = error as? URLError {

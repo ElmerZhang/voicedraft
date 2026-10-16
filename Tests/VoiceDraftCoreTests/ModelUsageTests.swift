@@ -260,6 +260,41 @@ final class ModelUsageTests: XCTestCase {
         XCTAssertEqual(ModelUsageFailure.category(VoiceDraftError.message("Provider said: synthetic-secret")), "other")
         XCTAssertEqual(ModelUsageFailure.category(SpeechRecognitionError.noSpeech), "other")
     }
+
+    func testFailureMessages() {
+        // VoiceDraftError: the English key with placeholders, never the interpolated arguments.
+        let audioDetail = "synthetic transcript words"
+        XCTAssertEqual(ModelUsageFailure.message(VoiceDraftError.message("Speech socket closed: \(audioDetail)")), "Speech socket closed: {0}")
+        XCTAssertEqual(ModelUsageFailure.message(VoiceDraftError.message("The recording was too short.")), "The recording was too short.")
+        // ProviderFailure: status, recognized code and request ID, independent of the interface language.
+        let requestID = UUID()
+        XCTAssertEqual(ModelUsageFailure.message(ProviderFailure.http(status: 401, code: "InvalidApiKey", requestID: requestID.uuidString)),
+                       "Model request failed (HTTP 401). code=InvalidApiKey requestID=\(requestID.uuidString)")
+        XCTAssertEqual(ModelUsageFailure.message(ProviderFailure.http(status: 500, code: "synthetic-secret", requestID: "not-a-uuid")),
+                       "Model request failed (HTTP 500).")
+        XCTAssertEqual(ModelUsageFailure.message(ProviderFailure.webSocket(["error_code": "Throttling.RateQuota"], taskID: requestID.uuidString)),
+                       "Speech task failed. code=Throttling.RateQuota requestID=\(requestID.uuidString)")
+        XCTAssertEqual(ModelUsageFailure.message(ProviderFailure.webSocket([:], taskID: "fixture-task")), "Speech task failed.")
+        XCTAssertEqual(ModelUsageFailure.message(FeatureError("Choose a writing model.")), "Choose a writing model.")
+        XCTAssertTrue(ModelUsageFailure.message(URLError(.timedOut)).hasPrefix("timedOut: "))
+        XCTAssertTrue(ModelUsageFailure.message(URLError(.networkConnectionLost)).hasPrefix("networkConnectionLost: "))
+        XCTAssertTrue(ModelUsageFailure.message(URLError(URLError.Code(rawValue: -1))).hasPrefix("URLError(-1): "))
+        XCTAssertEqual(ModelUsageFailure.message(SpeechRecognitionError.noSpeech), "noSpeech")
+        XCTAssertEqual(ModelUsageFailure.message(CancellationError()), "CancellationError")
+        struct FixtureError: Error { let detail = "synthetic-secret" }
+        XCTAssertEqual(ModelUsageFailure.message(FixtureError()), "FixtureError")
+        // Capped at 300 characters.
+        let long = String(repeating: "x", count: 400)
+        XCTAssertEqual(ModelUsageFailure.message(FeatureError(long)).count, ModelUsageFailure.maximumMessageLength)
+        XCTAssertEqual(ModelUsageFailure.message(VoiceDraftError.message(.init(key: long))).count, 300)
+
+        let profile = profile(.chatCompletions)
+        let ok = ModelUsageRecord(date: Date(), kind: .writing, source: .studioWriting, profile: profile, streamed: false, latencyMs: 1)
+        XCTAssertNil(ok.failureMessage)
+        let failed = ModelUsageRecord(date: Date(), kind: .speech, source: .dictationLiveSpeech, profile: profile, streamed: true, latencyMs: 400,
+                                      failure: SpeechRecognitionError.noSpeech)
+        XCTAssertEqual(failed.failure, "other"); XCTAssertEqual(failed.failureMessage, "noSpeech"); XCTAssertEqual(failed.v, 1)
+    }
 }
 
 private final class UsageFixtureProtocol: URLProtocol {

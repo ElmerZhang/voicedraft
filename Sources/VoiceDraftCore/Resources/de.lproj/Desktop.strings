@@ -197,3 +197,5 @@
 "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "Anteil diktierter Wörter im aktuell aktivierten Wortschatz, einschließlich Aliassen. Überlappungen zählen einmal. Dies ist Wortschatzabdeckung, keine Erkennungsgenauigkeit. Änderungen aktualisieren auch frühere Statistiken.";
 "How these are calculated" = "Berechnung";
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "Basiert auf gespeichertem Sprachverlauf. Erneut verarbeitete Aufnahmen zählen nochmals; gelöschte oder abgelaufene Einträge sind ausgeschlossen.";
+
+"Choose input device" = "Eingabegerät wählen";

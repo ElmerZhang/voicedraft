@@ -18,6 +18,8 @@ final class AppState: ObservableObject {
     @Published var page = "Studio"
     /// Tab shown when `page` is "Settings". Models and Sync are settings tabs, not pages.
     @Published var settingsTab = "Settings"
+    /// A fresh request also scrolls when the general settings tab is already open.
+    @Published private(set) var inputDeviceSettingsRequest: UUID?
     @Published private(set) var interfaceLanguage = L10n.language
     var languageChanged: (() -> Void)?
     func setLanguage(_ value: AppLanguage) {
@@ -1030,7 +1032,16 @@ extension AppState {
     }
     /// Opens the in-window settings overlay on a tab ("Settings", "Personalization", "Models", "Sync", "About", "Help").
     func openSettings(_ tab: String = "Settings") {
+        inputDeviceSettingsRequest = nil
         settingsTab = tab; page = "Settings"
+    }
+    var canChooseInputDeviceForError: Bool {
+        error.key == "The selected audio input is unavailable. Reconnect it or choose another device."
+    }
+    func openInputDeviceSettings() {
+        refreshInputDevices()
+        openSettings()
+        inputDeviceSettingsRequest = UUID()
     }
     func shortcutLabel(_ action: ShortcutAction) -> String {
         device.features.shortcuts.first { $0.action == action }?.label ?? F("Disabled", "未启用")

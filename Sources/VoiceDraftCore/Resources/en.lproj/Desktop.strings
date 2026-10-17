@@ -197,3 +197,5 @@
 "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics.";
 "How these are calculated" = "How these are calculated";
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded.";
+
+"Choose input device" = "Choose input device";

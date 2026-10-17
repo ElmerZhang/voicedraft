@@ -197,3 +197,5 @@
 "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "現在有効な辞書（別名を含む）に一致する入力文字・単語の割合です。重複は一度だけ数えます。認識精度ではなく辞書のカバー率です。辞書の変更は過去の統計にも反映されます。";
 "How these are calculated" = "計算方法";
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "保存された音声履歴を使用します。再処理した録音は再度数え、削除済みや期限切れの記録は除外します。";
+
+"Choose input device" = "入力デバイスを選択";

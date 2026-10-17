@@ -47,7 +47,7 @@ Secondary text uses `.secondary`; tertiary hints use `.tertiary`. Error text use
 | `VDBadge` | Status such as Active. |
 | `VDIconButton` | Every icon-only action: 28pt target, tooltip and accessibility label. |
 | `VDEmptyState` | Lists and grids with nothing to show: History, Vocabulary, Models, styles, routing rules. |
-| `VDInlineNotice(kind:)` | Transient feedback and warnings inside pages, sheets and the settings overlay. |
+| `VDInlineNotice(kind:)` | Transient feedback and warnings inside pages, sheets and the settings overlay. Optional labeled recovery button precedes the dismiss control; unavailable audio input offers Choose input device and scrolls Settings to the Audio section. |
 | `.vdPill` / `.vdPillSecondary` | Page-level primary action (New word, Add profile). Sheet and dialog footers use `.borderedProminent` for the confirming action. |
 | `.vdEditorBox()` | Every `TextEditor`, so inputs look like inputs. |
 | `.vdSheet(width:)` | Every sheet: padding 24, fixed width, canvas background, accent tint. |

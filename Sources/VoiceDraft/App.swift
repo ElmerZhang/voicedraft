@@ -253,6 +253,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
+                // Synthetic disconnected-device recovery: main page, new overlay, then an existing overlay.
+                state.page = "Studio"
+                state.error = "The selected audio input is unavailable. Reconnect it or choose another device."
+                for name in ["input-error", "input-error-settings", "input-error-settings-repeat"] {
+                    if name == "input-error-settings-repeat" {
+                        state.openSettings("Usage")
+                        try await Task.sleep(nanoseconds: 200_000_000)
+                    }
+                    if name != "input-error" { state.openInputDeviceSettings() }
+                    try await Task.sleep(nanoseconds: 600_000_000)
+                    if let view = window.contentView {
+                        view.layoutSubtreeIfNeeded()
+                        if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                            view.cacheDisplay(in: view.bounds, to: bitmap)
+                            try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent(name + ".png"))
+                        }
+                    }
+                }
+                state.error = ""
                 // Home again at the window's minimum width, where its first row is narrowest.
                 state.page = "Studio"
                 let defaultSize = window.contentLayoutRect.size

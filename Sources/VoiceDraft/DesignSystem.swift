@@ -326,6 +326,11 @@ struct VDInlineNotice: View {
     let kind: Kind
     let text: String
     var dismissLabel: String = "Dismiss"
+    struct Action {
+        let title: String
+        let perform: () -> Void
+    }
+    var action: Action? = nil
     var onDismiss: (() -> Void)? = nil
 
     private var tint: Color {
@@ -350,6 +355,10 @@ struct VDInlineNotice: View {
             Image(systemName: icon).foregroundStyle(tint)
             Text(text).font(.system(size: 13)).foregroundStyle(VD.Palette.ink).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
+            if let action {
+                Button(action.title, action: action.perform)
+                    .buttonStyle(.bordered).controlSize(.small).fixedSize()
+            }
             if let onDismiss { VDIconButton(systemName: "xmark", label: dismissLabel, size: 11, action: onDismiss) }
         }
         .padding(.horizontal, VD.Space.l).padding(.vertical, VD.Space.m)

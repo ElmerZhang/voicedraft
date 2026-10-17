@@ -169,6 +169,14 @@ struct RecordingHUD: View {
                             .background(.white.opacity(0.13), in: Capsule()).contentShape(Capsule())
                     }.buttonStyle(.plain)
                 }
+                if state.canHidePasteConfirmation {
+                    Button { state.hidePasteConfirmationForApp() } label: {
+                        Text(D("Don't show again for this app"))
+                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
+                            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 8).padding(.vertical, 8).contentShape(Rectangle())
+                    }.buttonStyle(.plain).help(state.pasteConfirmationApp?.name ?? "")
+                }
                 if failure {
                     Button { state.page = "Studio"; state.showMain?(); state.dismissHUD() } label: {
                         // Same height as the Copy pill; the padding is hittable but has no fill.

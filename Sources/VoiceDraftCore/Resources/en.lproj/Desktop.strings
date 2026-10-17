@@ -199,3 +199,8 @@
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded.";
 
 "Choose input device" = "Choose input device";
+
+"Don't show again for this app" = "Don't show again for this app";
+"Paste confirmations" = "Paste confirmations";
+"Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "Hidden after sending a paste in these apps. Copy remains available when nothing was sent.";
+"Show again" = "Show again";

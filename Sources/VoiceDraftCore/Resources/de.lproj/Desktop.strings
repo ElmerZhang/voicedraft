@@ -199,3 +199,8 @@
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "Basiert auf gespeichertem Sprachverlauf. Erneut verarbeitete Aufnahmen zählen nochmals; gelöschte oder abgelaufene Einträge sind ausgeschlossen.";
 
 "Choose input device" = "Eingabegerät wählen";
+
+"Don't show again for this app" = "Für diese App nicht mehr anzeigen";
+"Paste confirmations" = "Einfügehinweise";
+"Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "Nach dem Senden an diese Apps ausblenden. Wurde nichts gesendet, bleibt Kopieren verfügbar.";
+"Show again" = "Wieder anzeigen";

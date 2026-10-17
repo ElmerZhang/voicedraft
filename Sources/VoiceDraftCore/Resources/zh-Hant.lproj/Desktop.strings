@@ -199,3 +199,8 @@
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "統計依據保留的語音歷史。重新處理的錄音會再次計入；已刪除或到期的記錄不計入。";
 
 "Choose input device" = "選擇輸入裝置";
+
+"Don't show again for this app" = "此 App 不再提示";
+"Paste confirmations" = "貼上提示";
+"Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "向以下 App 傳送貼上後不再提示。未能傳送時，仍會提供複製按鈕。";
+"Show again" = "恢復提示";

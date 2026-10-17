@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-17 · Per-app paste confirmation preference
+
+- The queued, unconfirmed-paste card now offers Don't show again for this app. It remembers the captured destination bundle ID and display name in local DeviceSettings, closes the current card after saving, and suppresses later queued-paste cards for that app. Settings → Paste confirmations restores individual apps. Unknown destinations, errors, unsent results and manual-copy/Ask results retain their existing fallback; no focus or clipboard delivery checks changed.
+- Four coordinator regression tests cover app-specific suppression, identical display names, restoration, late receipts, unidentified/nonopaque targets, dismiss/cancel guards, and preserving errors on a muted app. A Codable test checks legacy defaults, preference round-trip and unrelated fields. Full `scripts/test-all.sh`: **337 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go checks, fixture integrations and eight-language localization checks.
+
+
 ## 2026-10-17 · Input-device error recovery link
 
 - The unavailable selected-input error now offers a localized Choose input device button on both main pages and the settings overlay. It refreshes the device list, opens general settings and scrolls directly to Audio → Input device. Repeated requests work while settings is already open; navigation does not change the selected device or dismiss the error.

@@ -6,6 +6,8 @@ public struct DeviceSettings: Codable {
     public var serverURL = "http://127.0.0.1:8765"
     public var autoSync = false
     public var autoPaste = true
+    /// Device-local bundle ID → display name; only suppresses cards after a queued paste.
+    public var hiddenPasteConfirmationApps: [String: String] = [:]
     public var keepHistory = true
     public var syncRevision = 0
     public var syncIdentity = ""
@@ -13,7 +15,7 @@ public struct DeviceSettings: Codable {
     public var features = DesktopOptions()
     public init() {}
     private enum CodingKeys: String, CodingKey {
-        case inputDeviceID, inputDeviceName, serverURL, autoSync, autoPaste, keepHistory, syncRevision, syncIdentity, dirty, features
+        case hiddenPasteConfirmationApps, inputDeviceID, inputDeviceName, serverURL, autoSync, autoPaste, keepHistory, syncRevision, syncIdentity, dirty, features
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -22,6 +24,7 @@ public struct DeviceSettings: Codable {
         serverURL = try c.decodeIfPresent(String.self, forKey: .serverURL) ?? "http://127.0.0.1:8765"
         autoSync = try c.decodeIfPresent(Bool.self, forKey: .autoSync) ?? false
         autoPaste = try c.decodeIfPresent(Bool.self, forKey: .autoPaste) ?? true
+        hiddenPasteConfirmationApps = try c.decodeIfPresent([String: String].self, forKey: .hiddenPasteConfirmationApps) ?? [:]
         keepHistory = try c.decodeIfPresent(Bool.self, forKey: .keepHistory) ?? true
         syncRevision = try c.decodeIfPresent(Int.self, forKey: .syncRevision) ?? 0
         syncIdentity = try c.decodeIfPresent(String.self, forKey: .syncIdentity) ?? ""

@@ -690,6 +690,9 @@ private struct DesktopSettingsView: View {
                 }
                 LaunchPreferences(state: state)
             }
+            if !state.device.hiddenPasteConfirmationApps.isEmpty {
+                PasteConfirmationPreferences(state: state)
+            }
             UpdatePreferences(state: state)
         }
     }
@@ -761,5 +764,22 @@ private struct DesktopPersonalizationView: View {
             }
             Text(L("Vocabulary and preferences are included in encrypted sync.")).font(VD.Font.footnote).foregroundStyle(.secondary)
         }.onAppear { style = state.settings.stylePrompt; language = state.settings.targetLanguage }
+    }
+}
+
+/// Also rendered by isolated previews with synthetic application identities.
+struct PasteConfirmationPreferences: View {
+    @ObservedObject var state: AppState
+    var body: some View {
+        VStack(alignment: .leading, spacing: VD.Space.s) {
+            VDSectionHeader(icon: "doc.on.clipboard", title: D("Paste confirmations"))
+            Text(D("Hidden after sending a paste in these apps. Copy remains available when nothing was sent."))
+                .font(VD.Font.detail).foregroundStyle(.secondary)
+            ForEach(state.device.hiddenPasteConfirmationApps.keys.sorted(), id: \.self) { bundleID in
+                VDSettingRow(title: state.device.hiddenPasteConfirmationApps[bundleID] ?? bundleID) {
+                    Button(D("Show again")) { state.restorePasteConfirmation(for: bundleID) }
+                }
+            }
+        }
     }
 }

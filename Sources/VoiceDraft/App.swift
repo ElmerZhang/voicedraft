@@ -313,7 +313,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             do {
                 let directory = URL(fileURLWithPath: path, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                for name in ["recording", "locked", "starting", "live", "processing", "result", "long-result", "failure", "notice",
+                for name in ["recording", "locked", "starting", "live", "processing", "result", "paste-sent", "long-result", "failure", "notice",
                              "screen-context", "screen-context-compact"] {
                     state.prepareHUDPreview(name); showHUD()
                     try await Task.sleep(nanoseconds: 300_000_000)
@@ -324,7 +324,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
                     try data.write(to: directory.appendingPathComponent(name + ".png"))
                 }
-                print("Rendered eleven synthetic HUD states without microphone, model, Keychain, screen, or persisted data access.")
+                state.prepareHUDPreview("paste-sent")
+                state.hidePasteConfirmationForApp()
+                let preferences = NSHostingView(rootView: PasteConfirmationPreferences(state: state)
+                    .padding(30).frame(width: 760).background(VD.Palette.canvas))
+                preferences.setFrameSize(preferences.fittingSize)
+                preferences.layoutSubtreeIfNeeded()
+                if let bitmap = preferences.bitmapImageRepForCachingDisplay(in: preferences.bounds) {
+                    preferences.cacheDisplay(in: preferences.bounds, to: bitmap)
+                    try bitmap.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("paste-confirmations-settings.png"))
+                }
+                print("Rendered twelve synthetic HUD states without microphone, model, Keychain, screen, or persisted data access.")
             } catch { fputs("HUD preview failed: \(error.localizedDescription)\n", stderr) }
             NSApp.terminate(nil)
         }

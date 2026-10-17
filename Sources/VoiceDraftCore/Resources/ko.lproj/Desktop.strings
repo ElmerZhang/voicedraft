@@ -199,3 +199,8 @@
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "보관된 음성 기록을 사용합니다. 재처리한 녹음은 다시 계산하며 삭제되거나 만료된 기록은 제외합니다.";
 
 "Choose input device" = "입력 장치 선택";
+
+"Don't show again for this app" = "이 앱에서는 다시 표시하지 않기";
+"Paste confirmations" = "붙여넣기 확인";
+"Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "이 앱에 붙여넣기를 보낸 후에는 표시하지 않습니다. 보내지 못한 경우에는 복사할 수 있습니다.";
+"Show again" = "다시 표시";

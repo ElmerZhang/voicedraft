@@ -10,6 +10,11 @@ struct ScreenExtractionRequest: Equatable {
     let app: ScreenContextApplication
 }
 
+struct PasteConfirmationApp: Equatable {
+    let bundleID: String
+    let name: String
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var settings = SharedSettings()
@@ -77,6 +82,7 @@ final class AppState: ObservableObject {
     private var stopTask: Task<Void, Never>?
     @Published private(set) var liveTranscript = ""
     @Published private(set) var recordingLocked = false
+    @Published private(set) var pasteConfirmationApp: PasteConfirmationApp?
     @Published private(set) var hudKind = DictationHUDKind.compact
     @Published private(set) var hudText = ""
     @Published private(set) var hudCopied = false
@@ -154,6 +160,7 @@ final class AppState: ObservableObject {
     func prepareHUDPreview(_ name: String) {
         guard preview else { return }
         phase = "idle"; elapsed = 12; level = 0.45; hudCopied = false; error = ""; recordingLocked = false; screenContextTermCount = nil
+        pasteConfirmationApp = nil; status = "Ready when you are"
         recordingDeviceName = "Preview microphone"
         liveTranscript = "周二下午三点开会。\n不对，把刚才的周二改成周四，时间不变。"
         hudText = "周四下午三点开会。"; result = hudText
@@ -165,6 +172,7 @@ final class AppState: ObservableObject {
         case "screen-context": phase = "recording"; hudKind = .live; screenContextTermCount = 12
         case "screen-context-compact": phase = "recording"; hudKind = .compact; screenContextTermCount = 12
         case "processing": phase = "processing"; hudKind = .live
+        case "paste-sent": presentQueuedPaste(hudText, opaque: true, bundleID: "com.example.preview", applicationName: "Preview Browser")
         case "failure": hudKind = .failure; hudText = liveTranscript; error = "The speech connection ended before the final result."
         case "notice": hudKind = .notice; hudText = ""; error = "Nothing to insert yet. Dictate first."
         case "long-result": hudKind = .result; hudText = Array(repeating: "这是用于检查长文本滚动的示例，不会发送到任何模型。", count: 18).joined(separator: "\n")
@@ -368,6 +376,7 @@ final class AppState: ObservableObject {
         runAudio = nil; runRetainAudio = device.keepHistory && device.features.retainAudio
         if let override { mode = override }
         error = ""; notice = ""; liveTranscript = ""; hudText = ""; hudCopied = false; hudKind = .compact; screenContextTermCount = nil
+        pasteConfirmationApp = nil
         generation = UUID(); let id = generation
         takeTrace = TakeTrace(takeID: id, origin: press?.event ?? started, action: press?.action, mode: mode, external: external)
         takeTrace?.pressDelay = press.map { $0.processed - $0.event }
@@ -598,7 +607,7 @@ final class AppState: ObservableObject {
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
         recordTakeDiagnostics(id, audioSeconds: duration, outcome: "completed")
         let opaqueDelivery = destination?.opaqueApplication == true
-        if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery) }
+        if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery, bundleID: destination?.bundleID, applicationName: destination?.name) }
         else { hudText = output; hudKind = .result; showHUD?() }
         if let delivery { awaitDeliveryOutcome(delivery, id: id, opaque: opaqueDelivery) }
         if mode == .polish || mode == .verbatim {
@@ -625,10 +634,11 @@ final class AppState: ObservableObject {
         screenContext.end(take: generation); screenContextTermCount = nil
         generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
         recorder.cancel(); liveRecorder.cancel(); tick?.invalidate(); tick = nil
+        pasteConfirmationApp = nil
         phase = "idle"; level = 0; status = "Cancelled"; runSpeechKey = ""; runWritingKey = ""
         liveTranscript = ""; hudText = ""; hudKind = .compact; hideHUD?()
     }
-    func dismissHUD() { if busy { cancel() } else { hideHUD?() } }
+    func dismissHUD() { pasteConfirmationApp = nil; if busy { cancel() } else { hideHUD?() } }
     /// Escape rule: cancel an active input run; otherwise, when idle, close a visible HUD card
     /// the way its close button does. An update installation (`busy` while idle) is untouched.
     /// Returning true only consumes VoiceDraft's own local Escape; the global monitor observes.
@@ -646,6 +656,7 @@ final class AppState: ObservableObject {
     func copyHUDResult() {
         guard !hudText.isEmpty, copyResult(hudText) else { return }
         hudCopied = true
+        pasteConfirmationApp = nil
         hideHUD?()
     }
     private func fail(_ error: Error, id: UUID) {
@@ -977,7 +988,7 @@ extension AppState {
                 let sent = try await TextInsertion.send(text, into: destination)
                 guard generation == id else { return }
                 phase = "idle"
-                presentQueuedPaste(text, opaque: destination.opaqueApplication)
+                presentQueuedPaste(text, opaque: destination.opaqueApplication, bundleID: destination.bundleID, applicationName: destination.name)
                 awaitDeliveryOutcome(sent, id: id, opaque: destination.opaqueApplication)
             } catch {
                 guard !(error is CancellationError) else { return }
@@ -1002,10 +1013,41 @@ extension AppState {
     /// HUD; an opaque target (paste unless proven otherwise) keeps the result
     /// card up so the user can copy if the paste went nowhere. The card closes on
     /// Escape, its close button, Copy, or the next take.
-    func presentQueuedPaste(_ text: String, opaque: Bool) {
+    func presentQueuedPaste(_ text: String, opaque: Bool, bundleID: String? = nil, applicationName: String? = nil) {
+        pasteConfirmationApp = nil
+        let app = bundleID.flatMap { id in
+            id.isEmpty ? nil : PasteConfirmationApp(bundleID: id, name: applicationName ?? id)
+        }
+        let hidden = app.map { device.hiddenPasteConfirmationApps[$0.bundleID] != nil } ?? false
         guard opaque else { hudKind = .compact; hideHUD?(); return }
+        guard !hidden || !error.isEmpty else {
+            status = "Paste sent · check the input field"
+            hudKind = .compact; hideHUD?(); return
+        }
+        pasteConfirmationApp = app
         status = Self.opaquePasteStatus
         hudText = text; hudCopied = false; hudKind = .result; showHUD?()
+    }
+    var canHidePasteConfirmation: Bool {
+        !busy && error.isEmpty && hudPasteSent && pasteConfirmationApp != nil
+    }
+    func hidePasteConfirmationForApp() {
+        guard canHidePasteConfirmation, let app = pasteConfirmationApp else { return }
+        var updated = device
+        updated.hiddenPasteConfirmationApps[app.bundleID] = app.name
+        do {
+            try store?.write(updated, name: "device")
+            device = updated
+            dismissHUD()
+        } catch { self.error = .init(error: error) }
+    }
+    func restorePasteConfirmation(for bundleID: String) {
+        var updated = device
+        updated.hiddenPasteConfirmationApps.removeValue(forKey: bundleID)
+        do {
+            try store?.write(updated, name: "device")
+            device = updated
+        } catch { self.error = .init(error: error) }
     }
     func applyDeliveryOutcome(_ outcome: TextInsertionOutcome, id: UUID, opaque: Bool = false) {
         guard generation == id else { return }
@@ -1013,7 +1055,7 @@ extension AppState {
         case .confirmed: status = "Text inserted"
         case .sentToTerminal: status = "Paste sent to terminal"
         // An opaque paste cannot be observed; its card's status stays in place.
-        case .sentWithoutConfirmation: status = opaque ? Self.opaquePasteStatus : "Paste sent · check the input field"
+        case .sentWithoutConfirmation: status = opaque && hudPasteSent ? Self.opaquePasteStatus : "Paste sent · check the input field"
         }
     }
     private func reinsertFallback(_ text: String, id: UUID, error: Error) {

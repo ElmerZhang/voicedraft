@@ -199,3 +199,8 @@
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "保存された音声履歴を使用します。再処理した録音は再度数え、削除済みや期限切れの記録は除外します。";
 
 "Choose input device" = "入力デバイスを選択";
+
+"Don't show again for this app" = "このアプリでは今後表示しない";
+"Paste confirmations" = "貼り付けの確認";
+"Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "これらのアプリへの貼り付け送信後は表示しません。送信できなかった場合はコピーできます。";
+"Show again" = "再表示する";

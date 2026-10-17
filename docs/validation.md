@@ -1,5 +1,12 @@
 # Validation record
 
+## 2026-10-17 · Per-app paste confirmation preference
+
+- The queued, unconfirmed-paste card now offers Don't show again for this app. It remembers the captured destination bundle ID and display name in local DeviceSettings, closes the current card after saving, and suppresses later queued-paste cards for that app. Settings → Paste confirmations restores individual apps. Unknown destinations, errors, unsent results and manual-copy/Ask results retain their existing fallback; no focus or clipboard delivery checks changed.
+- Four coordinator regression tests cover app-specific suppression, identical display names, restoration, late receipts, unidentified/nonopaque targets, dismiss/cancel guards, and preserving errors on a muted app. A Codable test checks legacy defaults, preference round-trip and unrelated fields. Full `scripts/test-all.sh`: **337 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go checks, fixture integrations and eight-language localization checks.
+
+- Built with the existing personal Apple Development identity and verified the signature. Inspected English/Chinese HUD and recovery-settings captures under `dist/paste-confirmation-en/` and `dist/paste-confirmation-zh/`, including the failure card without a mute button. Installed to `/Applications/VoiceDraft.app`, verified its ready Home window and matching packaged/installed SHA-256 `f8a13d052141905c00e632f56a5c5f6a49cc6b456582b1f7e04e9770a33e37ad`; the prior bundle is preserved in `.local/install-backups/VoiceDraft-before-paste-confirmation-20261017-190040.app`. Settings/history were not cleared. Real microphone → browser paste → user opt-out acceptance remains for the user to try; no real recording or model call was made by this check.
+
 ## 2026-10-17 · Input-device error recovery link
 
 - The unavailable selected-input error now offers a localized Choose input device button on both main pages and the settings overlay. It refreshes the device list, opens general settings and scrolls directly to Audio → Input device. Repeated requests work while settings is already open; navigation does not change the selected device or dismiss the error.

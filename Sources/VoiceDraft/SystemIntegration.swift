@@ -19,6 +19,8 @@ struct InputTarget {
     /// VoiceDraft enabled this app's Electron accessibility tree, which may not
     /// have been built yet; a later capture can still find the editor.
     var accessibilityPending = false
+    /// Captured with the target; never resolve the app from HUD focus or a reused PID.
+    var bundleID: String? = nil
     /// A writable AX editor (not an opaque or terminal keyboard surface).
     var writable: Bool { editable && !keyboardSurface }
 }
@@ -126,7 +128,8 @@ enum TextInsertion {
                            opaqueApplication: opaqueApplication,
                            focusGuard: opaqueApplication && trackOpaqueFocus ? OpaqueInputFocusGuard(ignoring: shortcuts) : nil,
                            accessibilityPending: ElectronAccessibilityPolicy.capturePending(
-                               enabled: electronEnabled[app.processIdentifier] != nil, writable: writable || terminalSurface))
+                               enabled: electronEnabled[app.processIdentifier] != nil, writable: writable || terminalSurface),
+                           bundleID: app.bundleIdentifier)
     }
     /// Explicit focus, its resolved focus target and the editor ancestor.
     private static func resolveFocus(_ root: AXUIElement) -> (raw: AXUIElement?, focused: AXUIElement?, editor: AXUIElement?) {

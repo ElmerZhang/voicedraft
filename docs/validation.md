@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-17 · Input-device error recovery link
+
+- The unavailable selected-input error now offers a localized Choose input device button on both main pages and the settings overlay. It refreshes the device list, opens general settings and scrolls directly to Audio → Input device. Repeated requests work while settings is already open; navigation does not change the selected device or dismiss the error.
+- Two regression tests cover the actual missing-device error, unrelated-error exclusion, navigation from another tab, repeated requests and clearing the transient target on ordinary settings navigation. `scripts/test-all.sh` passed **332 Swift tests, 0 failures, 1 conditional release-artifact test skipped**, plus Go checks, synthetic integrations and all eight localization catalogs.
+- Built and signature-verified `dist/VoiceDraft.app`. Isolated English light and Chinese dark captures in `dist/input-device-link-en/` and `dist/input-device-link-zh/` exercise the error banner, opening the overlay and routing back from Usage. Verified the recovery button and visible input picker. No real microphone disconnect or recording was tested; the installed application was not replaced.
+
 ## 2026-10-16 · Explicit prompt cache for Qwen writing
 
 - The writing system message is now two text blocks. The static block, which depends only on mode and Translate target language, carries Bailian's `cache_control: {"type": "ephemeral"}` marker; preferences and vocabulary follow in an unmarked block. Only the Qwen chat writing adapter sends the array; Chat Completions, Anthropic and Responses receive one flattened string with no marker. The on-screen context rule is now always in the static block, so the old "byte-identical to before on-screen context" hash test was replaced by tests for cache-block stability.

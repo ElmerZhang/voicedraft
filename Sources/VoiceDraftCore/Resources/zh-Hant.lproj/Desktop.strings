@@ -197,3 +197,5 @@
 "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "原始轉錄中符合目前啟用詞庫（含別名）的字詞比例，重疊命中只計一次。這表示詞庫覆蓋率，並非辨識準確率；修改詞庫會更新歷史統計。";
 "How these are calculated" = "統計方式";
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "統計依據保留的語音歷史。重新處理的錄音會再次計入；已刪除或到期的記錄不計入。";
+
+"Choose input device" = "選擇輸入裝置";

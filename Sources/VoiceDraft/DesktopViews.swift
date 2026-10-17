@@ -27,7 +27,7 @@ struct DesktopRootView: View {
                     sidebar.ignoresSafeArea(edges: .top)
                     VStack(spacing: 0) {
                         if !state.error.isEmpty && !settingsOpen {
-                            VDInlineNotice(kind: .error, text: L(state.error), dismissLabel: D("Dismiss")) { state.error = "" }
+                            DesktopErrorNotice(state: state)
                                 .padding(.horizontal, 30).padding(.top, VD.Space.xl)
                         }
                         ScrollView {
@@ -547,6 +547,18 @@ private struct DesktopHistoryView: View {
     }
 }
 
+/// Recovery stays next to the same error in both the main window and settings.
+private struct DesktopErrorNotice: View {
+    @ObservedObject var state: AppState
+    var body: some View {
+        VDInlineNotice(kind: .error, text: L(state.error), dismissLabel: D("Dismiss"),
+                       action: state.canChooseInputDeviceForError
+                        ? .init(title: D("Choose input device"), perform: state.openInputDeviceSettings) : nil) {
+            state.error = ""
+        }
+    }
+}
+
 private struct DesktopSettingsView: View {
     @ObservedObject var state: AppState
     @Binding var tab: String
@@ -576,21 +588,30 @@ private struct DesktopSettingsView: View {
                     VDIconButton(systemName: "xmark", label: D("Close settings"), size: 14, action: close).keyboardShortcut(.cancelAction)
                 }.padding(.horizontal, 30).padding(.top, 28).padding(.bottom, 20)
                 if !state.error.isEmpty {
-                    VDInlineNotice(kind: .error, text: L(state.error), dismissLabel: D("Dismiss")) { state.error = "" }
+                    DesktopErrorNotice(state: state)
                         .padding(.horizontal, 30).padding(.bottom, VD.Space.m)
                 }
-                ScrollView {
-                    Group {
-                        switch tab {
-                        case "Models": ModelsView(state: state, showsHeading: false)
-                        case "Sync": SyncView(state: state, showsHeading: false)
-                        case "Personalization": DesktopPersonalizationView(state: state)
-                        case "Usage": UsageActivityView(history: state.history, vocabulary: state.settings.vocabulary, keepHistory: state.device.keepHistory)
-                        case "About": about
-                        case "Help": help
-                        default: general
-                        }
-                    }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 30).padding(.bottom, 30)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        Group {
+                            switch tab {
+                            case "Models": ModelsView(state: state, showsHeading: false)
+                            case "Sync": SyncView(state: state, showsHeading: false)
+                            case "Personalization": DesktopPersonalizationView(state: state)
+                            case "Usage": UsageActivityView(history: state.history, vocabulary: state.settings.vocabulary, keepHistory: state.device.keepHistory)
+                            case "About": about
+                            case "Help": help
+                            default: general
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 30).padding(.bottom, 30)
+                    }
+                    .task(id: state.inputDeviceSettingsRequest) {
+                        guard state.inputDeviceSettingsRequest != nil, tab == "Settings" else { return }
+                        // Let a tab switch mount the general settings before resolving its anchor.
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        proxy.scrollTo("input-device", anchor: .top)
+                    }
                 }
                 if !state.notice.isEmpty {
                     VDInlineNotice(kind: .success, text: L(state.notice), dismissLabel: D("Dismiss")) { state.notice = "" }
@@ -642,7 +663,7 @@ private struct DesktopSettingsView: View {
                         VDIconButton(systemName: "arrow.clockwise", label: L("Refresh devices")) { state.refreshInputDevices() }
                     }.disabled(state.busy)
                 }
-            }
+            }.id("input-device")
             section(D("Language"), icon: "globe") {
                 VDSettingRow(title: L("Interface language"), detail: D("Choose the language used in VoiceDraft.")) {
                     Picker(L("Interface language"), selection: Binding(get: { state.interfaceLanguage }, set: { state.setLanguage($0) })) {

@@ -197,3 +197,5 @@
 "Share of dictated words matching your currently enabled vocabulary, including aliases. Overlapping matches count once. This is vocabulary coverage, not recognition accuracy; changing vocabulary updates past statistics." = "현재 활성화된 어휘(별칭 포함)와 일치하는 받아쓴 글자·단어의 비율입니다. 중복은 한 번만 셉니다. 인식 정확도가 아닌 어휘 포함률이며, 어휘를 바꾸면 과거 통계도 갱신됩니다.";
 "How these are calculated" = "계산 방식";
 "Statistics use retained voice history. Reprocessed recordings count again; deleted or expired records are excluded." = "보관된 음성 기록을 사용합니다. 재처리한 녹음은 다시 계산하며 삭제되거나 만료된 기록은 제외합니다.";
+
+"Choose input device" = "입력 장치 선택";

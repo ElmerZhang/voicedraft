@@ -1,5 +1,10 @@
 # Validation record
 
+## 2026-10-19 · Single-word Polish output
+
+- Polish no longer adds terminal punctuation to a one-word dictation. Block A gains a static "Single-word transcripts" rule with examples (Polish block A is now 7,914 characters), the Final Polish check repeats it, and `SingleWordOutput.finalize` strips trailing terminal marks from the final Polish result when the transcript is a single token (at most 4 characters with CJK, 40 otherwise) and the output remains one. It runs at dictation delivery and in Studio; other modes and streamed partials are unchanged.
+- New `SingleWordOutputTests` cover stripped, preserved-term and unchanged cases plus CJK/Latin length cutoffs; `WritingLanguageTests` assert the rule and examples appear only in Polish across all writing protocols. `swift test --disable-sandbox`: **340 tests, 0 failures, 4 skipped** (fixture-dependent). Synthetic inputs only; no real audio or model call was made.
+
 ## 2026-10-17 · Per-app paste confirmation preference
 
 - The queued, unconfirmed-paste card now offers Don't show again for this app. It remembers the captured destination bundle ID and display name in local DeviceSettings, closes the current card after saving, and suppresses later queued-paste cards for that app. Settings → Paste confirmations restores individual apps. Unknown destinations, errors, unsent results and manual-copy/Ask results retain their existing fallback; no focus or clipboard delivery checks changed.

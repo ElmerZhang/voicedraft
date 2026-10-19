@@ -559,7 +559,8 @@ final class AppState: ObservableObject {
                 try await WritingClient.complete(request, profile: writing, key: writingKey, onUpdate: { [weak self] text in
                     await self?.updateWriting(text, id: id)
                 }, usage: usage)
-            } }
+            }
+            if mode == .polish { output = SingleWordOutput.finalize(output, transcript: raw) } }
             catch {
                 try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
                 result = raw; hudText = raw
@@ -735,11 +736,12 @@ final class AppState: ObservableObject {
                     let request = try QwenRequests.writing(profile: writing, key: key(for: writing), text: raw,
                         mode: mode, settings: configuration, selection: selected)
                     let writingKey = try key(for: writing)
-                    output = try await metered(.writing, source: .studioWriting, profile: writing, mode: mode, streamed: true, takeID: id) { usage in
+                    let written = try await metered(.writing, source: .studioWriting, profile: writing, mode: mode, streamed: true, takeID: id) { usage in
                         try await WritingClient.complete(request, profile: writing, key: writingKey, onUpdate: { [weak self] text in
                             await self?.updateWriting(text, id: id)
                         }, usage: usage)
                     }
+                    output = mode == .polish ? SingleWordOutput.finalize(written, transcript: raw) : written
                 }
                 try Task.checkCancellation(); guard generation == id else { return }
                 result = output; phase = "idle"; status = "Your text is ready"

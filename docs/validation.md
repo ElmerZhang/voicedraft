@@ -4,6 +4,7 @@
 
 - Polish no longer adds terminal punctuation to a one-word dictation. Block A gains a static "Single-word transcripts" rule with examples (Polish block A is now 7,914 characters), the Final Polish check repeats it, and `SingleWordOutput.finalize` strips trailing terminal marks from the final Polish result when the transcript is a single token (at most 4 characters with CJK, 40 otherwise) and the output remains one. It runs at dictation delivery and in Studio; other modes and streamed partials are unchanged.
 - New `SingleWordOutputTests` cover stripped, preserved-term and unchanged cases plus CJK/Latin length cutoffs; `WritingLanguageTests` assert the rule and examples appear only in Polish across all writing protocols. `swift test --disable-sandbox`: **340 tests, 0 failures, 4 skipped** (fixture-dependent). Synthetic inputs only; no real audio or model call was made.
+- Built with the existing personal Apple Development identity (team G5G46WU2P2) and verified the signature. Installed to `/Applications/VoiceDraft.app` with matching packaged/installed executable SHA-256 `81343e395d6bfc8ae690903d3e283d088b1cdb7afb907185527eef3f09620b04`; the prior bundle is preserved in `.local/install-backups/VoiceDraft-before-single-word-polish-20261019-153009.app`. Settings/history were not cleared. Saying a single word in Polish mode and checking the inserted text is the remaining real-device acceptance step.
 
 ## 2026-10-17 · Per-app paste confirmation preference
 

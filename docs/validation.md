@@ -1,5 +1,9 @@
 # Validation record
 
+## 2026-10-21 · Unmarked self-repairs in dictation cleanup
+
+The cleanup rules cover unmarked repairs, parallel lists and ambiguous clauses.
+
 ## 2026-10-19 · Single-word Polish output
 
 - Polish no longer adds terminal punctuation to a one-word dictation. Block A gains a static "Single-word transcripts" rule with examples (Polish block A is now 7,914 characters), the Final Polish check repeats it, and `SingleWordOutput.finalize` strips trailing terminal marks from the final Polish result when the transcript is a single token (at most 4 characters with CJK, 40 otherwise) and the output remains one. It runs at dictation delivery and in Studio; other modes and streamed partials are unchanged.

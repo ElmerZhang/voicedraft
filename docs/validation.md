@@ -1,5 +1,21 @@
 # Validation record
 
+## 2026-10-21 · Unmarked self-repairs in dictation cleanup
+
+- The user's Polish history contained `1 万欧对于我们来说也是一个很大的事，数目了。如果这单不能确认成交的话，我觉得我们可能没必要去做这个认证。` unchanged in both transcript and result (`qwen3.7-flash`, `enable_thinking` false). The cleanup rules covered marked corrections (“不对，改成周四”) and same-word restarts (“我想，我想”), but not a replacement repair with no marker, and the ambiguity rule told the model to preserve it.
+- Block A gains a cleanup bullet that defines the unmarked self-repair (the restated fragment cannot stand on its own and only reads as a replacement for the words just before the break; keep only the restated wording and the recognizer's comma goes with the abandoned attempt; list items, added points and appositives stay), three paired examples (the user's sentence, an English “on Tues, on Thursday” repair, and a retained “同事，也是朋友” addition), and the pre-return check now lists abandoned attempts. Polish block A grows from 7,914 to 8,871 characters, so the Bailian explicit cache is re-created once. No local heuristic, raw-text replacement or extra model call was added.
+- `WritingLanguageTests` assert the bullet and the three examples appear in Polish and Translate only, across all four writing protocols. `swift test --disable-sandbox`: **340 tests, 0 failures, 4 skipped** (fixture-dependent). Automated tests used no real audio, credentials or provider calls.
+- Real-model check against the user's `qwen3.7-flash` writing profile. The agent built request bodies for the sentences below through the real `QwenRequests.writing` with the user's settings, style and vocabulary; the session's credential guard blocked reading the Keychain key, so the user posted them (three calls per sentence, sampling enabled). Results:
+
+| Input | Polish result (3 calls) |
+| --- | --- |
+| 1 万欧对于我们来说也是一个很大的事，数目了。如果这单不能确认成交的话，我觉得我们可能没必要去做这个认证。 | 3/3: 1 万欧对于我们来说也是一个很大的数目了。如果这单不能确认成交的话，我觉得我们可能没必要去做这个认证。 |
+| Let's meet on Tues, on Thursday afternoon to go over the plan. | 3/3: Let's meet on Thursday afternoon to go over the plan. |
+| 他是我的同事，也是我的朋友。 | 3/3 unchanged; the second clause adds a point. |
+| 这个方案有两个问题，一个是成本，一个是时间。 | 3/3 unchanged; parallel list items. |
+| 周二开会，不对，改成周四。 | 3/3: 周四开会。 (marked correction unchanged) |
+| 我们先把这个功能，这个接口做完再说。 | 1/3 repaired to 我们先把这个接口做完再说。, 2/3 unchanged. This probe sentence is genuinely ambiguous (“把这个功能、这个接口做完” also reads as two objects), so the ambiguity rule keeps it; no example was added for it. |
+
 ## 2026-10-19 · Single-word Polish output
 
 - Polish no longer adds terminal punctuation to a one-word dictation. Block A gains a static "Single-word transcripts" rule with examples (Polish block A is now 7,914 characters), the Final Polish check repeats it, and `SingleWordOutput.finalize` strips trailing terminal marks from the final Polish result when the transcript is a single token (at most 4 characters with CJK, 40 otherwise) and the output remains one. It runs at dictation delivery and in Studio; other modes and streamed partials are unchanged.

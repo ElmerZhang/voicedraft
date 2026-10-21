@@ -16,6 +16,8 @@
 | 周二开会，不对，改成周四。 | 3/3: 周四开会。 (marked correction unchanged) |
 | 我们先把这个功能，这个接口做完再说。 | 1/3 repaired to 我们先把这个接口做完再说。, 2/3 unchanged. This probe sentence is genuinely ambiguous (“把这个功能、这个接口做完” also reads as two objects), so the ambiguity rule keeps it; no example was added for it. |
 
+- Built with the existing Apple Development identity (team G5G46WU2P2) and verified the signature. Installed to `/Applications/VoiceDraft.app` with matching packaged/installed executable SHA-256 `84f0c3f313ab8790323ad86a5d5184c73a43ba942611496527137e8298e3b463`; the prior bundle is preserved in `.local/install-backups/VoiceDraft-before-self-repair-polish-20261021-144648.app`. The running app was quit, replaced and relaunched; settings/history were not cleared. Dictating a sentence with an unmarked mid-sentence restatement in Polish mode and checking the inserted text is the remaining real-device acceptance step.
+
 ## 2026-10-19 · Single-word Polish output
 
 - Polish no longer adds terminal punctuation to a one-word dictation. Block A gains a static "Single-word transcripts" rule with examples (Polish block A is now 7,914 characters), the Final Polish check repeats it, and `SingleWordOutput.finalize` strips trailing terminal marks from the final Polish result when the transcript is a single token (at most 4 characters with CJK, 40 otherwise) and the output remains one. It runs at dictation delivery and in Studio; other modes and streamed partials are unchanged.

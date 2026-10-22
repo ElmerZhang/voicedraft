@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "VoiceDraft",
     defaultLocalization: "en",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v13), .iOS(.v17)],
     products: [.executable(name: "VoiceDraft", targets: ["VoiceDraft"])],
     targets: [
         .target(name: "CVoiceDraft", linkerSettings: [.linkedLibrary("z")]),

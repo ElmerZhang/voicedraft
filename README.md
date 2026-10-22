@@ -83,7 +83,7 @@ Requires Go 1.25+, the Swift toolchain, and Python 3 for the localization checks
 
 To inspect the interface without credentials, microphone or provider calls, run the packaged binary with `VOICEDRAFT_CAPTURE_PREVIEWS=<dir>` (pages and settings tabs), `VOICEDRAFT_CAPTURE_ONBOARDING=<dir>`, `VOICEDRAFT_CAPTURE_HUD_PREVIEWS=<dir>` or `VOICEDRAFT_CAPTURE_SHEETS=<dir>` (every sheet and the Clear history confirmation); add `VOICEDRAFT_PREVIEW_APPEARANCE=dark` for dark mode, or the arguments `-interfaceLanguage zh-Hans` (any supported code) for another interface language. Each mode writes PNGs and exits. Keep the capture process frontmost: when another app is active, native controls are captured in their inactive gray state.
 
-See [architecture](docs/architecture.md), [deployment](docs/server.md), [roadmap](docs/roadmap.md), and [validation](docs/validation.md).
+See [architecture](docs/architecture.md), [iOS client](docs/ios.md), [deployment](docs/server.md), [roadmap](docs/roadmap.md), and [validation](docs/validation.md).
 
 Settings now use schema v3. v1/v2 profiles and vocabulary migrate in memory while keeping profile IDs and keys; the next save persists v3. Global lines and all profile terms are merged, with active-profile overrides winning conflicts. Remote vocabulary IDs are preserved as recovery references until their contents are imported. Upgrade other syncing clients before sharing the new settings.
 

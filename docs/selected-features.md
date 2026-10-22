@@ -14,7 +14,7 @@ The checklist below describes implementation coverage, not proof of microphone, 
 | A6 | Optional output-device mute; restore that device's original state on completion/cancel/error/quit | `RecordingEffects` |
 | B3 | Doubao binary WebSocket, API key or legacy App ID/access token, configurable resource ID, hotwords | `DoubaoSpeech`, `DoubaoWire` |
 | B4 | Whisper-compatible multipart requests, custom URL/model, including OpenAI/Groq gateways | `WhisperRequests` |
-| B5 | Google Speech v2 inline audio with local segmentation; OAuth token or service-account JSON in Keychain | `GoogleSpeech`, `GoogleCredential` |
+| B5 | Google Speech v2 inline audio with local segmentation; OAuth token or service-account JSON in Keychain; the PEM private key is loaded by a dependency-free PKCS#8/PKCS#1 reader shared by macOS and iOS | `GoogleSpeech`, `GoogleCredential`, `GooglePrivateKey` |
 | B6 | Chat Completions, Anthropic Messages and Responses writing protocols | `WritingClient` |
 | B8 | Discover models from supported HTTP endpoints, preserve gateway prefix, paginate Anthropic | Profile editor → Fetch model list |
 | B9 | Stream text into the editor/HUD; never insert unfinished/truncated output | `SSEFramer`, `WritingStream` |

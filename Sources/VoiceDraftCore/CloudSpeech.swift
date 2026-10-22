@@ -139,13 +139,7 @@ public enum GoogleCredential {
         guard text.utf8.count <= 64_000, let json = try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
               json["type"] as? String == "service_account", let email = json["client_email"] as? String,
               let pem = json["private_key"] as? String else { throw FeatureError("Paste a Google service account JSON key or a current OAuth access token.") }
-        let derText = pem.components(separatedBy: .newlines).filter { !$0.hasPrefix("---") }.joined()
-        guard let der = Data(base64Encoded: derText) else { throw FeatureError("Invalid Google private key.") }
-        // SecItemImport accepts PKCS#8 PEM without writing a permanent Keychain item.
-        var format = SecExternalFormat.formatPEMSequence, type = SecExternalItemType.itemTypePrivateKey
-        var keys: CFArray?
-        let status = SecItemImport(Data(pem.utf8) as CFData, nil, &format, &type, [], nil, nil, &keys)
-        guard !der.isEmpty, status == errSecSuccess, let key = (keys as? [SecKey])?.first else { throw FeatureError("Could not read the Google service account private key.") }
+        let key = try GooglePrivateKey.secKey(fromPEM: pem)
         let now = Int(Date().timeIntervalSince1970)
         let header = base64URL(try JSONSerialization.data(withJSONObject: ["alg": "RS256", "typ": "JWT"]))
         let claims = base64URL(try JSONSerialization.data(withJSONObject: ["iss": email, "scope": "https://www.googleapis.com/auth/cloud-platform", "aud": "https://oauth2.googleapis.com/token", "iat": now, "exp": now + 3600]))
@@ -158,5 +152,81 @@ public enum GoogleCredential {
         let (data, response) = try await HTTPTransport().send(request)
         guard response.statusCode == 200, let root = try JSONSerialization.jsonObject(with: data) as? [String: Any], let token = root["access_token"] as? String else { throw FeatureError("Google authentication failed. Check the service account and enabled Speech API.") }
         return token
+    }
+}
+
+/// Dependency-free PEM loading shared by macOS and iOS: PKCS#8 or PKCS#1 PEM -> PKCS#1 DER -> SecKey.
+enum GooglePrivateKey {
+    static func secKey(fromPEM pem: String) throws -> SecKey {
+        let der = try pkcs1DER(fromPEM: pem)
+        let attributes: [CFString: Any] = [kSecAttrKeyType: kSecAttrKeyTypeRSA, kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+                                           kSecAttrKeySizeInBits: try modulusBits(pkcs1: der)]
+        var error: Unmanaged<CFError>?
+        guard let key = SecKeyCreateWithData(der as CFData, attributes as CFDictionary, &error) else {
+            throw FeatureError("Could not read the Google service account private key.")
+        }
+        return key
+    }
+
+    static func pkcs1DER(fromPEM pem: String) throws -> Data {
+        let lines = pem.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let armour = lines.first ?? ""
+        let body = lines.filter { !$0.hasPrefix("-----") }.joined()
+        guard !body.isEmpty, let der = Data(base64Encoded: body), !der.isEmpty else { throw FeatureError("Invalid Google private key.") }
+        if armour.contains("BEGIN RSA PRIVATE KEY") {
+            _ = try modulusBits(pkcs1: der)
+            return der
+        }
+        guard armour.isEmpty || armour.contains("BEGIN PRIVATE KEY") else { throw FeatureError("Invalid Google private key.") }
+        // PrivateKeyInfo ::= SEQUENCE { INTEGER version, AlgorithmIdentifier, OCTET STRING privateKey, ... }
+        var outer = ASN1Reader(der)
+        var info = ASN1Reader(try outer.read(.sequence))
+        guard outer.isAtEnd else { throw FeatureError("Invalid Google private key.") }
+        _ = try info.read(.integer)
+        let algorithm = try info.read(.sequence)
+        // rsaEncryption OID 1.2.840.113549.1.1.1
+        let rsaOID: [UInt8] = [0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01]
+        guard algorithm.starts(with: rsaOID) else { throw FeatureError("Google private key must be RSA.") }
+        let inner = try info.read(.octetString)
+        _ = try modulusBits(pkcs1: inner)
+        return inner
+    }
+
+    /// RSAPrivateKey ::= SEQUENCE { INTEGER version, INTEGER modulus, ... }
+    static func modulusBits(pkcs1 der: Data) throws -> Int {
+        var outer = ASN1Reader(der)
+        var key = ASN1Reader(try outer.read(.sequence))
+        _ = try key.read(.integer)
+        var modulus = try key.read(.integer)[...]
+        while modulus.first == 0 { modulus = modulus.dropFirst() }
+        guard let top = modulus.first else { throw FeatureError("Invalid Google private key.") }
+        return (modulus.count - 1) * 8 + (8 - top.leadingZeroBitCount)
+    }
+}
+
+/// Minimal DER reader for SEQUENCE, INTEGER and OCTET STRING; anything else is rejected.
+struct ASN1Reader {
+    enum Tag: UInt8 { case integer = 0x02, octetString = 0x04, sequence = 0x30 }
+    private let bytes: [UInt8]
+    private var offset = 0
+    init(_ data: Data) { bytes = [UInt8](data) }
+    var isAtEnd: Bool { offset == bytes.count }
+
+    mutating func read(_ expected: Tag) throws -> Data {
+        guard offset < bytes.count, let tag = Tag(rawValue: bytes[offset]), tag == expected else {
+            throw FeatureError("Invalid Google private key.")
+        }
+        offset += 1
+        guard offset < bytes.count else { throw FeatureError("Invalid Google private key.") }
+        var length = Int(bytes[offset]); offset += 1
+        if length & 0x80 != 0 {
+            let count = length & 0x7F
+            guard (1...4).contains(count), offset + count <= bytes.count else { throw FeatureError("Invalid Google private key.") }
+            length = 0
+            for _ in 0..<count { length = (length << 8) | Int(bytes[offset]); offset += 1 }
+        }
+        guard length <= bytes.count - offset else { throw FeatureError("Invalid Google private key.") }
+        defer { offset += length }
+        return Data(bytes[offset..<offset + length])
     }
 }

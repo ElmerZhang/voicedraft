@@ -37,4 +37,14 @@ Baseline reviewed against the public [Typeless quickstart](https://www.typeless.
 4. Add individual adapters for Doubao and OpenAI, followed by other providers. Add a schema migration and protocol fixtures with each adapter.
 5. Implement Windows and mobile clients, test the encryption contract across languages, and add account/device management if the service becomes multi-user.
 
-Full feature parity remains a product program beyond this preview. Billing, subscription plans, vendor branding, marketing claims, and proprietary training behavior are not copied.
+Full feature parity remains a product program beyond this preview. Billing, subscription plans, vendor branding, marketing claims, and proprietary training behavior are not copied (historical note; billing scope is superseded by Direction (2026-10-22) below, vendor branding and proprietary behavior remain out of scope).
+
+## Direction (2026-10-22)
+
+- The whole project is open source under AGPL-3.0, including the planned iOS client.
+- The Mac and iOS apps are free.
+- The only paid service is an optional hosted zero-knowledge sync. Self-hosting remains free and functionally identical.
+- History and audio never sync.
+- Billing and subscription work is now in scope for the hosted service only.
+- Trademark registration is deferred.
+- App Store distribution of the Mac app is not planned. The Mac app ships directly and notarized.

@@ -5,3 +5,15 @@ dist/
 .env
 __pycache__/
 .local/
+
+.claude/
+*.p12
+*.p8
+*.pem
+*.mobileprovision
+*.dmg
+*.app
+*.token
+xcuserdata/
+*.xcuserstate
+DerivedData/

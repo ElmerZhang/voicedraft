@@ -1,8 +1,6 @@
 # VoiceDraft
 
-VoiceDraft is a personal experimental project, independent of company projects and knowledge bases.
-
-A native macOS voice writing app with independently configurable Qwen speech and writing models, plus a self-hosted encrypted configuration vault. This is a runnable first release, not full Typeless feature parity.
+A native macOS voice writing app with independently configurable Qwen speech and writing models, plus a self-hosted encrypted configuration vault. It is inspired by the public behaviour of Typeless and TypeFlux; this is an independent implementation and no code was copied.
 
 ## Run the Mac app
 
@@ -85,7 +83,7 @@ Requires Go 1.25+, the Swift toolchain, and Python 3 for the localization checks
 
 To inspect the interface without credentials, microphone or provider calls, run the packaged binary with `VOICEDRAFT_CAPTURE_PREVIEWS=<dir>` (pages and settings tabs), `VOICEDRAFT_CAPTURE_ONBOARDING=<dir>`, `VOICEDRAFT_CAPTURE_HUD_PREVIEWS=<dir>` or `VOICEDRAFT_CAPTURE_SHEETS=<dir>` (every sheet and the Clear history confirmation); add `VOICEDRAFT_PREVIEW_APPEARANCE=dark` for dark mode, or the arguments `-interfaceLanguage zh-Hans` (any supported code) for another interface language. Each mode writes PNGs and exits. Keep the capture process frontmost: when another app is active, native controls are captured in their inactive gray state.
 
-See [architecture](docs/architecture.md), [deployment](docs/server.md), [feature parity and roadmap](docs/roadmap.md), and [validation](docs/validation.md).
+See [architecture](docs/architecture.md), [deployment](docs/server.md), [roadmap](docs/roadmap.md), and [validation](docs/validation.md).
 
 Settings now use schema v3. v1/v2 profiles and vocabulary migrate in memory while keeping profile IDs and keys; the next save persists v3. Global lines and all profile terms are merged, with active-profile overrides winning conflicts. Remote vocabulary IDs are preserved as recovery references until their contents are imported. Upgrade other syncing clients before sharing the new settings.
 
@@ -102,8 +100,7 @@ Add its case and matching rules in `AppLanguage`/`L10n`, provide complete `Local
 - [Qwen ASR Message server events](https://help.aliyun.com/zh/model-studio/qwen-asr-message-server-events)
 - [Qwen ASR HTTP API](https://www.alibabacloud.com/help/en/model-studio/qwen-asr-api-reference)
 - [Bailian OpenAI-compatible text generation](https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope)
-- [Typeless quickstart and current feature categories](https://www.typeless.com/help/quickstart)
-- [Typeless Ask anything behavior](https://www.typeless.com/ask-anything)
+- Public behaviour that inspired this project: [Typeless quickstart](https://www.typeless.com/help/quickstart) and [Ask anything](https://www.typeless.com/ask-anything). Independent implementation, no code copied.
 
 Other model providers are intentionally out of scope for this release.
 
@@ -112,3 +109,19 @@ Other model providers are intentionally out of scope for this release.
 VoiceDraft now includes hold/tap recording shortcuts, configurable keys, 10-minute capture, recording sounds/mute, Doubao/Whisper-compatible/Google speech, three writing protocols with streaming/model discovery, reusable per-app writing styles, local context, vocabulary files, automatic Codex/Claude context and project-name discovery with writing-model filtering, usage counts, retained audio and history retry/expiry, login launch and onboarding with optional domain vocabulary packs.
 
 See [the selected feature checklist and provider setup](docs/selected-features.md) and [self-hosted signed update publishing](docs/updates.md). The new controls have English and Chinese copy; other interface languages currently fall back to English for these additions. This is a local implementation, not a deployed update service or a claim of real-account provider acceptance.
+
+## License
+
+VoiceDraft is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). Contributions require agreeing to the [Contributor License Agreement](CLA.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability and for the threat model.
+
+## Trademark
+
+The name "VoiceDraft" and its icon are covered by a separate policy: see [TRADEMARK.md](TRADEMARK.md).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build, test and contribution rules.

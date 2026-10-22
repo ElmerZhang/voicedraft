@@ -1,0 +1,19 @@
+/* VoiceDraft keyboard extension strings (English). */
+"keyboard.hint.fullAccess" = "Turn on Full Access for VoiceDraft in Settings to use voice";
+"keyboard.hint.openApp" = "Open VoiceDraft and turn on Listening";
+"keyboard.status.recording" = "Recording…";
+"keyboard.status.processing" = "Processing…";
+"keyboard.status.timedOut" = "No result from VoiceDraft. Try again in the app.";
+"keyboard.button.insertLast" = "Insert last";
+"keyboard.button.micStart" = "Start recording in VoiceDraft";
+"keyboard.button.micStop" = "Stop recording";
+"keyboard.button.nextKeyboard" = "Next keyboard";
+"keyboard.key.shift" = "Shift";
+"keyboard.key.delete" = "Delete";
+"keyboard.key.space" = "space";
+"keyboard.key.return" = "return";
+"keyboard.key.go" = "go";
+"keyboard.key.search" = "search";
+"keyboard.key.send" = "send";
+"keyboard.key.done" = "done";
+"keyboard.key.next" = "next";

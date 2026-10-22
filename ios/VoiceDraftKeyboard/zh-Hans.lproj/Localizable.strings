@@ -1,0 +1,19 @@
+/* VoiceDraft keyboard extension strings (Simplified Chinese). */
+"keyboard.hint.fullAccess" = "请在“设置”中为 VoiceDraft 开启“完全访问”以使用语音";
+"keyboard.hint.openApp" = "请打开 VoiceDraft 并开启“聆听”";
+"keyboard.status.recording" = "正在录音…";
+"keyboard.status.processing" = "正在处理…";
+"keyboard.status.timedOut" = "VoiceDraft 没有返回结果，请在 App 中重试。";
+"keyboard.button.insertLast" = "插入上次结果";
+"keyboard.button.micStart" = "在 VoiceDraft 中开始录音";
+"keyboard.button.micStop" = "停止录音";
+"keyboard.button.nextKeyboard" = "下一个键盘";
+"keyboard.key.shift" = "大写";
+"keyboard.key.delete" = "删除";
+"keyboard.key.space" = "空格";
+"keyboard.key.return" = "换行";
+"keyboard.key.go" = "前往";
+"keyboard.key.search" = "搜索";
+"keyboard.key.send" = "发送";
+"keyboard.key.done" = "完成";
+"keyboard.key.next" = "下一项";

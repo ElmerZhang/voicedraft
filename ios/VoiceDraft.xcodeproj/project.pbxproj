@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,6 +13,11 @@
 		A10000000000000000000023 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ContentView.swift */; };
 		A10000000000000000000024 /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* KeyboardViewController.swift */; };
 		A10000000000000000000025 /* VoiceDraftKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* VoiceDraftKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A10000000000000000000026 /* KeyboardBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* KeyboardBridge.swift */; };
+		A10000000000000000000027 /* KeyboardBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* KeyboardBridge.swift */; };
+		A10000000000000000000028 /* KeyboardKeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* KeyboardKeysView.swift */; };
+		A10000000000000000000029 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* Localizable.strings */; };
+		A1000000000000000000002A /* VoiceDraftCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000061 /* VoiceDraftCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +55,10 @@
 		A10000000000000000000017 /* VoiceDraftKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VoiceDraftKeyboard.entitlements; sourceTree = "<group>"; };
 		A10000000000000000000018 /* VoiceDraft.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceDraft.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000019 /* VoiceDraftKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VoiceDraftKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000001A /* KeyboardBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardBridge.swift; sourceTree = "<group>"; };
+		A1000000000000000000001B /* KeyboardKeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardKeysView.swift; sourceTree = "<group>"; };
+		A1000000000000000000001D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A1000000000000000000001E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,6 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002A /* VoiceDraftCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +103,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000010 /* AppGroup.swift */,
+				A1000000000000000000001A /* KeyboardBridge.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -112,6 +123,8 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000013 /* KeyboardViewController.swift */,
+				A1000000000000000000001B /* KeyboardKeysView.swift */,
+				A1000000000000000000001C /* Localizable.strings */,
 				A10000000000000000000015 /* Info.plist */,
 				A10000000000000000000017 /* VoiceDraftKeyboard.entitlements */,
 			);
@@ -119,6 +132,18 @@
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXVariantGroup section */
+		A1000000000000000000001C /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A1000000000000000000001D /* en */,
+				A1000000000000000000001E /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin PBXNativeTarget section */
 		A10000000000000000000030 /* VoiceDraft */ = {
@@ -136,6 +161,9 @@
 				A10000000000000000000039 /* PBXTargetDependency */,
 			);
 			name = VoiceDraft;
+			packageProductDependencies = (
+				A10000000000000000000061 /* VoiceDraftCore */,
+			);
 			productName = VoiceDraft;
 			productReference = A10000000000000000000018 /* VoiceDraft.app */;
 			productType = "com.apple.product-type.application";
@@ -185,6 +213,9 @@
 				"zh-Hans",
 			);
 			mainGroup = A10000000000000000000002;
+			packageReferences = (
+				A10000000000000000000060 /* XCLocalSwiftPackageReference ".." */,
+			);
 			productRefGroup = A10000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -207,6 +238,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000029 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -218,6 +250,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000020 /* AppGroup.swift in Sources */,
+				A10000000000000000000026 /* KeyboardBridge.swift in Sources */,
 				A10000000000000000000022 /* VoiceDraftApp.swift in Sources */,
 				A10000000000000000000023 /* ContentView.swift in Sources */,
 			);
@@ -228,7 +261,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000021 /* AppGroup.swift in Sources */,
+				A10000000000000000000027 /* KeyboardBridge.swift in Sources */,
 				A10000000000000000000024 /* KeyboardViewController.swift in Sources */,
+				A10000000000000000000028 /* KeyboardKeysView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -423,6 +458,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A10000000000000000000060 /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000061 /* VoiceDraftCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000060 /* XCLocalSwiftPackageReference ".." */;
+			productName = VoiceDraftCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000000000000000000001 /* Project object */;
 }

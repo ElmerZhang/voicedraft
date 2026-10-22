@@ -6,9 +6,34 @@ enum AppGroup {
 }
 
 /// The most recent transcription result handed from the app to the keyboard.
+///
+/// `id` and `mode` were added after the first release. Files written without them still decode:
+/// a missing `id` gets a fresh UUID and a missing `mode` becomes an empty string.
 struct SharedResult: Codable, Equatable {
+    var id: UUID
     var text: String
+    /// The writing mode that produced the text, for example `polish`, `translate` or `ask`.
+    var mode: String
     var createdAt: Date
+
+    init(id: UUID = UUID(), text: String, mode: String = "", createdAt: Date = Date()) {
+        self.id = id
+        self.text = text
+        self.mode = mode
+        self.createdAt = createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, text, mode, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        text = try container.decode(String.self, forKey: .text)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? ""
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
 }
 
 /// Stores the latest result as `latest-result.json` in the app-group container.
@@ -36,8 +61,8 @@ struct SharedResultStore {
         try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
-    func write(text: String, createdAt: Date = Date()) throws {
-        try write(SharedResult(text: text, createdAt: createdAt))
+    func write(text: String, mode: String = "", createdAt: Date = Date()) throws {
+        try write(SharedResult(text: text, mode: mode, createdAt: createdAt))
     }
 
     func read() -> SharedResult? {

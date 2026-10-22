@@ -1,4 +1,5 @@
 import SwiftUI
+import VoiceDraftCore
 
 /// Placeholder home screen. Recording is not implemented yet; the button only reflects press state.
 struct ContentView: View {
@@ -41,6 +42,11 @@ struct ContentView: View {
             }
             .padding()
             .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+
+            // Exercises the VoiceDraftCore link until the real pipeline is wired in.
+            Text("Settings schema v\(SharedSettings().schemaVersion)")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding()
         .onAppear(perform: reload)

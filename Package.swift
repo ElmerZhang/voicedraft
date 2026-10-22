@@ -5,7 +5,11 @@ let package = Package(
     name: "VoiceDraft",
     defaultLocalization: "en",
     platforms: [.macOS(.v13), .iOS(.v17)],
-    products: [.executable(name: "VoiceDraft", targets: ["VoiceDraft"])],
+    products: [
+        .executable(name: "VoiceDraft", targets: ["VoiceDraft"]),
+        // Linked by the iOS app target in ios/VoiceDraft.xcodeproj.
+        .library(name: "VoiceDraftCore", targets: ["VoiceDraftCore"])
+    ],
     targets: [
         .target(name: "CVoiceDraft", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "VoiceDraftCore", dependencies: ["CVoiceDraft"], resources: [.process("Resources")]),

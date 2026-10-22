@@ -29,6 +29,17 @@ go build ./...
 
 `./scripts/test-all.sh` includes the Go checks and Swift integration against an isolated Go fixture server. Package the app with `./scripts/build-app.sh`.
 
+For iOS changes (everything under `ios/`), build and test on the Simulator:
+
+```sh
+xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft \
+  -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO
+```
+
+The keyboard extension must never link `VoiceDraftCore` or contain networking code; see [docs/ios.md](docs/ios.md).
+
 ## Rules
 
 - No third-party Swift packages. The Go server uses the pinned pure-Go `modernc.org/sqlite` driver.

@@ -47,21 +47,33 @@ public struct LocalizedMessage: ExpressibleByStringLiteral, ExpressibleByStringI
 
 public enum L10n {
     private static let preferenceKey = "interfaceLanguage"
+    /// Preference store for the interface language. An iOS keyboard extension can point this
+    /// at its app-group suite before first use; macOS keeps `.standard`.
+    public static var defaults: UserDefaults = .standard
     static let resourceBundle: Bundle = {
-        if Bundle.main.bundleURL.pathExtension == "app" {
-            guard let url = Bundle.main.resourceURL?.appendingPathComponent("VoiceDraft_VoiceDraftCore.bundle"),
-                  let bundle = Bundle(url: url) else { fatalError("Missing packaged localization resources") }
-            return bundle
+        let name = "VoiceDraft_VoiceDraftCore.bundle"
+        let packaged = ["app", "appex"].contains(Bundle.main.bundleURL.pathExtension)
+        if packaged {
+            // Bundle.module's generated accessor traps when its bundle is missing, so packaged
+            // apps and extensions search their own resources and never call it.
+            let candidates = [Bundle.main.resourceURL, Bundle.main.bundleURL].compactMap { $0?.appendingPathComponent(name) }
+            if let bundle = candidates.lazy.compactMap({ Bundle(url: $0) }).first { return bundle }
+            NSLog("VoiceDraft: missing packaged localization resources %@; falling back to the main bundle", name)
+            return Bundle.main
         }
+        #if SWIFT_PACKAGE
         return Bundle.module
+        #else
+        return Bundle.main
+        #endif
     }()
     public static var language: AppLanguage {
-        get { AppLanguage(rawValue: UserDefaults.standard.string(forKey: preferenceKey) ?? "") ?? .system }
+        get { AppLanguage(rawValue: defaults.string(forKey: preferenceKey) ?? "") ?? .system }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: preferenceKey)
+            defaults.set(newValue.rawValue, forKey: preferenceKey)
             // Cocoa-owned UI (including permission dialogs) reads this app-only preference at launch.
-            if newValue == .system { UserDefaults.standard.removeObject(forKey: "AppleLanguages") }
-            else { UserDefaults.standard.set([newValue.rawValue, "en"], forKey: "AppleLanguages") }
+            if newValue == .system { defaults.removeObject(forKey: "AppleLanguages") }
+            else { defaults.set([newValue.rawValue, "en"], forKey: "AppleLanguages") }
         }
     }
     public static var systemLanguages: [String] {

@@ -3,6 +3,13 @@ import XCTest
 @testable import VoiceDraftCore
 
 final class AgentContextScannerTests: XCTestCase {
+    func testDefaultHomeIsCurrentUserHome() {
+        #if os(macOS)
+        XCTAssertEqual(AgentContextScanner.defaultHome.standardizedFileURL.path,
+                       FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path)
+        #endif
+        XCTAssertTrue(AgentContextScanner.defaultHome.hasDirectoryPath)
+    }
     private func withHome(_ run: (URL) throws -> Void) throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)

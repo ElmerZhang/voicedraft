@@ -39,7 +39,10 @@ public enum AgentContextScanner {
         let date: Date
     }
 
-    public static func scan(home: URL = FileManager.default.homeDirectoryForCurrentUser, excluding: Set<String> = []) throws -> AgentContextScan {
+    /// The current user's home (the container home when sandboxed); available on macOS and iOS.
+    public static var defaultHome: URL { URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true) }
+
+    public static func scan(home: URL = defaultHome, excluding: Set<String> = []) throws -> AgentContextScan {
         try scan(home: home, limits: Limits(), excluding: excluding)
     }
 

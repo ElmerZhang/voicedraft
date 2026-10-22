@@ -100,3 +100,30 @@ xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft \
 The tests cover status availability, the shared result file, the take state machine, `AppModel` takes driven with
 silent audio and in-memory credentials, and `IOSLocalStore` round trips. No test opens the microphone, the Keychain
 or the network.
+
+## Device build
+
+For device builds, choose your own Apple Development team in Xcode for the app, keyboard and test targets. Use bundle identifiers and an App Group registered to that team. Configure the same group in both entitlements files and the shared App Group identifier.
+
+- Register the App Group once in the Xcode GUI before the first command-line build. Open each of `VoiceDraft` and
+  `VoiceDraftKeyboard`, go to Signing & Capabilities, and select your registered group under App Groups. Command-line
+  provisioning alone creates App IDs with the App Groups capability but no group assigned. Signing then fails with
+  "Provisioning profile ... doesn't match the entitlements file's value for the
+  com.apple.security.application-groups entitlement".
+- `xcodebuild` needs the device's hardware UDID from `xcrun xctrace list devices`, not the CoreDevice identifier that
+  `xcrun devicectl list devices` prints.
+- Personal Team profiles expire after 7 days. Rebuild and reinstall before then.
+- On first install, trust the developer under Settings > General > VPN & Device Management, or launch fails with
+  "profile has not been explicitly trusted by the user".
+
+```sh
+xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft -configuration Debug \
+  -destination 'id=<hardware UDID>' -derivedDataPath <derived data> \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
+xcrun devicectl device install app --device <CoreDevice id> \
+  <derived data>/Build/Products/Debug-iphoneos/VoiceDraft.app
+xcrun devicectl device process launch --device <CoreDevice id> com.voicedraft.ios
+```
+
+Then add the keyboard under Settings > General > Keyboard > Keyboards > Add New Keyboard, allow Full Access, and grant
+the microphone on the first take.

@@ -61,3 +61,5 @@ xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft \
 ```
 
 The project links the root package product `VoiceDraftCore`. `swift test --disable-sandbox` at the repository root remains the shared test entry point. iOS-only code is tested by the `VoiceDraftiOSTests` target (status policy, shared result, take state machine, AppModel takes with silent audio and in-memory keys, local store round trips); run it with the same command and `test` instead of `build`, or `VOICEDRAFT_IOS=1 ./scripts/test-all.sh`. Nothing in these tests touches the microphone, the Keychain or the network.
+
+For installing on a physical iPhone (Personal Team signing, one-time App Group registration in the Xcode GUI, hardware UDID destination, 7-day profile expiry, devicectl commands), see the Device build section of `ios/README.md`.

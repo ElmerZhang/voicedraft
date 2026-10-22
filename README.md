@@ -2,6 +2,8 @@
 
 A native macOS voice writing app with independently configurable Qwen speech and writing models, plus a self-hosted encrypted configuration vault. It is inspired by the public behaviour of Typeless and TypeFlux; this is an independent implementation and no code was copied.
 
+An iOS client (a container app plus a custom keyboard extension that shares `VoiceDraftCore`) lives under `ios/`; see [docs/ios.md](docs/ios.md).
+
 ## Run the Mac app
 
 Open `dist/VoiceDraft.app` after building:

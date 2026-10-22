@@ -11,6 +11,7 @@ The iOS client is a container app plus a custom keyboard extension under `ios/`.
 | Vocabulary, styles and provider profiles from `SharedSettings` | Agent context discovery (`AgentContextScanner` reads Codex/Claude folders that do not exist on iOS) |
 | Local history, plain JSON like the Mac, never synced | Self-updating (the App Store updates the app) |
 | Keyboard extension: insert last result, trigger recording in the container app, minimal typing | Hosted-sync purchase and any in-app purchase (follows later, in the container app only) |
+| Choosing the active speech and writing profiles and entering their API keys | Creating or editing model profiles on the phone (they arrive through sync or the built-in defaults) |
 
 ## Process model
 
@@ -20,7 +21,9 @@ Apple keyboard extensions have no microphone access and may not launch other app
 2. **Insert from the keyboard.** The keyboard reads the latest result from the app group and inserts it through `textDocumentProxy`. This needs Full Access because the app group container is gated by it.
 3. **Record from the keyboard.** The keyboard posts a Darwin notification to start or stop a take. If the container app is alive (foreground, or background with an active listening session), it records, runs the pipeline, writes the result to the app group and posts a result notification; the keyboard inserts it. If the app is not alive, the keyboard shows an "Open VoiceDraft" hint and does nothing else. The keyboard never guesses or retries.
 
-A listening session is explicit: the user turns it on in the app, it keeps the audio session active under the `audio` background mode, and it ends after an idle timeout or when the user turns it off. The app does not play silent audio or use other keep-alive tricks.
+Takes are capped at 10 minutes like the Mac; Core's chunking handles provider limits. A take that fails (no speech, missing key, provider error) writes an empty latest result and still posts the result notification, so the keyboard stops waiting and inserts nothing. Keyboard takes carry no application name, and history labels them "Keyboard".
+
+A listening session is explicit: the user turns it on in the app, it keeps the audio engine running under the `audio` background mode (discarding audio until a take starts, with the system microphone indicator visible the whole time), publishes a status lease of 15 minutes that is refreshed every minute, and ends after an idle timeout or when the user turns it off. The app does not play silent audio or use other keep-alive tricks.
 
 ## Trust boundaries
 
@@ -28,7 +31,7 @@ A listening session is explicit: the user turns it on in the app, it keeps the a
 | --- | --- | --- |
 | App group container `group.com.voicedraft` | Latest result (text, mode, timestamp), keyboard status flags, the UI language preference | API keys, sync token, passphrase, history, audio |
 | Container app Keychain | API keys, sync token, sync passphrase | — |
-| Container app documents (file protection complete) | Settings JSON, history JSON, optional retained audio | — |
+| Container app documents (file protection complete) | Settings JSON (including vocabulary, like the Mac), history JSON capped at 500 entries, a local JSONL usage log | Retained audio (not implemented on iOS) |
 | Keyboard extension | Nothing persistent of its own | Any network code. The extension does not link the provider clients and makes no requests |
 
 The keyboard requires Full Access only for the app group. Because the extension contains no networking and is open source, the Full Access warning can be answered with a verifiable statement rather than a promise.
@@ -57,4 +60,4 @@ xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft \
   -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
 ```
 
-The project links the root package product `VoiceDraftCore`. `swift test --disable-sandbox` at the repository root remains the shared test entry point; iOS-only code is tested through the Xcode project.
+The project links the root package product `VoiceDraftCore`. `swift test --disable-sandbox` at the repository root remains the shared test entry point. iOS-only code is tested by the `VoiceDraftiOSTests` target (status policy, shared result, take state machine, AppModel takes with silent audio and in-memory keys, local store round trips); run it with the same command and `test` instead of `build`, or `VOICEDRAFT_IOS=1 ./scripts/test-all.sh`. Nothing in these tests touches the microphone, the Keychain or the network.

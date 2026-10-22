@@ -1,6 +1,6 @@
 # Architecture
 
-Current feature expansion and migration details: [selected-features.md](selected-features.md). The original sections below document the initial Qwen architecture; where they describe v4/four-minute/500-entry limits, the v5 rules in the expansion take precedence.
+Current feature expansion and migration details: [selected-features.md](selected-features.md). The iOS client (container app plus keyboard extension, sharing `VoiceDraftCore`) is documented in [ios.md](ios.md); this page owns the Mac app and everything shared. The original sections below document the initial Qwen architecture; where they describe v4/four-minute/500-entry limits, the v5 rules in the expansion take precedence.
 
 ## Boundaries
 

@@ -285,3 +285,4 @@
 "Nothing to insert yet. Dictate first." = "まだ挿入できる結果がありません。先に音声入力してください。";
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "ショートカットキーが押されたままだったため、貼り付けませんでした。代わりに結果をコピーしてください。";
 "No text field is focused. Copy the result instead." = "入力欄にフォーカスがありません。代わりに結果をコピーしてください。";
+"This is not a VoiceDraft sync pairing link." = "VoiceDraft の同期ペアリングリンクではありません。";

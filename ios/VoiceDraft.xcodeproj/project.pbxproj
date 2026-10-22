@@ -38,6 +38,7 @@
 		B1000000000000000000002E /* SharedResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002D /* SharedResultTests.swift */; };
 		B10000000000000000000030 /* TakeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002F /* TakeStateTests.swift */; };
 		B10000000000000000000032 /* IOSLocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000031 /* IOSLocalStoreTests.swift */; };
+		C10000000000000000000006 /* SyncPairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000005 /* SyncPairingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -107,6 +108,7 @@
 		B1000000000000000000002D /* SharedResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedResultTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000002F /* TakeStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeStateTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000031 /* IOSLocalStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSLocalStoreTests.swift; sourceTree = "<group>"; };
+		C10000000000000000000005 /* SyncPairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPairingTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000033 /* VoiceDraftiOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoiceDraftiOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -252,6 +254,7 @@
 				B1000000000000000000002D /* SharedResultTests.swift */,
 				B1000000000000000000002F /* TakeStateTests.swift */,
 				B10000000000000000000031 /* IOSLocalStoreTests.swift */,
+				C10000000000000000000005 /* SyncPairingTests.swift */,
 			);
 			path = VoiceDraftiOSTests;
 			sourceTree = "<group>";
@@ -444,6 +447,7 @@
 				B1000000000000000000002E /* SharedResultTests.swift in Sources */,
 				B10000000000000000000030 /* TakeStateTests.swift in Sources */,
 				B10000000000000000000032 /* IOSLocalStoreTests.swift in Sources */,
+				C10000000000000000000006 /* SyncPairingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

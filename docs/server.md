@@ -35,7 +35,7 @@ The local `run-server.sh` also reuses the existing `.local/access-token` and `.l
 2. Create a private `.env` next to `compose.yaml` containing `VOICEDRAFT_SYNC_TOKEN=<a random token of at least 32 characters>`. Generate a token with `openssl rand -hex 32` or the built binary's `--generate-token` command; set the file's permissions to 0600.
 3. Run `docker compose up -d --build`. The named volume preserves the SQLite vault.
 4. Put Caddy or your existing HTTPS reverse proxy in front of `127.0.0.1:8765`. `Caddyfile.example` is a starting point; replace the domain and configure DNS. Install Caddy separately using its official instructions. Apply request size, connection, and rate limits appropriate to your host.
-5. On each Mac, use the shared HTTPS URL, server access token, and client-only passphrase. A new device downloads the server copy explicitly.
+5. On the first Mac, enter the shared HTTPS URL, server access token, and client-only passphrase. To add another device, open **Settings > Sync > Pair another device** on a configured Mac and scan the code with the iPhone camera or open the copied link on the device; the iPhone asks before it saves the connection and downloads the server copy. Another Mac takes the same three values by hand and downloads the server copy explicitly.
 
 The supplied Compose mapping binds to loopback and is intended for an on-host HTTPS reverse proxy. For a proxy in another container, attach the service to a private Docker network and proxy to `sync:8765` instead.
 

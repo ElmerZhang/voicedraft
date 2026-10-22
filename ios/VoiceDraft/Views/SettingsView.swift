@@ -73,10 +73,17 @@ struct SyncSettingsView: View {
                     model.configureSync(url: url, token: token, passphrase: passphrase)
                 }
                 .disabled(model.syncing)
+                // Reads the clipboard only on tap, so iOS shows no paste prompt when the screen opens.
+                Button {
+                    model.receivePairingText(UIPasteboard.general.string)
+                } label: {
+                    Label(AppText.t("Paste pairing link"), systemImage: "doc.on.clipboard")
+                }
+                .disabled(model.syncing || model.busy)
             } header: {
                 Text(verbatim: AppText.t("Connection"))
             } footer: {
-                Text(verbatim: AppText.t("Use HTTPS, or HTTP on localhost for development. The token and passphrase stay in this iPhone's Keychain. Settings and keys are encrypted with the passphrase before upload; history and audio are never synced."))
+                Text(verbatim: AppText.t("On a Mac with sync set up, open Settings > Sync > Pair another device, then scan the code with the iPhone camera or paste the link here.") + "\n\n" + AppText.t("Use HTTPS, or HTTP on localhost for development. The token and passphrase stay in this iPhone's Keychain. Settings and keys are encrypted with the passphrase before upload; history and audio are never synced."))
             }
             Section {
                 Button {
@@ -108,11 +115,16 @@ struct SyncSettingsView: View {
             }
         }
         .navigationTitle(Text(verbatim: AppText.t("Sync")))
-        .onAppear {
-            url = model.device.serverURL
-            token = model.syncToken
-            passphrase = model.syncPassphrase
-        }
+        .onAppear(perform: loadFields)
+        // A pairing link can change the connection while this screen is open.
+        .onChange(of: model.device.serverURL) { _, _ in loadFields() }
+        .onChange(of: model.device.syncIdentity) { _, _ in loadFields() }
+    }
+
+    private func loadFields() {
+        url = model.device.serverURL
+        token = model.syncToken
+        passphrase = model.syncPassphrase
     }
 }
 

@@ -204,3 +204,10 @@
 "Paste confirmations" = "Paste confirmations";
 "Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "Hidden after sending a paste in these apps. Copy remains available when nothing was sent.";
 "Show again" = "Show again";
+"Pair another device" = "Pair another device";
+"Show pairing code" = "Show pairing code";
+"Hide pairing code" = "Hide pairing code";
+"Copy pairing link" = "Copy pairing link";
+"Pairing code" = "Pairing code";
+"The code and link contain the access token and passphrase. Show them only to your own devices." = "The code and link contain the access token and passphrase. Show them only to your own devices.";
+"Scan with the iPhone camera, or copy the link and open it on the device." = "Scan with the iPhone camera, or copy the link and open it on the device.";

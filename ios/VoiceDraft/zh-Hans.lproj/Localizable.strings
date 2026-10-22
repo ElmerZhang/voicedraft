@@ -100,3 +100,11 @@
 "{0} terms" = "{0} 个词条";
 "Issues" = "问题反馈";
 "Security policy" = "安全政策";
+"Turn on Allow Full Access." = "打开“允许完全访问”。";
+"Paste pairing link" = "粘贴配对链接";
+"The clipboard does not contain a VoiceDraft pairing link." = "剪贴板里没有 VoiceDraft 配对链接。";
+"Connect to {0} and download the server copy?" = "连接到 {0} 并下载服务器上的配置？";
+"This replaces the settings and API keys on this iPhone." = "这会替换这台 iPhone 上的设置和 API Key。";
+"Connect" = "连接";
+"Paired. Downloaded revision {0} with {1} model profiles." = "配对完成。已下载版本 {0}，包含 {1} 个模型配置。";
+"On a Mac with sync set up, open Settings > Sync > Pair another device, then scan the code with the iPhone camera or paste the link here." = "在已设置同步的 Mac 上打开“设置 > 同步 > 配对其他设备”，然后用 iPhone 相机扫描二维码，或把链接粘贴到这里。";

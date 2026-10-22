@@ -285,3 +285,4 @@
 "Nothing to insert yet. Dictate first." = "还没有可插入的内容，请先听写。";
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "快捷键仍被按住，没有粘贴。请改为复制结果。";
 "No text field is focused. Copy the result instead." = "当前没有聚焦的输入框。请改为复制结果。";
+"This is not a VoiceDraft sync pairing link." = "这不是 VoiceDraft 同步配对链接。";

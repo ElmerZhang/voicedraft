@@ -204,3 +204,10 @@
 "Paste confirmations" = "粘贴提示";
 "Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "向以下 App 发送粘贴后不再提示。未能发送时，仍会提供复制按钮。";
 "Show again" = "恢复提示";
+"Pair another device" = "配对其他设备";
+"Show pairing code" = "显示配对二维码";
+"Hide pairing code" = "隐藏配对二维码";
+"Copy pairing link" = "复制配对链接";
+"Pairing code" = "配对二维码";
+"The code and link contain the access token and passphrase. Show them only to your own devices." = "二维码和链接包含访问令牌和同步口令，只给你自己的设备看。";
+"Scan with the iPhone camera, or copy the link and open it on the device." = "用 iPhone 相机扫描，或复制链接后在设备上打开。";

@@ -38,6 +38,8 @@ The keyboard requires Full Access only for the app group. Because the extension 
 
 The sync server sees exactly what it sees from the Mac: one ciphertext envelope, its size, revision numbers and access timing. History and audio never leave the device.
 
+Pairing. The app registers the `voicedraft` URL scheme (`CFBundleURLTypes`, role Editor) and handles `voicedraft://sync?...` links from `onOpenURL`, including cold launches, and from **Paste pairing link** on the Sync screen. That button reads the clipboard only when tapped, so iOS shows no paste prompt when the screen opens. Core's `SyncPairingLink` validates the link (format in [architecture.md](architecture.md#encrypted-sync-protocol-v1)). A valid link only waits in memory until the user confirms "Connect to <host> and download the server copy?". Connect then runs the same configure path as manual entry (Keychain token and passphrase, server URL, revision reset for a new server identity) and an explicit download, and reports the revision and profile count or the error. The link itself is never stored. Scanning the Mac's QR code with the Camera app opens the same link.
+
 ## Audio path
 
 The Mac feeds `PCM16Audio` from an `AVCaptureAudioDataOutput` sample buffer. iOS uses an `AVAudioEngine` input tap, converts to 16 kHz mono PCM16 with `AVAudioConverter`, and feeds the same `LiveAudioFeed` for WebSocket adapters or buffers a WAV for HTTP adapters. The audio session uses the `.record` category with Bluetooth allowed and is activated only while a take or a listening session is running.

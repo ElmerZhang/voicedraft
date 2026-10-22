@@ -64,7 +64,7 @@ The interface follows the system light or dark appearance; the recording HUD is 
 The service listens on `http://127.0.0.1:8765`. Its randomly generated access token is saved at `.local/access-token`; copy it into the app's **Sync** page. Choose a separate, strong sync passphrase of at least 12 characters. Do not use your Bailian API key as the sync access token or passphrase.
 
 - First Mac: save the connection, then **Sync now**.
-- New device: use the same server URL, access token, and sync passphrase; save the connection, then **Download server copy**.
+- New device: use the same server URL, access token, and sync passphrase; save the connection, then **Download server copy**. For an iPhone, open **Pair another device** on the Mac's Sync tab and scan the code with the iPhone camera instead of typing.
 - Enable automatic sync to synchronize after saves and every 30 seconds while Studio or History is open. Editing model/vocabulary pages pauses background polling to protect unsaved form edits.
 - Conflicting changes stop with an explicit message. Downloading a server copy requires confirmation and replaces local model settings and vocabulary. Reapply any local edits you want to keep afterward.
 

@@ -204,3 +204,10 @@
 "Paste confirmations" = "貼り付けの確認";
 "Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "これらのアプリへの貼り付け送信後は表示しません。送信できなかった場合はコピーできます。";
 "Show again" = "再表示する";
+"Pair another device" = "別のデバイスとペアリング";
+"Show pairing code" = "ペアリングコードを表示";
+"Hide pairing code" = "ペアリングコードを隠す";
+"Copy pairing link" = "ペアリングリンクをコピー";
+"Pairing code" = "ペアリングコード";
+"The code and link contain the access token and passphrase. Show them only to your own devices." = "コードとリンクにはアクセストークンとパスフレーズが含まれます。自分のデバイスにだけ見せてください。";
+"Scan with the iPhone camera, or copy the link and open it on the device." = "iPhone のカメラでスキャンするか、リンクをコピーしてデバイスで開いてください。";

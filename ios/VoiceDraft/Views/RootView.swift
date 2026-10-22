@@ -19,10 +19,43 @@ struct RootView: View {
         .fullScreenCover(isPresented: $model.showingOnboarding) {
             OnboardingView()
                 .environmentObject(model)
+                .pairingConfirmation(model: model, active: true)
         }
+        // While onboarding covers the tabs, onboarding presents the confirmation instead.
+        .pairingConfirmation(model: model, active: !model.showingOnboarding)
+        // Cold launches deliver the link here too; the model is already loaded by then.
+        .onOpenURL { url in model.receivePairingLink(url) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { model.sceneBecameActive() }
         }
+    }
+}
+
+/// Asks before a pairing link replaces this iPhone's connection, settings and API keys.
+struct PairingConfirmation: ViewModifier {
+    @ObservedObject var model: AppModel
+    let active: Bool
+
+    func body(content: Content) -> some View {
+        let pairing = model.pendingPairing
+        let host = pairing.flatMap { URL(string: $0.serverURL)?.host } ?? ""
+        content.alert(
+            Text(verbatim: AppText.t("Connect to {0} and download the server copy?", host)),
+            isPresented: Binding(get: { active && model.pendingPairing != nil },
+                                 set: { if !$0, active { model.pendingPairing = nil } }),
+            presenting: pairing
+        ) { pairing in
+            Button(AppText.t("Connect")) { Task { await model.connectPairing(pairing) } }
+            Button(AppText.t("Cancel"), role: .cancel) { model.pendingPairing = nil }
+        } message: { _ in
+            Text(verbatim: AppText.t("This replaces the settings and API keys on this iPhone."))
+        }
+    }
+}
+
+extension View {
+    func pairingConfirmation(model: AppModel, active: Bool) -> some View {
+        modifier(PairingConfirmation(model: model, active: active))
     }
 }
 

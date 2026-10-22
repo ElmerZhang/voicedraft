@@ -204,3 +204,10 @@
 "Paste confirmations" = "Confirmaciones de pegado";
 "Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "Se ocultan tras enviar el pegado a estas apps. Copiar sigue disponible si no se envió nada.";
 "Show again" = "Volver a mostrar";
+"Pair another device" = "Vincular otro dispositivo";
+"Show pairing code" = "Mostrar código de vinculación";
+"Hide pairing code" = "Ocultar código de vinculación";
+"Copy pairing link" = "Copiar enlace de vinculación";
+"Pairing code" = "Código de vinculación";
+"The code and link contain the access token and passphrase. Show them only to your own devices." = "El código y el enlace contienen el token de acceso y la frase de contraseña. Muéstralos solo a tus propios dispositivos.";
+"Scan with the iPhone camera, or copy the link and open it on the device." = "Escanéalo con la cámara del iPhone, o copia el enlace y ábrelo en el dispositivo.";

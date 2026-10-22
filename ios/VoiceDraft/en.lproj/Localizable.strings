@@ -100,3 +100,11 @@
 "{0} terms" = "{0} terms";
 "Issues" = "Issues";
 "Security policy" = "Security policy";
+"Turn on Allow Full Access." = "Turn on Allow Full Access.";
+"Paste pairing link" = "Paste pairing link";
+"The clipboard does not contain a VoiceDraft pairing link." = "The clipboard does not contain a VoiceDraft pairing link.";
+"Connect to {0} and download the server copy?" = "Connect to {0} and download the server copy?";
+"This replaces the settings and API keys on this iPhone." = "This replaces the settings and API keys on this iPhone.";
+"Connect" = "Connect";
+"Paired. Downloaded revision {0} with {1} model profiles." = "Paired. Downloaded revision {0} with {1} model profiles.";
+"On a Mac with sync set up, open Settings > Sync > Pair another device, then scan the code with the iPhone camera or paste the link here." = "On a Mac with sync set up, open Settings > Sync > Pair another device, then scan the code with the iPhone camera or paste the link here.";

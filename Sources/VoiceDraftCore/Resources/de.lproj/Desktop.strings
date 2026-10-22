@@ -204,3 +204,10 @@
 "Paste confirmations" = "Einfügehinweise";
 "Hidden after sending a paste in these apps. Copy remains available when nothing was sent." = "Nach dem Senden an diese Apps ausblenden. Wurde nichts gesendet, bleibt Kopieren verfügbar.";
 "Show again" = "Wieder anzeigen";
+"Pair another device" = "Weiteres Gerät koppeln";
+"Show pairing code" = "Kopplungscode anzeigen";
+"Hide pairing code" = "Kopplungscode ausblenden";
+"Copy pairing link" = "Kopplungslink kopieren";
+"Pairing code" = "Kopplungscode";
+"The code and link contain the access token and passphrase. Show them only to your own devices." = "Code und Link enthalten das Zugriffstoken und die Passphrase. Zeige sie nur deinen eigenen Geräten.";
+"Scan with the iPhone camera, or copy the link and open it on the device." = "Mit der iPhone-Kamera scannen oder den Link kopieren und auf dem Gerät öffnen.";

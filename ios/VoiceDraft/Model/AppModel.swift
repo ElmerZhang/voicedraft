@@ -60,6 +60,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var syncing = false
     @Published private(set) var language: AppLanguage = L10n.language
     @Published var showingOnboarding = false
+    /// A parsed pairing link waiting for the user to confirm. Never persisted.
+    @Published var pendingPairing: SyncPairing?
 
     var mode: WritingMode { device.mode }
     var busy: Bool { takeState != .idle }

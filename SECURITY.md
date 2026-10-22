@@ -16,6 +16,7 @@ VoiceDraft has no account system and no VoiceDraft-operated inference service. A
 | --- | --- | --- |
 | The sync server operator | The ciphertext envelope and its size, revision numbers, when and how often you sync, and your bearer access token. | Your model settings, vocabulary, API keys or sync passphrase in plaintext. Audio. History. The server has no audio pipeline, and history is never synced. |
 | The model provider you configured | The audio, text, selections and vocabulary hints that you send to it, plus your API key for that provider. Optional screen context while that feature is on. | Your other providers' keys, your sync passphrase, your sync server data, and your local history. |
+| Anyone who sees your pairing code or pairing link | Your sync server URL, access token and passphrase, which is enough to download and decrypt your synced settings and API keys. Treat the code and link like the passphrase. | Your local history and audio, which are never synced. |
 | Someone with your Mac's user account | Local history (plain JSON, mode 0600, up to 500 records), local settings, usage logs, and any retained audio. Keychain items such as API keys, the sync token and the passphrase are readable only on your unlocked device. | Nothing is hidden from a fully compromised, unlocked account. Local history is not encrypted. |
 
 ## What we promise
@@ -23,7 +24,7 @@ VoiceDraft has no account system and no VoiceDraft-operated inference service. A
 - No telemetry.
 - No inference proxy. We never route your audio or text through a VoiceDraft-operated service.
 - No audio on the sync server.
-- Your sync passphrase never leaves the client.
+- Your sync passphrase is never sent to the sync server. It leaves a device only inside a pairing code or link that you choose to show.
 - API keys are stored in the Keychain and reach the server only inside the encrypted envelope.
 - History never syncs.
 

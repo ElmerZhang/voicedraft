@@ -551,6 +551,9 @@ struct SyncView: View {
                 Text(L("First Mac: save the connection, then Sync now.\nNew device: save the connection, then Download server copy.\nIf both devices have changes, sync pauses instead of overwriting either copy."))
                     .font(VD.Font.detail).foregroundStyle(.secondary).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             }
+            if !state.device.serverURL.isEmpty {
+                VDSurface(spacing: VD.Space.s) { PairingCodeView(state: state) }
+            }
             VDSurface(style: .shaded, spacing: VD.Space.s) {
                 HStack(spacing: VD.Space.s) {
                     Image(systemName: "lock.shield").font(.system(size: 15, weight: .semibold)).foregroundStyle(VD.Palette.accent)

@@ -52,9 +52,11 @@ extension AppModel {
         return SyncSnapshot(settings: settings, credentials: keys)
     }
 
-    /// Replaces local settings, vocabulary and API keys with the server copy.
-    func downloadSync() async {
-        guard !syncing, !busy else { return }
+    /// Replaces local settings, vocabulary and API keys with the server copy. Returns true when the
+    /// server copy was applied.
+    @discardableResult
+    func downloadSync() async -> Bool {
+        guard !syncing, !busy else { return false }
         setSyncing(true)
         defer { setSyncing(false) }
         do {
@@ -68,7 +70,52 @@ extension AppModel {
             guard !busy else { throw VoiceDraftError.message("Settings changed during sync. Try again.") }
             try applySnapshot(decoded, revision: remote.revision)
             setSync(status: syncedStatus())
-        } catch { setSync(status: .init(error: error)) }
+            return true
+        } catch {
+            setSync(status: .init(error: error))
+            return false
+        }
+    }
+
+    // MARK: Pairing link
+
+    /// Handles a `voicedraft://sync` link from `onOpenURL` or the clipboard. A valid link waits in
+    /// `pendingPairing` for the user to confirm; nothing changes before that.
+    func receivePairingLink(_ url: URL) {
+        do {
+            pendingPairing = try SyncPairingLink.parse(url)
+        } catch {
+            pendingPairing = nil
+            errorMessage = .init(error: error)
+        }
+    }
+
+    /// Reads the clipboard once, when the user taps "Paste pairing link".
+    func receivePairingText(_ text: String?) {
+        let trimmed = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), url.scheme?.lowercased() == SyncPairingLink.scheme else {
+            errorMessage = "The clipboard does not contain a VoiceDraft pairing link."
+            return
+        }
+        receivePairingLink(url)
+    }
+
+    /// Stores the paired connection exactly like "Save connection": Keychain token and passphrase, server
+    /// URL, and a revision reset when the server identity changes.
+    @discardableResult
+    func configurePairing(_ pairing: SyncPairing) -> Bool {
+        configureSync(url: pairing.serverURL, token: pairing.token, passphrase: pairing.passphrase)
+    }
+
+    /// The confirmed pairing: save the connection, then download and apply the server copy.
+    func connectPairing(_ pairing: SyncPairing) async {
+        pendingPairing = nil
+        guard configurePairing(pairing) else { return }
+        if await downloadSync() {
+            notice = "Paired. Downloaded revision \(device.syncRevision) with \(settings.profiles.count) model profiles."
+        } else {
+            errorMessage = syncStatus
+        }
     }
 
     /// Encrypts and uploads the local state on top of the revision this device last saw. When the server

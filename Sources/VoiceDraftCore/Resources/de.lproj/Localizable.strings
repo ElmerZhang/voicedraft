@@ -285,3 +285,4 @@
 "Nothing to insert yet. Dictate first." = "Noch nichts zum Einfügen. Diktiere zuerst.";
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Die Kurzbefehltasten waren noch gedrückt, daher wurde nichts eingefügt. Kopiere stattdessen das Ergebnis.";
 "No text field is focused. Copy the result instead." = "Kein Textfeld ist ausgewählt. Kopiere stattdessen das Ergebnis.";
+"This is not a VoiceDraft sync pairing link." = "Das ist kein VoiceDraft-Sync-Kopplungslink.";

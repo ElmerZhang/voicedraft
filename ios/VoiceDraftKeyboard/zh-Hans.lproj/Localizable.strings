@@ -1,14 +1,16 @@
 /* VoiceDraft keyboard extension strings (Simplified Chinese). */
 "keyboard.hint.fullAccess" = "请在“设置”中为 VoiceDraft 开启“完全访问”以使用语音";
-"keyboard.hint.openApp" = "请打开 VoiceDraft 并开启“聆听”";
+"keyboard.hint.openApp" = "请打开 VoiceDraft 并开启待机";
 "keyboard.status.recording" = "正在录音…";
 "keyboard.status.processing" = "正在处理…";
+"keyboard.status.connecting" = "正在连接…";
+"keyboard.status.connectionLost" = "VoiceDraft 已断开，请重新录音";
+"keyboard.status.appBusy" = "VoiceDraft 正在处理另一段录音";
 "keyboard.status.timedOut" = "VoiceDraft 没有返回结果，请在 App 中重试。";
 "keyboard.button.insertLast" = "插入上次结果";
 "keyboard.button.micStart" = "在 VoiceDraft 中开始录音";
 "keyboard.button.micStop" = "停止录音";
 "keyboard.button.nextKeyboard" = "下一个键盘";
-"keyboard.key.shift" = "大写";
 "keyboard.key.delete" = "删除";
 "keyboard.key.space" = "空格";
 "keyboard.key.return" = "换行";
@@ -17,3 +19,18 @@
 "keyboard.key.send" = "发送";
 "keyboard.key.done" = "完成";
 "keyboard.key.next" = "下一项";
+"keyboard.status.listening" = "VoiceDraft 待机中，按住按钮说话。";
+"keyboard.voice.hold" = "按住说话";
+"keyboard.voice.release" = "松开结束";
+"keyboard.voice.tapToStop" = "轻点结束";
+"keyboard.status.recordingInApp" = "VoiceDraft 正在录音…";
+"keyboard.status.opensApp" = "将在 VoiceDraft 中开始录音";
+"keyboard.status.opening" = "正在打开 VoiceDraft…";
+"keyboard.status.openRefused" = "iOS 未允许键盘打开 VoiceDraft（open 返回失败）。请手动打开 VoiceDraft 并开启待机。";
+"keyboard.status.opened" = "已打开 VoiceDraft（方式 %d）";
+"keyboard.status.openFailed" = "打开失败：%@";
+"keyboard.status.takeNotStarted" = "上次录音未开始";
+"keyboard.voice.tapOpensApp" = "点击开始语音（会打开 VoiceDraft）";
+"keyboard.voice.finish" = "结束";
+"keyboard.voice.tap" = "点击说话";
+"keyboard.voice.holdHint" = "也可长按说话，松开结束";

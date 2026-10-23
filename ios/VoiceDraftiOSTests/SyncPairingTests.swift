@@ -25,7 +25,7 @@ final class SyncPairingTests: XCTestCase {
             statusStore: AppStatusStore(fileURL: directory.appendingPathComponent("status.json")),
             resultStore: SharedResultStore(fileURL: directory.appendingPathComponent("result.json")),
             presenceStore: KeyboardPresenceStore(fileURL: directory.appendingPathComponent("presence.json")),
-            audio: SilentAudioCapture(), usageLog: IOSUsageLog(directory: nil), post: { _ in }, observeKeyboard: false))
+            audio: SilentAudioCapture(), keepAlive: SilentStandbyKeepAlive(), usageLog: IOSUsageLog(directory: nil), post: { _ in }, observeKeyboard: false))
     }
 
     func testConfigureFromParsedLinkStoresConnectionAndResetsRevision() throws {

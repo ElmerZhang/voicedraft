@@ -23,8 +23,15 @@ struct RootView: View {
         }
         // While onboarding covers the tabs, onboarding presents the confirmation instead.
         .pairingConfirmation(model: model, active: !model.showingOnboarding)
-        // Cold launches deliver the link here too; the model is already loaded by then.
-        .onOpenURL { url in model.receivePairingLink(url) }
+        .fullScreenCover(isPresented: Binding(get: { model.keyboardTakeID != nil },
+                                              set: { if !$0 { model.dismissKeyboardTake() } })) {
+            KeyboardTakeView()
+                .environmentObject(model)
+        }
+        // Cold launches deliver links here too; the model is already loaded by then.
+        .onOpenURL { url in
+            if !model.receiveRecordLink(url) { model.receivePairingLink(url) }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { model.sceneBecameActive() }
         }

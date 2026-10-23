@@ -16,12 +16,20 @@ final class PCMRouter: @unchecked Sendable {
     private var feed: LiveAudioFeed?
     private var limitBytes = Int.max
     private var currentLevel = 0.0
+    private var levelSampledAt: Date?
     private var currentFailure: Error?
 
     var isActive: Bool { lock.withLock { active } }
     var elapsed: Double { lock.withLock { Double(pcm.count) / Double(Self.bytesPerSecond) } }
     var level: Double { lock.withLock { currentLevel } }
     var failure: Error? { lock.withLock { currentFailure } }
+
+    func recordingMeter(takeID: UUID) -> RecordingMeterSample? {
+        lock.withLock {
+            guard active, let levelSampledAt else { return nil }
+            return RecordingMeterSample(takeID: takeID, level: currentLevel, sampledAt: levelSampledAt)
+        }
+    }
 
     /// Starts collecting a take of at most `maxSeconds`.
     func begin(feed: LiveAudioFeed?, maxSeconds: Double) {
@@ -31,19 +39,22 @@ final class PCMRouter: @unchecked Sendable {
             self.feed = feed
             limitBytes = Int(maxSeconds * Double(Self.bytesPerSecond))
             currentLevel = 0
+            levelSampledAt = nil
             currentFailure = nil
         }
     }
 
-    func accept(_ chunk: Data) {
+    func accept(_ chunk: Data, at now: Date = Date()) {
         lock.withLock {
             guard active, !chunk.isEmpty else { return }
             let room = limitBytes - pcm.count
             guard room > 0 else { return }
             var chunk = chunk.count > room ? Data(chunk.prefix(room)) : chunk
             if !chunk.count.isMultiple(of: 2) { chunk.removeLast() }
+            guard !chunk.isEmpty else { return }
             pcm.append(chunk)
             currentLevel = PCM16Audio.level(chunk)
+            levelSampledAt = now
             guard let feed else { return }
             do { try feed.append(chunk) } catch {
                 currentFailure = error
@@ -61,6 +72,7 @@ final class PCMRouter: @unchecked Sendable {
             try? feed?.finish()
             feed = nil
             currentLevel = 0
+            levelSampledAt = nil
             return collected
         }
     }
@@ -73,6 +85,7 @@ final class PCMRouter: @unchecked Sendable {
             feed?.cancel()
             feed = nil
             currentLevel = 0
+            levelSampledAt = nil
         }
     }
 }

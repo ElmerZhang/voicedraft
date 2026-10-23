@@ -48,3 +48,5 @@ Full feature parity remains a product program beyond this preview. Billing, subs
 - Billing and subscription work is now in scope for the hosted service only.
 - Trademark registration is deferred.
 - App Store distribution of the Mac app is not planned. The Mac app ships directly and notarized.
+- The iOS keyboard is voice only (hold to talk, insert last result, globe, space, delete, return); typing is left to other keyboards ([ios.md](ios.md#app-store-constraints-that-shape-the-design)).
+- iOS keyboard dictation opens the VoiceDraft app to record when it is not on standby, then keeps a keyboard standby window (default 15 minutes) so later takes need no app switch ([ios.md](ios.md#process-model)).

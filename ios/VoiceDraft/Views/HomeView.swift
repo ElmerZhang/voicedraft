@@ -17,6 +17,7 @@ struct HomeView: View {
                     .disabled(model.busy)
 
                     MessageBanner()
+                    KeyboardSetupBanner()
 
                     Text(verbatim: statusText)
                         .font(.headline)
@@ -58,7 +59,7 @@ struct HomeView: View {
         case .processing:
             return model.transcript.isEmpty ? AppText.t("Recognizing speech…") : AppText.t("Writing…")
         case .idle:
-            return model.listening ? AppText.t("Listening for the keyboard") : AppText.t("Hold to talk, or tap to lock")
+            return model.listening ? AppText.t("On standby for the keyboard") : AppText.t("Hold to talk, or tap to lock")
         }
     }
 }
@@ -168,14 +169,21 @@ struct ListeningCard: View {
             Toggle(isOn: Binding(get: { model.listening }, set: { value in
                 Task { await model.setListening(value) }
             })) {
-                Label(AppText.t("Listening"), systemImage: model.listening ? "dot.radiowaves.left.and.right" : "mic.slash")
+                Label(AppText.t("Start standby now"), systemImage: model.listening ? "dot.radiowaves.left.and.right" : "mic.slash")
             }
             .tint(.red)
-            Text(verbatim: AppText.t("While listening is on, the keyboard can start and stop takes even when VoiceDraft is in the background. The microphone stays open, so the orange microphone indicator stays on. Audio outside a take is discarded and never sent."))
+            Text(verbatim: model.device.standbyKeepsMicrophoneOpen
+                 ? AppText.t("During standby the keyboard can start and stop takes without opening VoiceDraft. The microphone stays open, so the orange microphone indicator stays on. Audio outside a take is discarded and never sent. The keyboard also starts standby by itself after it opens VoiceDraft to record.")
+                 : AppText.t("During standby the keyboard can start and stop takes without opening VoiceDraft. VoiceDraft stays resident in the background and opens the microphone only while you hold to talk, so the microphone indicator is off between takes. The keyboard also starts standby by itself after it opens VoiceDraft to record."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+            if !model.device.standbyKeepsMicrophoneOpen {
+                Text(verbatim: model.standbyWindowHint)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             if model.listening, let endsAt = model.listeningEndsAt {
-                Text(verbatim: AppText.t("Turns off at {0} if unused.", endsAt.formatted(.dateTime.hour().minute().locale(L10n.locale))))
+                Text(verbatim: AppText.t("Standby ends at {0}.", endsAt.formatted(.dateTime.hour().minute().locale(L10n.locale))))
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.red)
             }

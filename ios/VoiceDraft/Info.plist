@@ -36,7 +36,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VoiceDraft records your voice only while you hold the record button and sends it to the speech provider you configured.</string>
+	<string>VoiceDraft records your voice when you dictate in the app or from the VoiceDraft keyboard, and sends it only to the speech provider you configured. During keyboard standby the microphone opens only while you hold to talk, unless you choose to keep it open, and audio outside a take is discarded.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

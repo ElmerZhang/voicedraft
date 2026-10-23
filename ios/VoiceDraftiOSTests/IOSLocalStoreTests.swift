@@ -50,16 +50,16 @@ final class IOSLocalStoreTests: XCTestCase {
         device.syncRevision = 7
         device.dirty = false
         device.mode = .ask
-        device.listeningTimeoutMinutes = 25
+        device.keyboardStandbyMinutes = 30
         device.onboardingCompleted = true
         try store.saveDevice(device)
         XCTAssertEqual(try store.loadDevice(), device)
 
-        try Data(#"{"serverURL":"https://a.example","mode":"edit","listeningTimeoutMinutes":0}"#.utf8).write(to: store.url("device"))
+        try Data(#"{"serverURL":"https://a.example","mode":"edit","listeningTimeoutMinutes":0,"keyboardStandbyMinutes":7}"#.utf8).write(to: store.url("device"))
         let legacy = try store.loadDevice()
         XCTAssertEqual(legacy.serverURL, "https://a.example")
         XCTAssertEqual(legacy.mode, .polish, "Edit is not offered on iPhone")
-        XCTAssertEqual(legacy.listeningTimeoutMinutes, 1)
+        XCTAssertEqual(legacy.keyboardStandbyMinutes, 15, "an unknown standby value falls back to the default")
         XCTAssertTrue(legacy.keepHistory)
     }
 

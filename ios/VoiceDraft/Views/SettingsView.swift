@@ -25,13 +25,25 @@ struct SettingsView: View {
                 Section {
                     Toggle(AppText.t("Keep history"), isOn: Binding(get: { model.device.keepHistory },
                                                                     set: { model.setKeepHistory($0) }))
-                    Stepper(value: Binding(get: { model.device.listeningTimeoutMinutes },
-                                           set: { model.setListeningTimeout(minutes: $0) }),
-                            in: IOSDeviceSettings.listeningTimeoutRange) {
-                        Text(verbatim: AppText.t("Listening turns off after {0} min idle", String(model.device.listeningTimeoutMinutes)))
-                    }
                 } header: {
                     Text(verbatim: AppText.t("This iPhone"))
+                }
+                Section {
+                    Picker(AppText.t("Keyboard standby"), selection: Binding(get: { model.device.keyboardStandbyMinutes },
+                                                                             set: { model.setKeyboardStandby(minutes: $0) })) {
+                        ForEach(IOSDeviceSettings.standbyOptions, id: \.self) { minutes in
+                            Text(verbatim: minutes == 0 ? AppText.t("Off") : AppText.t("{0} min", String(minutes))).tag(minutes)
+                        }
+                    }
+                } footer: {
+                    Text(verbatim: AppText.t("During standby the app stays resident in the background; the microphone opens only while you hold to talk") + "\n" + model.standbyWindowHint)
+                }
+                Section {
+                    Toggle(AppText.t("Keep microphone open during standby"),
+                           isOn: Binding(get: { model.device.standbyKeepsMicrophoneOpen },
+                                         set: { value in Task { await model.setStandbyKeepsMicrophoneOpen(value) } }))
+                } footer: {
+                    Text(verbatim: AppText.t("Keeping the microphone open avoids background recording start failures but shows the microphone indicator during standby"))
                 }
                 Section {
                     NavigationLink { LanguageSettingsView() } label: {
@@ -307,18 +319,17 @@ struct LanguageSettingsView: View {
 }
 
 struct KeyboardSetupView: View {
+    @EnvironmentObject private var model: AppModel
+
     var body: some View {
         Form {
             Section {
-                step(1, AppText.t("Open Settings > General > Keyboard > Keyboards."))
-                step(2, AppText.t("Tap Add New Keyboard and choose VoiceDraft."))
-                step(3, AppText.t("Tap VoiceDraft and turn on Allow Full Access."))
-                step(4, AppText.t("In any text field, hold the globe key and pick VoiceDraft."))
-                Button(AppText.t("Open Settings")) {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-                }
+                KeyboardStatusLine(status: model.keyboardSetup)
+                KeyboardSetupSteps()
             } header: {
                 Text(verbatim: AppText.t("Enable the keyboard"))
+            } footer: {
+                Text(verbatim: AppText.t("In any text field, hold the globe key and pick VoiceDraft."))
             }
             Section {
                 Text(verbatim: AppText.t("Full Access lets the keyboard read the last result and the app's status from the shared app-group container. That is all it is used for."))
@@ -330,13 +341,6 @@ struct KeyboardSetupView: View {
         }
         .navigationTitle(Text(verbatim: AppText.t("Keyboard setup")))
     }
-
-    private func step(_ number: Int, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(verbatim: "\(number)").font(.headline).foregroundStyle(.tint)
-            Text(verbatim: text)
-        }
-    }
 }
 
 struct AboutView: View {
@@ -347,10 +351,21 @@ struct AboutView: View {
         return "\(short) (\(build))"
     }
 
+    /// The keyboard's latest try to open this app, from `open-attempts.json`, in one line.
+    private var lastKeyboardOpen: String? {
+        guard let attempt = KeyboardOpenAttemptStore().read().last else { return nil }
+        let scheme = attempt.urlForm == .lowercase ? "voicedraft://" : "VoiceDraft://"
+        let time = attempt.at.formatted(date: .abbreviated, time: .standard)
+        return "\(attempt.strategy.number) \(attempt.strategy.rawValue) · \(scheme) · \(attempt.result.rawValue) · \(time)"
+    }
+
     var body: some View {
         Form {
             Section {
                 LabeledContent(AppText.t("Version"), value: version)
+                if let lastKeyboardOpen {
+                    LabeledContent(AppText.t("Last keyboard open"), value: lastKeyboardOpen)
+                }
             }
             Section {
                 Text(verbatim: AppText.t("VoiceDraft is free software under the GNU Affero General Public License v3.0. You bring your own provider keys; audio and text go directly from this iPhone to the providers you configure. The developer runs no service that receives your data."))

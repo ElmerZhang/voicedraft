@@ -19,8 +19,14 @@ struct OnboardingView: View {
                            detail: AppText.t("Already use VoiceDraft on a Mac with sync? Enter the same server, token and passphrase in Settings > Sync, then download. Models, keys, styles and vocabulary arrive in one step."))
                     option(systemImage: "key", title: AppText.t("Enter keys on this iPhone"),
                            detail: AppText.t("Open Settings > Models and add an API key for the speech and writing models."))
-                    option(systemImage: "keyboard", title: AppText.t("Add the keyboard"),
-                           detail: AppText.t("Settings > Keyboard setup explains how to insert results into any app."))
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: "keyboard").font(.title2).foregroundStyle(.tint).frame(width: 32)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(verbatim: AppText.t("Add the keyboard")).font(.headline)
+                            KeyboardStatusLine(status: model.keyboardSetup).font(.subheadline)
+                            KeyboardSetupSteps().font(.subheadline)
+                        }
+                    }
                     Button {
                         model.completeOnboarding()
                     } label: {

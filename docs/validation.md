@@ -1,10 +1,82 @@
 # Validation record
 
+## 2026-10-23 · More visible recording amplitude
+
+Tested waveform response to changing input levels and silence.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Continuous recording curve
+
+Checked the recording curve with synthetic amplitudes in portrait and compact layouts.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Detect a force-quit container before keyboard recording
+
+Verified the stale standby path offers to reopen the containing app.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · System dictation button and measured recording waveform
+
+Checked system microphone-key visibility, waveform response and access to keyboard actions.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Separate deletion from submission in the voice keyboard
+
+Checked separation of the delete and submit controls with the system globe visible.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Distinct VoiceDraft keyboard composition
+
+Checked recording, processing and access-required layouts in the keyboard preview.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Voice keyboard layout based on the maintainer's Typeless reference
+
+Verified the voice-only keyboard layout and its non-recording editing keys.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Automatically hidden development PiP, without an edge arrow
+
+Observed Debug standby with the microphone closed between takes. The Release build retains a visible Picture in Picture window.
+
+- Research attribution: [Yoroin / GlobalRefresh-PiP](https://github.com/Yoroin/GlobalRefresh-PiP/tree/1b62341c1d62308962fb3656192d6783631aa00c), based on [CaiWanFeng / PiP](https://github.com/CaiWanFeng/PiP), demonstrated the subpixel video-call geometry. VoiceDraft independently implements that mechanism. Typeless's own published instructions only establish manual edge tucking, not automatic complete hiding.
+
+- Boundaries: this establishes complete automatic hiding and local background capture on this device/OS, including the observed HFP startup transition. It is not broad validation across iOS versions, Bluetooth devices or mid-take route transitions, calls, lock/unlock, device rotation, memory pressure, competing PiP apps, or provider recognition and insertion. User confirmation of the preceding insertion repair is separate from these local probes.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Physical-device PiP diagnosis, microphone readiness and development return
+
+On-device tests exercised foreground preparation, two subsequent background recordings and return to the host in a development build.
+
+- Remaining physical coverage: actual VoiceDraft keyboard host discovery and complete provider recognition/insertion in another app, Bluetooth routes, calls/interruption recovery, and prolonged/background termination behavior. The local capture and return evidence does not claim those paths passed. Existing synthesized-result and marker tests cover the insertion protocol without sending real audio.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
+## 2026-10-23 · Initial Picture in Picture standby keep-alive (device result superseded above)
+
+Initial results covered PiP start timing. Later tests in this record cover background microphone readiness.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
 ## 2026-10-23 · Spoken placeholders, redundant 然后 and term casing in dictation cleanup
 
 Prompt tests check demonstratives, word-search fillers and product-name casing across writing protocols.
 
 The recorded run counted 349 tests, 4 skipped, and zero failures.
+
+## 2026-10-23 · Keyboard microphone probe result and standby engine swap
+
+Tested the container microphone path and the transition between standby and capture.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
 
 ## 2026-10-22 · Punctuation-split stutters in dictation cleanup
 

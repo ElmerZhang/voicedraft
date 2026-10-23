@@ -9,6 +9,14 @@ Hand-authored Xcode project for the VoiceDraft iOS client. No third-party depend
   `latest-result.json` in the `group.com.voicedraft` app-group container. `KeyboardPresenceStore` holds
   `keyboard-presence.json`, the keyboard's "I am enabled" marker.
 
+The app icon reuses the Mac's green waveform artwork. `VoiceDraft/Assets.xcassets/AppIcon.appiconset`
+contains an opaque 1024 × 1024 square; Xcode generates device sizes and iOS applies the corner mask.
+Both Debug and Release select `AppIcon`. To regenerate it from the shared drawing code, run from the repo root:
+
+```sh
+swift scripts/make-icon.swift --ios ios/VoiceDraft/Assets.xcassets/AppIcon.appiconset
+```
+
 ## Keyboard
 
 The keyboard extension is voice only. A labeled delete key sits in the upper-right corner, beside a small VoiceDraft

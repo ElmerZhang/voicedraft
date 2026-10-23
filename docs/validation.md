@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-23 · iOS app icon
+
+Verified the app asset, device-size rendering and visibility in system search.
+
+The recorded run counted 349 tests, 1 skipped, and zero failures.
+
 ## 2026-10-23 · More visible recording amplitude
 
 Tested waveform response to changing input levels and silence.

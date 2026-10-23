@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F20000000000000000000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* Assets.xcassets */; };
 		A10000000000000000000020 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* AppGroup.swift */; };
 		A10000000000000000000021 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* AppGroup.swift */; };
 		A10000000000000000000022 /* VoiceDraftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* VoiceDraftApp.swift */; };
@@ -89,6 +90,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F20000000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000000000000000000010 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
 		A10000000000000000000011 /* VoiceDraftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDraftApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@
 		A10000000000000000000005 /* VoiceDraft */ = {
 			isa = PBXGroup;
 			children = (
+				F20000000000000000000001 /* Assets.xcassets */,
 				F10000000000000000000004 /* StandbyDeviceProbe.swift */,
 				A10000000000000000000011 /* VoiceDraftApp.swift */,
 				B10000000000000000000001 /* Model */,
@@ -422,6 +425,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20000000000000000000002 /* Assets.xcassets in Resources */,
 				B10000000000000000000029 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -606,6 +610,7 @@
 		A10000000000000000000054 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = VoiceDraft/VoiceDraft.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -630,6 +635,7 @@
 		A10000000000000000000055 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = VoiceDraft/VoiceDraft.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

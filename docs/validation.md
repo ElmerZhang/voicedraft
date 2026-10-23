@@ -1,5 +1,17 @@
 # Validation record
 
+## 2026-10-23 · Spoken placeholders, redundant 然后 and term casing in dictation cleanup
+
+Prompt tests check demonstratives, word-search fillers and product-name casing across writing protocols.
+
+The recorded run counted 349 tests, 4 skipped, and zero failures.
+
+## 2026-10-22 · Punctuation-split stutters in dictation cleanup
+
+Checked punctuation-split repeats and contrasting cases where a list or emphasis should remain.
+
+The recorded run counted 349 tests, 4 skipped, and zero failures.
+
 ## 2026-10-21 · Unmarked self-repairs in dictation cleanup
 
 The cleanup rules cover unmarked repairs, parallel lists and ambiguous clauses.

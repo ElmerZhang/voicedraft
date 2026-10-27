@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-27 · Delayed restarts and stray slips in dictation cleanup
+
+Checked that a condition inserted between two starts is preserved.
+
+The recorded run counted 349 tests, 4 skipped, and zero failures.
+
 ## 2026-10-23 · iOS app icon
 
 Verified the app asset, device-size rendering and visibility in system search.

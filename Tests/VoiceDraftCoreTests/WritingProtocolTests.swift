@@ -176,7 +176,7 @@ extension WritingProtocolTests {
             XCTAssertFalse(second.a.contains(marker), marker)
         }
         XCTAssertNotEqual(try cachedPrefix(.translate).a, first.a)
-        XCTAssertTrue(first.b.hasSuffix("Return only the polished text with the original language mix preserved."))
+        XCTAssertTrue(first.b.hasSuffix("Keep the original language mix and paragraph breaks."))
     }
 
     func testCachedPrefixAlwaysCarriesScreenContextRule() throws {

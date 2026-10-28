@@ -560,7 +560,7 @@ final class AppState: ObservableObject {
                     await self?.updateWriting(text, id: id)
                 }, usage: usage)
             }
-            if mode == .polish { output = SingleWordOutput.finalize(output, transcript: raw) } }
+            if mode == .polish { output = PolishOutput.finalize(output, transcript: raw, protectedTerms: configuration.vocabulary.protectedTypographyTerms) } }
             catch {
                 try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
                 result = raw; hudText = raw
@@ -741,7 +741,7 @@ final class AppState: ObservableObject {
                             await self?.updateWriting(text, id: id)
                         }, usage: usage)
                     }
-                    output = mode == .polish ? SingleWordOutput.finalize(written, transcript: raw) : written
+                    output = mode == .polish ? PolishOutput.finalize(written, transcript: raw, protectedTerms: configuration.vocabulary.protectedTypographyTerms) : written
                 }
                 try Task.checkCancellation(); guard generation == id else { return }
                 result = output; phase = "idle"; status = "Your text is ready"

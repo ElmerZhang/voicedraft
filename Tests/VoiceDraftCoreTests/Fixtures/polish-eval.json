@@ -1,0 +1,195 @@
+{
+ "comparison": "trim; collapse CRLF to LF; collapse runs of newlines and the spaces around them to one LF; then exact match against any accepted string",
+ "cases": [
+  {
+   "id": "reformulation-take",
+   "note": "An unfinished word is replaced by the complete noun phrase; keep the shared material.",
+   "transcript": "请把那盒彩笔的画一幅风，用一幅风景画装饰门口。",
+   "accepted": [
+    "请用那盒彩笔画一幅风景画装饰门口。"
+   ]
+  },
+  {
+   "id": "delayed-restart-take",
+   "note": "A conditional interrupts a repeated clause. Preserve the condition and the speaker.",
+   "transcript": "礼堂的挂钟我挂歪了。它原本挂在，如果门楣够高的话，它原本挂在门楣上。然后另外一只放在窗边。",
+   "accepted": [
+    "礼堂的挂钟我挂歪了。如果门楣够高的话，它原本挂在门楣上。另外一只放在窗边。",
+    "礼堂的挂钟我挂歪了。如果门楣够高的话，它原本挂在门楣上。然后另外一只放在窗边。"
+   ]
+  },
+  {
+   "id": "placeholder-take",
+   "note": "Drop the abandoned noun and word-search placeholders. The last demonstrative can point to the cup.",
+   "transcript": "先找盖子啊，保温杯的杯盖。桌上有那个带刻度的那个量杯，然后水烧开后用这个量杯量水。",
+   "accepted": [
+    "先找保温杯的杯盖。桌上有带刻度的量杯，水烧开后用量杯量水。",
+    "先找保温杯的杯盖。桌上有带刻度的量杯，水烧开后用这个量杯量水。"
+   ]
+  },
+  {
+   "id": "punctuated-stutter",
+   "note": "Punctuation splits the repeated start.",
+   "transcript": "还、还要带水。路、路上没有水井。",
+   "accepted": [
+    "还要带水。路上没有水井。"
+   ]
+  },
+  {
+   "id": "same-slot-repair",
+   "note": "The second unit replaces the first in the same grammatical slot.",
+   "transcript": "这块石头有三十斤，公斤。搬它要用推车。",
+   "accepted": [
+    "这块石头有三十公斤。搬它要用推车。"
+   ]
+  },
+  {
+   "id": "plain-duplicate",
+   "note": "Duplicated determiner with open terminal punctuation.",
+   "transcript": "这幅这幅地图上能不能画条小路",
+   "accepted": [
+    "这幅地图上能不能画条小路",
+    "这幅地图上能不能画条小路？",
+    "这幅地图上能不能画条小路。"
+   ]
+  },
+  {
+   "id": "keep-affirmation-repeat",
+   "note": "emphatic whole-word repeat must stay",
+   "transcript": "对、对、对，就是这样。",
+   "accepted": [
+    "对、对、对，就是这样。",
+    "对，对，对，就是这样。"
+   ]
+  },
+  {
+   "id": "keep-affirmation-repeat-2",
+   "transcript": "好，好，我知道了。",
+   "accepted": [
+    "好，好，我知道了。"
+   ]
+  },
+  {
+   "id": "keep-step-ranhou",
+   "note": "然后 ordering explicit steps stays",
+   "transcript": "打开设置。然后点登录。然后输入密码。",
+   "accepted": [
+    "打开设置。然后点登录。然后输入密码。"
+   ]
+  },
+  {
+   "id": "ambiguous-ranhou",
+   "note": "either reading is acceptable",
+   "transcript": "这个接口我们就不动了，然后看看前端那边。",
+   "accepted": [
+    "这个接口我们就不动了，然后看看前端那边。",
+    "这个接口我们就不动了，看看前端那边。"
+   ]
+  },
+  {
+   "id": "keep-ranhou-zai",
+   "transcript": "先备份数据库，然后再执行迁移。",
+   "accepted": [
+    "先备份数据库，然后再执行迁移。"
+   ]
+  },
+  {
+   "id": "drop-bridge-ranhou",
+   "transcript": "哎呀，这本图册的封面怎么装订？然后翻翻有没有现成的样式。",
+   "accepted": [
+    "这本图册的封面怎么装订？翻翻有没有现成的样式。"
+   ]
+  },
+  {
+   "id": "keep-appositive",
+   "transcript": "联系张三，我们的产品经理，看看排期。",
+   "accepted": [
+    "联系张三，我们的产品经理，看看排期。"
+   ]
+  },
+  {
+   "id": "keep-shenme",
+   "transcript": "没什么问题，直接上线。",
+   "accepted": [
+    "没什么问题，直接上线。"
+   ]
+  },
+  {
+   "id": "keep-two-actions",
+   "transcript": "先剪一张纸，用那张纸折一艘船。",
+   "accepted": [
+    "先剪一张纸，用那张纸折一艘船。"
+   ]
+  },
+  {
+   "id": "keep-adverb-ye",
+   "transcript": "这个功能我们也先不做了，等下个版本再说。",
+   "accepted": [
+    "这个功能我们也先不做了，等下个版本再说。"
+   ]
+  },
+  {
+   "id": "keep-subject-wo",
+   "transcript": "这本画册我翻过，没问题。",
+   "accepted": [
+    "这本画册我翻过，没问题。"
+   ]
+  },
+  {
+   "id": "explicit-correction",
+   "transcript": "周二开会，不对，改成周四。",
+   "accepted": [
+    "周四开会。"
+   ]
+  },
+  {
+   "id": "english-reformulation",
+   "transcript": "Let's build a, let's put the mockup on a web page first.",
+   "accepted": [
+    "Let's put the mockup on a web page first."
+   ]
+  },
+  {
+   "id": "short-delayed-restart",
+   "transcript": "它原本摆在，如果长凳还有空位的话，它也是在另一张长凳上展出的。",
+   "accepted": [
+    "如果长凳还有空位的话，它也是在另一张长凳上展出的。"
+   ]
+  },
+  {
+   "id": "mixed-language-keep",
+   "transcript": "Please check this branch，然后再 merge。",
+   "accepted": [
+    "Please check this branch，然后再 merge。"
+   ]
+  },
+  {
+   "id": "typography",
+   "transcript": "用VoiceDraft处理3段文字，文件大小20GB，进度15%，角度90°。",
+   "accepted": [
+    "用 VoiceDraft 处理 3 段文字，文件大小 20 GB，进度 15%，角度 90°。"
+   ]
+  },
+  {
+   "id": "single-word",
+   "transcript": "测试。",
+   "accepted": [
+    "测试"
+   ]
+  },
+  {
+   "id": "verbatim-quote",
+   "transcript": "他原话是“然后看看”，请保留“然后”。",
+   "accepted": [
+    "他原话是“然后看看”，请保留“然后”。"
+   ]
+  },
+  {
+   "id": "keep-demonstratives",
+   "transcript": "这个 PR 我还没看，那个分支先别删。",
+   "accepted": [
+    "这个 PR 我还没看，那个分支先别删。"
+   ]
+  }
+ ]
+}

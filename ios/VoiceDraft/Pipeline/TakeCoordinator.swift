@@ -100,7 +100,7 @@ final class TakeCoordinator: @unchecked Sendable {
             try await WritingClient.complete(request, profile: configuration.writing, key: configuration.writingKey,
                                              onUpdate: onUpdate, usage: usage)
         }
-        if configuration.mode == .polish { output = SingleWordOutput.finalize(output, transcript: raw) }
+        if configuration.mode == .polish { output = PolishOutput.finalize(output, transcript: raw, protectedTerms: configuration.settings.vocabulary.protectedTypographyTerms) }
         return output
     }
 

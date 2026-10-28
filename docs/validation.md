@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-28 · Cleanup-rule restructure, local typography pass, style default and evaluation corpus
+
+Tested term protection and local typography. The opt-in corpus checks complete output against accepted variants.
+
+The recorded run counted 363 tests, 5 skipped, and zero failures.
+
 ## 2026-10-28 · Mid-word break-offs before a reformulation in dictation cleanup
 
 Prompt checks cover a partial word before a reformulated request and two actions that should both survive.

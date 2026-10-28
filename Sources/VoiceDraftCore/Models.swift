@@ -105,7 +105,11 @@ public struct SharedSettings: Codable, Equatable {
     public var speechID: UUID
     public var writingID: UUID
     public var vocabulary = AppVocabulary()
-    public var stylePrompt = "Preserve my tone and meaning. Be concise. Keep technical terms and mixed languages intact."
+    /// The shipped writing preference. "Be concise" was removed on 2026-10-28 because it pulled
+    /// Polish toward paraphrase against the cleanup rules; stored copies of the old default migrate.
+    public static let defaultStylePrompt = "Preserve my tone, wording and meaning. Keep technical terms and mixed languages intact."
+    static let legacyDefaultStylePrompt = "Preserve my tone and meaning. Be concise. Keep technical terms and mixed languages intact."
+    public var stylePrompt = SharedSettings.defaultStylePrompt
     public var targetLanguage = "English"
     public var styles: [WritingStyle] = []
     public var selectedStyleID: UUID?
@@ -134,6 +138,7 @@ public struct SharedSettings: Codable, Equatable {
             for i in profiles.indices { profiles[i].legacySpeechOptions = nil }
         }
         stylePrompt = try c.decode(String.self, forKey: .stylePrompt)
+        if stylePrompt == SharedSettings.legacyDefaultStylePrompt { stylePrompt = SharedSettings.defaultStylePrompt }
         targetLanguage = try c.decode(String.self, forKey: .targetLanguage)
         styles = try c.decodeIfPresent([WritingStyle].self, forKey: .styles) ?? []
         selectedStyleID = try c.decodeIfPresent(UUID.self, forKey: .selectedStyleID)

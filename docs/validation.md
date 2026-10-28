@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-28 · Mid-word break-offs before a reformulation in dictation cleanup
+
+Prompt checks cover a partial word before a reformulated request and two actions that should both survive.
+
+The recorded run counted 349 tests, 4 skipped, and zero failures.
+
 ## 2026-10-27 · Delayed restarts and stray slips in dictation cleanup
 
 Checked that a condition inserted between two starts is preserved.

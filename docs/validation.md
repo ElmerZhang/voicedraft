@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-10-29 · Restatements after 或者说 in dictation cleanup
+
+Request tests cover an abandoned instruction followed by a restatement and a complete clause where the marker carries meaning.
+
+The recorded run counted 363 tests, 5 skipped, and zero failures.
+
 ## 2026-10-28 · Cleanup-rule restructure, local typography pass, style default and evaluation corpus
 
 Tested term protection and local typography. The opt-in corpus checks complete output against accepted variants.

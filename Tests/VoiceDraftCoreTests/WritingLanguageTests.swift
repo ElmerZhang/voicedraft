@@ -72,6 +72,8 @@ final class WritingLanguageTests: XCTestCase {
                 XCTAssertEqual(system.contains("start the same words again after an inserted condition"), cleansDictation)
                 XCTAssertEqual(system.contains("Spoken corrections: apply an explicit correction"), cleansDictation)
                 XCTAssertEqual(system.contains("Abandoned starts: the speaker breaks off"), cleansDictation)
+                XCTAssertEqual(system.contains("Restatements: 或者说, 就是说, 我是说, I mean and or rather"), cleansDictation)
+                XCTAssertEqual(system.contains("Cleaned: 先用缓存，或者说先不打数据库，看看够不够快。"), cleansDictation)
                 XCTAssertEqual(system.contains("Cleaned: 他们不买红豆。橱柜里还有。"), cleansDictation)
                 XCTAssertEqual(system.contains("Cleaned: 行、行、行，就这么办。不，不，这个先别动。"), cleansDictation)
                 XCTAssertEqual(system.contains("Cleaned: 先登录。然后打开设置。然后改密码。"), cleansDictation)

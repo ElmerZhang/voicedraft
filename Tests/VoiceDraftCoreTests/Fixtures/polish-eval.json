@@ -190,6 +190,22 @@
    "accepted": [
     "这个 PR 我还没看，那个分支先别删。"
    ]
+  },
+  {
+   "id": "reformulation-marker-take",
+   "note": "A restatement discards a correction embedded in an abandoned instruction.",
+   "transcript": "请标出花圃，Tulip 不是，是 Lily，直接写，或者说 Label Label 就填 Spring。\n然后和图册 A 关联。",
+   "accepted": [
+    "请标出花圃，Label 就填 Spring。\n然后和图册 A 关联。"
+   ]
+  },
+  {
+   "id": "keep-huozheshuo-content",
+   "note": "或者说 after a complete clause is content",
+   "transcript": "这个方案能省一半时间，或者说省一半人力，值得试一下。",
+   "accepted": [
+    "这个方案能省一半时间，或者说省一半人力，值得试一下。"
+   ]
   }
  ]
 }

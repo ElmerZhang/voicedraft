@@ -6,6 +6,8 @@ Request tests cover an abandoned instruction followed by a restatement and a com
 
 The recorded run counted 363 tests, 5 skipped, and zero failures.
 
+Device signing was verified after provisioning renewal.
+
 ## 2026-10-28 · Cleanup-rule restructure, local typography pass, style default and evaluation corpus
 
 Tested term protection and local typography. The opt-in corpus checks complete output against accepted variants.

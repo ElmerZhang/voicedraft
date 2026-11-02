@@ -225,7 +225,9 @@ public enum QwenRequests {
             ["type": "text", "text": cachedPrefix, "cache_control": ["type": "ephemeral"]],
             ["type": "text", "text": variableSuffix]
         ]
-        var inputObject: [String: Any] = ["transcript": text, "selected_text": selection, "application": application]
+        // Cleanup modes get the deterministic restatement collapse; the raw transcript stays in the history.
+        let transcript = cleanup.isEmpty ? text : DictationPrepass.collapseRestatements(text)
+        var inputObject: [String: Any] = ["transcript": transcript, "selected_text": selection, "application": application]
         if !settings.recentInputContext.isEmpty {
             inputObject["recent_input_context_reference_only"] = settings.recentInputContext
         }

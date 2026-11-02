@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-11-02 · Deterministic pre-pass for a restart after a recognizer-closed attempt
+
+Tested restarts across a sentence break and the distinction between cleanup modes and modes that preserve their input.
+
+The recorded run counted 369 tests, 5 skipped, and zero failures.
+
 ## 2026-10-29 · Restatements after 或者说 in dictation cleanup
 
 Request tests cover an abandoned instruction followed by a restatement and a complete clause where the marker carries meaning.

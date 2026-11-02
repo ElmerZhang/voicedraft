@@ -206,6 +206,22 @@
    "accepted": [
     "这个方案能省一半时间，或者说省一半人力，值得试一下。"
    ]
+  },
+  {
+   "id": "restatement-across-break-take",
+   "note": "A sentence break separates an incomplete attempt from its restart.",
+   "transcript": "天色还早。我们明天会把那盆花。\n嗯，应该说是我明天会把那盆花搬到门廊。",
+   "accepted": [
+    "天色还早。我明天会把那盆花搬到门廊。"
+   ]
+  },
+  {
+   "id": "keep-yinggaishuo-content",
+   "note": "应该说 after a complete statement, across a paragraph break, is content; the break stays",
+   "transcript": "这个方案可以。\n应该说是目前最稳的一个方案。",
+   "accepted": [
+    "这个方案可以。\n应该说是目前最稳的一个方案。"
+   ]
   }
  ]
 }

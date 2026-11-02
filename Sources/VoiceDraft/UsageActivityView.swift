@@ -3,11 +3,14 @@ import VoiceDraftCore
 
 /// Home's summary: four Total-usage tiles, one Yesterday line (omitted when empty) and a footnote.
 /// Personalization stays in Settings → Usage.
-struct UsageSummaryView: View {
+/// Equatable over its data so `.equatable()` skips recounting on unrelated `AppState` publishes.
+struct UsageSummaryView: View, Equatable {
     let history: [HistoryEntry]
     let vocabulary: AppVocabulary
     let viewMore: () -> Void
     @Environment(\.locale) private var locale
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.history == rhs.history && lhs.vocabulary == rhs.vocabulary }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -149,7 +152,8 @@ private struct UsageMetricsView: View {
     private var format: UsageFormat { UsageFormat(locale: locale) }
 }
 
-struct UsageActivityView: View {
+/// Equatable over its inputs so `.equatable()` skips recounting on unrelated `AppState` publishes.
+struct UsageActivityView: View, Equatable {
     let history: [HistoryEntry]
     let vocabulary: AppVocabulary
     let keepHistory: Bool

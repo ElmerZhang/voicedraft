@@ -198,6 +198,7 @@ private struct DesktopHomeView: View {
             HomeFirstRowLayout(spacing: VD.Space.l) {
                 shortcuts
                 UsageSummaryView(history: state.history, vocabulary: state.settings.vocabulary) { state.openSettings("Usage") }
+                    .equatable()
                     .padding(.vertical, 10)
             }
         }
@@ -280,18 +281,8 @@ private struct DesktopVocabularyView: View {
     @State private var editing: VocabularyEntry?
     @State private var bulkOpen = false
     @State private var words = ""
-    private var entries: [VocabularyEntry] {
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return state.settings.vocabulary.entries.filter {
-            (filter == 0 || (filter == 1 ? $0.origin == .automatic : $0.origin == .manual)) &&
-            (statusFilter == 0 || (statusFilter == 1 ? $0.enabled : !$0.enabled)) &&
-            (term.isEmpty || $0.text.localizedCaseInsensitiveContains(term) || $0.aliases.contains { $0.localizedCaseInsensitiveContains(term) })
-        }.sorted {
-            if $0.priority != $1.priority { return $0.priority }
-            if $0.useCount != $1.useCount { return $0.useCount > $1.useCount }
-            return $0.text.localizedStandardCompare($1.text) == .orderedAscending
-        }
-    }
+    /// Filtered and sorted once per change of vocabulary, query or filters; nil until the page first appears.
+    @State private var entries: [VocabularyEntry]?
     private var vocabularyEnabled: Binding<Bool> {
         Binding(get: { state.settings.vocabulary.enabled }, set: { enabled in update { $0.enabled = enabled } })
     }
@@ -321,12 +312,13 @@ private struct DesktopVocabularyView: View {
             if !state.settings.vocabulary.enabled {
                 VDInlineNotice(kind: .info, text: D("App vocabulary is off. Your words are kept but not sent to your models."))
             }
-            if entries.isEmpty {
-                VDEmptyState(icon: "book.closed", title: query.isEmpty && filter == 0 && statusFilter == 0 ? L("Add names, products, or phrases you often say.") : D("No matching words"))
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 215), spacing: VD.Space.m)], alignment: .leading, spacing: VD.Space.m) {
-                    ForEach(entries) { entry in chip(entry) }
-                }.opacity(state.settings.vocabulary.enabled ? 1 : 0.6)
+            if let entries {
+                if entries.isEmpty {
+                    VDEmptyState(icon: "book.closed", title: query.isEmpty && filter == 0 && statusFilter == 0 ? L("Add names, products, or phrases you often say.") : D("No matching words"))
+                } else {
+                    VocabularyChipGrid(entries: entries, enabled: state.settings.vocabulary.enabled, editing: $editing, state: state)
+                        .equatable()
+                }
             }
             VDSurface(style: .shaded, spacing: VD.Space.s) {
                 Label(D("Automatic learning"), systemImage: "sparkles").font(VD.Font.cardTitle)
@@ -368,6 +360,14 @@ private struct DesktopVocabularyView: View {
             }, saveError: { state.error.isEmpty ? nil : L(state.error) })
         }
         .sheet(isPresented: $bulkOpen) { bulkSheet }
+        .onAppear(perform: refilter)
+        .onChange(of: state.settings.vocabulary) { _ in refilter() }
+        .onChange(of: query) { _ in refilter() }
+        .onChange(of: filter) { _ in refilter() }
+        .onChange(of: statusFilter) { _ in refilter() }
+    }
+    private func refilter() {
+        entries = VocabularyListing.entries(state.settings.vocabulary, query: query, originFilter: filter, statusFilter: statusFilter)
     }
     private var pills: some View {
         VDFilterPills(labels: [D("All"), D("Auto-added"), D("Manually-added")], selection: $filter).fixedSize()
@@ -381,6 +381,29 @@ private struct DesktopVocabularyView: View {
     }
     private var masterToggle: some View {
         Toggle(L("Enable app vocabulary"), isOn: vocabularyEnabled).toggleStyle(.switch).font(VD.Font.detail).fixedSize()
+    }
+    private var bulkSheet: some View {
+        VocabularyBulkAddSheet(state: state, words: $words, isPresented: $bulkOpen)
+    }
+    private func update(_ change: (inout AppVocabulary) -> Void) {
+        var copy = state.settings; change(&copy.vocabulary); state.save(copy)
+    }
+}
+
+/// Vocabulary's chip grid. Takes value inputs only, so `.equatable()` skips it on unrelated `AppState` publishes
+/// such as the recording tick or sync status; `state` is a plain reference used for the chip actions.
+private struct VocabularyChipGrid: View, Equatable {
+    let entries: [VocabularyEntry]
+    let enabled: Bool
+    @Binding var editing: VocabularyEntry?
+    let state: AppState
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.entries == rhs.entries && lhs.enabled == rhs.enabled }
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 215), spacing: VD.Space.m)], alignment: .leading, spacing: VD.Space.m) {
+            ForEach(entries) { entry in chip(entry) }
+        }.opacity(enabled ? 1 : 0.6)
     }
     private func chip(_ entry: VocabularyEntry) -> some View {
         Button { editing = entry } label: {
@@ -408,9 +431,6 @@ private struct DesktopVocabularyView: View {
                 }
                 Button(L("Delete term"), role: .destructive) { update { $0.removeEntry(entry.id) } }
             }
-    }
-    private var bulkSheet: some View {
-        VocabularyBulkAddSheet(state: state, words: $words, isPresented: $bulkOpen)
     }
     private func update(_ change: (inout AppVocabulary) -> Void) {
         var copy = state.settings; change(&copy.vocabulary); state.save(copy)
@@ -451,14 +471,8 @@ private struct DesktopHistoryView: View {
     @State private var filter = 0
     @State private var confirmClear = false
     @State private var expanded: Set<UUID> = []
-    private var entries: [HistoryEntry] {
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return state.history.filter {
-            (filter == 0 || (filter == 2 ? $0.mode == .ask : $0.mode != .ask)) &&
-            (term.isEmpty || $0.result.localizedCaseInsensitiveContains(term) || $0.original.localizedCaseInsensitiveContains(term))
-        }.sorted { $0.date > $1.date }
-    }
-    private var days: [Date] { Set(entries.map { Calendar.current.startOfDay(for: $0.date) }).sorted(by: >) }
+    /// Filtered, sorted and grouped once per change of history, query or filter; nil until the page first appears.
+    @State private var groups: [HistoryDayGroup]?
     private var keepHistory: Binding<Bool> {
         Binding(get: { state.device.keepHistory }, set: { state.saveDevice(autoPaste: state.device.autoPaste, history: $0) })
     }
@@ -482,25 +496,57 @@ private struct DesktopHistoryView: View {
                 Spacer(minLength: VD.Space.s)
                 VDSearchField(title: L("Search your words"), text: $query, width: 200)
             }
-            if entries.isEmpty {
-                VDEmptyState(icon: "clock.arrow.circlepath", title: state.history.isEmpty ? L("Your words will find a home here.") : D("No matching entries"))
-            }
-            ForEach(days, id: \.self) { day in
-                VStack(alignment: .leading, spacing: VD.Space.s) {
-                    Text(dayTitle(day)).font(VD.Font.detail.weight(.medium)).foregroundStyle(.secondary).padding(.leading, VD.Space.xs)
-                    VDSurface(padding: 0, spacing: 0) {
-                        let group = entries.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
-                        ForEach(Array(group.enumerated()), id: \.element.id) { index, entry in
-                            if index > 0 { Divider().padding(.horizontal, VD.Space.l) }
-                            historyRow(entry)
-                        }
-                    }
+            if let groups {
+                if groups.isEmpty {
+                    VDEmptyState(icon: "clock.arrow.circlepath", title: state.history.isEmpty ? L("Your words will find a home here.") : D("No matching entries"))
+                } else {
+                    HistoryDayList(groups: groups, expanded: $expanded, playingAudioID: state.playingAudioID, busy: state.busy, state: state)
+                        .equatable()
                 }
             }
             Label(F("History and retained recordings stay on this Mac. Manage audio retention in Settings.", "历史与保留的录音只存储在本机。可在设置中管理录音保存和保留期限。"), systemImage: "lock")
                 .font(VD.Font.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.confirmationDialog(L("Delete all local history?"), isPresented: $confirmClear, titleVisibility: .visible) {
             Button(L("Delete history"), role: .destructive) { state.deleteHistory() }
+        }
+        .onAppear(perform: regroup)
+        .onChange(of: state.history) { _ in regroup() }
+        .onChange(of: query) { _ in regroup() }
+        .onChange(of: filter) { _ in regroup() }
+    }
+    private func regroup() {
+        groups = HistoryListing.groups(state.history, query: query, filter: filter)
+    }
+}
+
+/// History's day sections. Takes value inputs only, so `.equatable()` skips it on unrelated `AppState` publishes
+/// such as the recording tick or sync status; `state` is a plain reference used for row actions.
+private struct HistoryDayList: View, Equatable {
+    let groups: [HistoryDayGroup]
+    @Binding var expanded: Set<UUID>
+    let playingAudioID: UUID?
+    let busy: Bool
+    let state: AppState
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.groups == rhs.groups && lhs.expanded == rhs.expanded && lhs.playingAudioID == rhs.playingAudioID && lhs.busy == rhs.busy
+    }
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: VD.Space.xl) {
+            ForEach(groups) { group in
+                VStack(alignment: .leading, spacing: VD.Space.s) {
+                    Text(dayTitle(group.day)).font(VD.Font.detail.weight(.medium)).foregroundStyle(.secondary).padding(.leading, VD.Space.xs)
+                    VDSurface(padding: 0, spacing: 0) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                                if index > 0 { Divider().padding(.horizontal, VD.Space.l) }
+                                historyRow(entry)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     private func historyRow(_ entry: HistoryEntry) -> some View {
@@ -530,12 +576,12 @@ private struct DesktopHistoryView: View {
                     }
                     HStack(spacing: VD.Space.s) {
                         if entry.audioID != nil {
-                            Button(state.playingAudioID == entry.audioID ? F("Stop audio", "停止播放") : F("Play audio", "播放录音")) { state.play(entry) }
+                            Button(playingAudioID == entry.audioID ? F("Stop audio", "停止播放") : F("Play audio", "播放录音")) { state.play(entry) }
                             Button(F("Transcribe again", "重新识别")) { state.reprocess(entry, transcribeAgain: true) }
                         }
                         Button(F("Rewrite transcript", "重新处理文字")) { state.reprocess(entry, transcribeAgain: false) }
                         Text(F("Uses current models and style", "使用当前模型和风格")).font(VD.Font.footnote).foregroundStyle(.secondary)
-                    }.disabled(state.busy)
+                    }.disabled(busy)
                 }.padding(.leading, 86).padding(.trailing, 92)
             }
         }.padding(VD.Space.l)
@@ -598,7 +644,7 @@ private struct DesktopSettingsView: View {
                             case "Models": ModelsView(state: state, showsHeading: false)
                             case "Sync": SyncView(state: state, showsHeading: false)
                             case "Personalization": DesktopPersonalizationView(state: state)
-                            case "Usage": UsageActivityView(history: state.history, vocabulary: state.settings.vocabulary, keepHistory: state.device.keepHistory)
+                            case "Usage": UsageActivityView(history: state.history, vocabulary: state.settings.vocabulary, keepHistory: state.device.keepHistory).equatable()
                             case "About": about
                             case "Help": help
                             default: general

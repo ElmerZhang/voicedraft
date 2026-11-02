@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-11-02 · History and Vocabulary page performance
+
+Tests exercise day grouping, filtering and page summaries with synthetic entries.
+
+The recorded run counted 374 tests, 5 skipped, and zero failures.
+
 ## 2026-11-02 · Deterministic pre-pass for a restart after a recognizer-closed attempt
 
 Tested restarts across a sentence break and the distinction between cleanup modes and modes that preserve their input.

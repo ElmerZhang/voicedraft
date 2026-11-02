@@ -114,6 +114,8 @@ final class AppState: ObservableObject {
     }
     private var tick: Timer?
     private var syncTimer: Timer?
+    /// Pending auto sync after a save; each save restarts the delay so a burst of edits syncs once.
+    private var autoSyncTask: Task<Void, Never>?
     private var task: Task<Void, Never>?
     private(set) var generation = UUID()
     private var target: InputTarget?
@@ -276,8 +278,17 @@ final class AppState: ObservableObject {
             }
             self.settings = settings; device.dirty = true; try persistDevice()
             notice = "Saved on this Mac"
-            if device.autoSync { Task { await sync() } }
+            if device.autoSync { scheduleAutoSync() }
         } catch { self.error = .init(error: error) }
+    }
+    /// Coalesces auto sync after saves: each call cancels the pending sync and waits 2 s again.
+    private func scheduleAutoSync() {
+        autoSyncTask?.cancel()
+        autoSyncTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            await self.sync()
+        }
     }
     func saveDevice(autoPaste: Bool, history: Bool) {
         device.autoPaste = autoPaste; device.keepHistory = history
@@ -300,10 +311,18 @@ final class AppState: ObservableObject {
             try persistDevice(); syncStatus = "Connection saved. Sync or download to continue."
         } catch { self.error = .init(error: error) }
     }
-    private func snapshot() throws -> SyncSnapshot {
-        var keys: [String: String] = [:]
-        for profile in settings.profiles { keys[profile.id.uuidString] = try key(for: profile) }
+    /// Builds the sync snapshot from `settings` captured now, reading the Keychain off the main actor.
+    private func snapshot() async throws -> SyncSnapshot {
+        let settings = settings, preview = preview
+        let keys = try await Task.detached(priority: .userInitiated) {
+            try Self.readKeys(for: settings.profiles, preview: preview)
+        }.value
         return SyncSnapshot(settings: settings, credentials: keys)
+    }
+    private nonisolated static func readKeys(for profiles: [ModelProfile], preview: Bool) throws -> [String: String] {
+        var keys: [String: String] = [:]
+        for profile in profiles { keys[profile.id.uuidString] = preview ? "" : try KeychainStore.read(profile.id.uuidString) }
+        return keys
     }
     private func apply(_ incoming: SyncSnapshot, revision: Int) throws {
         try incoming.validate()
@@ -330,7 +349,7 @@ final class AppState: ObservableObject {
         do {
             let client = try SyncClient(baseURL: device.serverURL, token: syncToken())
             let passphrase = try syncPassphrase()
-            let before = try snapshot()
+            let before = try await snapshot()
             let remote = try await client.fetch()
             guard download || remote.revision >= device.syncRevision else {
                 throw VoiceDraftError.message("The server revision moved backwards. Check the server backup before downloading explicitly.")
@@ -339,7 +358,7 @@ final class AppState: ObservableObject {
             if let envelope = remote.payload {
                 decoded = try await Task.detached { try SyncCrypto.decrypt(envelope, passphrase: passphrase) }.value
             } else { decoded = nil }
-            guard try snapshot() == before, !busy else {
+            guard try await snapshot() == before, !busy else {
                 throw VoiceDraftError.message("Settings changed during sync. Try again.")
             }
             if download {
@@ -354,7 +373,7 @@ final class AppState: ObservableObject {
                 let envelope = try await Task.detached { try SyncCrypto.encrypt(before, passphrase: passphrase) }.value
                 let saved = try await client.upload(envelope, revision: remote.revision)
                 device.syncRevision = saved.revision
-                device.dirty = try snapshot() != before
+                device.dirty = try await snapshot() != before
                 try persistDevice()
             } else if remote.revision != device.syncRevision, let decoded {
                 guard page == "Studio" || page == "History" else {

@@ -191,7 +191,7 @@ public struct SharedSettings: Codable, Equatable {
     }
 }
 
-public struct HistoryEntry: Codable, Identifiable {
+public struct HistoryEntry: Codable, Equatable, Identifiable {
     public var id = UUID()
     public var date = Date()
     public var mode: WritingMode

@@ -74,3 +74,74 @@ final class InsertionClipboardReader: @unchecked Sendable {
         }
     }
 }
+
+/// Supplies the temporary dictation text lazily so VoiceDraft learns when a
+/// reader actually takes it. The answer is synchronous and comes from memory, so
+/// the target's paste never waits on VoiceDraft's work. The callback may arrive
+/// on any thread: it touches only lock-protected state and never hops to the
+/// main actor.
+final class InsertionClipboardProvider: NSObject, NSPasteboardItemDataProvider, @unchecked Sendable {
+    private let text: String
+    private let lock = NSLock()
+    private var didRequest = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(text: String) { self.text = text }
+
+    var requested: Bool { lock.lock(); defer { lock.unlock() }; return didRequest }
+
+    func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
+        item.setString(text, forType: type)
+        lock.lock()
+        didRequest = true
+        let pending = waiters; waiters = []
+        lock.unlock()
+        for waiter in pending { waiter.resume() }
+    }
+
+    /// Resumes any waiter without recording a request, so a waiting task ends
+    /// when the insertion window closes without the text ever being read.
+    func stopWaiting() {
+        lock.lock()
+        let pending = waiters; waiters = []
+        lock.unlock()
+        for waiter in pending { waiter.resume() }
+    }
+
+    func pasteboardFinishedWithDataProvider(_ pasteboard: NSPasteboard) {}
+
+    /// Returns once the pasteboard first asked for the text; immediately if it
+    /// already has. Insertion uses one waiter; extra concurrent waiters are
+    /// also resumed on the first request rather than released early.
+    func waitForFirstRequest() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if didRequest { lock.unlock(); continuation.resume(); return }
+            waiters.append(continuation)
+            lock.unlock()
+        }
+    }
+}
+
+/// Restores the user's clipboard at most once, from whichever insertion path
+/// gets there first (receipt confirmation, consumption plus grace, or timeout).
+@MainActor
+final class InsertionClipboardRestoration {
+    private let previous: InsertionClipboardSnapshot
+    private let board: NSPasteboard
+    private let generation: Int
+    private var onFinish: (() -> Void)?
+
+    init(previous: InsertionClipboardSnapshot, board: NSPasteboard, generation: Int, onFinish: @escaping () -> Void) {
+        self.previous = previous; self.board = board; self.generation = generation; self.onFinish = onFinish
+    }
+
+    var finished: Bool { onFinish == nil }
+
+    func finish() {
+        guard let done = onFinish else { return }
+        onFinish = nil
+        previous.restore(board, ifGeneration: generation)
+        done()
+    }
+}

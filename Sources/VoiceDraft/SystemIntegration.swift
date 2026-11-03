@@ -28,7 +28,8 @@ struct InputTarget {
 enum TextInsertionOutcome: Equatable { case confirmed, sentToTerminal, sentWithoutConfirmation }
 
 /// A queued paste. `outcome` resolves when the receipt window ends and the
-/// user's clipboard has been restored; the delivery lease is held until then.
+/// user's clipboard has been restored; the delivery lease is held at most until
+/// then and is released with the restore, which may come earlier on consumption.
 struct TextInsertionDelivery {
     let outcome: Task<TextInsertionOutcome, Never>
 }
@@ -241,8 +242,10 @@ enum TextInsertion {
     /// queued. Every pre-post failure throws, releases the delivery lease and
     /// restores the clipboard if it was already written. After posting, an
     /// unstructured main-actor task (never a child of the caller, so cancelling the
-    /// take cannot shorten it) observes the receipt per `InsertionReceiptPolicy`,
-    /// restores the user's clipboard and releases the lease on every path.
+    /// take cannot shorten it) observes the receipt per `InsertionReceiptPolicy`.
+    /// The user's clipboard is restored and the lease released once, on the first
+    /// of confirmation, the text's first pasteboard read plus a short grace, or
+    /// the end of the window.
     static func send(_ text: String, into target: InputTarget) async throws -> TextInsertionDelivery {
         try Task.checkCancellation()
         // A previous delivery's temporary text may still be on the clipboard. Wait
@@ -294,8 +297,11 @@ enum TextInsertion {
             throw VoiceDraftError.message("Could not send the paste shortcut.")
         }
         down.flags = .maskCommand; up.flags = .maskCommand
+        // The text is supplied lazily so the first read marks consumption; the
+        // transient marker stays eager so clipboard managers see it up front.
+        let provider = InsertionClipboardProvider(text: text)
         let item = NSPasteboardItem()
-        guard item.setString(text, forType: .string),
+        guard item.setDataProvider(provider, forTypes: [.string]),
               item.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")),
               board.changeCount == previous.generation else { throw VoiceDraftError.message("Could not copy the result.") }
         board.clearContents()
@@ -311,10 +317,24 @@ enum TextInsertion {
         let policy = InsertionReceiptPolicy(keyboardSurface: target.keyboardSurface)
         let element = policy.observesAccessibility ? current.element : nil
         let keyboardSurface = target.keyboardSurface, opaqueApplication = target.opaqueApplication
+        let restoration = InsertionClipboardRestoration(previous: previous, board: board, generation: generation) {
+            delivering = false
+        }
+        // Once the pasteboard hands the text to a reader, restore after a short
+        // grace instead of waiting out the receipt window. A reader that ignores
+        // the transient marker and fetches first shortens the window to the grace.
+        // Unstructured like the outcome task: cancelling the take must not shorten it.
+        Task { @MainActor in
+            await provider.waitForFirstRequest()
+            guard !restoration.finished else { return }
+            await Task.detached { try? await Task.sleep(nanoseconds: policy.consumptionGraceNanoseconds) }.value
+            restoration.finish()
+        }
         let outcome = Task { @MainActor () -> TextInsertionOutcome in
-            // The paste is already queued: keep the clipboard available for the
-            // whole bounded window regardless of cancellation, then restore it.
-            defer { previous.restore(board, ifGeneration: generation); delivering = false }
+            // The paste is already queued: keep the clipboard available until it
+            // is consumed or the bounded window ends, regardless of cancellation.
+            // Receipt polling continues independently of the restore.
+            defer { restoration.finish(); provider.stopWaiting() }
             // AX/event success only acknowledges delivery. Wait for the actual
             // field update before claiming success, without retrying and duplicating text.
             for _ in 0..<policy.attempts {

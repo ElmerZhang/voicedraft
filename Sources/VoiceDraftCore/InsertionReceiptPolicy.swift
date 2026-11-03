@@ -8,6 +8,11 @@ public struct InsertionReceiptPolicy: Equatable, Sendable {
     public let attempts: Int
     public let intervalNanoseconds: UInt64
     public let observesAccessibility: Bool
+    /// Delay between the pasteboard's first request for the temporary text and
+    /// restoring the user's clipboard. The grace covers a non-target reader (a
+    /// clipboard manager that ignores the transient marker) fetching the text
+    /// before the target's paste handler does.
+    public let consumptionGraceNanoseconds: UInt64 = 200_000_000
 
     public init(keyboardSurface: Bool) {
         if keyboardSurface {

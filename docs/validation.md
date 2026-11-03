@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-11-03 · Clipboard restored on consumption after a paste
+
+Receipt and restoration tests cover clipboard consumption, timeouts and concurrent clipboard ownership.
+
+The recorded run counted 379 tests, 5 skipped, and zero failures.
+
 ## 2026-11-02 · History and Vocabulary page performance
 
 Tests exercise day grouping, filtering and page summaries with synthetic entries.

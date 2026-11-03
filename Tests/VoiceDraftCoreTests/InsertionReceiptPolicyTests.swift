@@ -17,4 +17,12 @@ final class InsertionReceiptPolicyTests: XCTestCase {
         XCTAssertEqual(policy.maximumSeconds, 0.3, accuracy: 0.0001)
         XCTAssertLessThan(policy.maximumSeconds, InsertionReceiptPolicy(keyboardSurface: false).maximumSeconds)
     }
+
+    func testConsumptionGraceIsShortAndBoundedByTheWindow() {
+        for keyboardSurface in [false, true] {
+            let policy = InsertionReceiptPolicy(keyboardSurface: keyboardSurface)
+            XCTAssertEqual(policy.consumptionGraceNanoseconds, 200_000_000)
+            XCTAssertLessThan(Double(policy.consumptionGraceNanoseconds) / 1_000_000_000, policy.maximumSeconds)
+        }
+    }
 }

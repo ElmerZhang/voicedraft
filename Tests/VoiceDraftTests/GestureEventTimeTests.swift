@@ -70,6 +70,26 @@ final class TakeDiagnosticsTests: XCTestCase {
         XCTAssertEqual(decoded.takeID, record.takeID)
         XCTAssertEqual(log.fileURL.lastPathComponent, "takes.jsonl")
     }
+
+    func testRecordHasInsertionRolesAndReasonKeys() throws {
+        var trace = TakeTrace(takeID: UUID(), origin: 10, action: .dictate, mode: .polish, external: true)
+        trace.startRole = "AXTextArea"; trace.deliveryRole = "AXWindow"
+        trace.insertion = "blocked"; trace.insertionBlocked = InsertionBlockReason.notEditable.rawValue
+        let record = trace.record(audioSeconds: 2, outcome: "completed", failure: nil)
+        XCTAssertEqual(record.insertion, "blocked")
+        XCTAssertEqual(record.insertionBlocked, "notEditable")
+        XCTAssertEqual(record.startRole, "AXTextArea")
+        XCTAssertEqual(record.deliveryRole, "AXWindow")
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let decoded = try JSONDecoder.iso8601.decode(TakeDiagnosticRecord.self, from: encoder.encode(record))
+        XCTAssertEqual(decoded.insertionBlocked, "notEditable")
+        XCTAssertEqual(decoded.deliveryRole, "AXWindow")
+        // Earlier lines without the insertion fields still decode.
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(record)) as? [String: Any])
+        for key in ["insertion", "insertionBlocked", "startRole", "deliveryRole"] { legacy[key] = nil }
+        let old = try JSONDecoder.iso8601.decode(TakeDiagnosticRecord.self, from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertNil(old.insertion); XCTAssertNil(old.deliveryRole)
+    }
 }
 
 private extension JSONDecoder {

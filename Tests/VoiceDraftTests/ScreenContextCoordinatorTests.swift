@@ -82,7 +82,7 @@ final class ScreenContextCoordinatorTests: XCTestCase {
 
     private func target(pid: pid_t = 4242, secure: Bool = false) -> InputTarget {
         InputTarget(pid: pid, name: "Notes", element: nil, window: nil, range: nil, selection: "", value: nil,
-                    secure: secure, editable: true, keyboardSurface: false, opaqueApplication: false, focusGuard: nil)
+                    secure: secure, editable: true, keyboardSurface: false, opaqueApplication: false)
     }
 
     private func options(ocr: Bool = false, excluded: [String] = []) -> DesktopOptions {

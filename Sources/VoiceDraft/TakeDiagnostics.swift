@@ -38,6 +38,15 @@ struct TakeDiagnosticRecord: Codable, Equatable {
     var outcome: String
     /// `ModelUsageFailure.message` of the error; nil when completed or cancelled.
     var failure: String?
+    /// External takes that reached delivery: `queued`, `blocked`, `disabled`
+    /// (automatic paste off), `ask` or `unauthorized`.
+    var insertion: String?
+    /// `InsertionBlockReason` raw value when `insertion` is `blocked`.
+    var insertionBlocked: String?
+    /// AX role of the take-start target (`AXWindow` when the window itself is
+    /// the target) and of the delivery-time target; nil when none was read.
+    var startRole: String?
+    var deliveryRole: String?
 }
 
 /// The running take's timings on the uptime clock; turned into a record once.
@@ -60,6 +69,10 @@ struct TakeTrace {
     var releaseEffect: String?
     var locked = false
     var finishWhenReady = false
+    var insertion: String?
+    var insertionBlocked: String?
+    var startRole: String?
+    var deliveryRole: String?
 
     init(takeID: UUID, date: Date = Date(), origin: TimeInterval, action: ShortcutAction?, mode: WritingMode, external: Bool) {
         self.takeID = takeID; self.date = date; self.origin = origin
@@ -75,7 +88,8 @@ struct TakeTrace {
             microphoneMs: ms(microphone), taskStartedMs: ms(taskStarted), releaseDelayMs: ms(releaseDelay), heldMs: ms(held),
             releaseEffect: releaseEffect, locked: locked, finishWhenReady: finishWhenReady,
             audioSeconds: audioSeconds.map { ($0 * 100).rounded() / 100 }, outcome: outcome,
-            failure: failure.map(ModelUsageFailure.message))
+            failure: failure.map(ModelUsageFailure.message), insertion: insertion, insertionBlocked: insertionBlocked,
+            startRole: startRole, deliveryRole: deliveryRole)
     }
 }
 

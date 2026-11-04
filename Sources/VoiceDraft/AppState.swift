@@ -399,10 +399,11 @@ final class AppState: ObservableObject {
         generation = UUID(); let id = generation
         takeTrace = TakeTrace(takeID: id, origin: press?.event ?? started, action: press?.action, mode: mode, external: external)
         takeTrace?.pressDelay = press.map { $0.processed - $0.event }
-        target?.focusGuard?.stop()
         let captureStarted = ProcessInfo.processInfo.systemUptime
-        target = external ? TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true) : nil
-        if external { takeTrace?.capture = ProcessInfo.processInfo.systemUptime - captureStarted }
+        // Settings, context and History use this start capture; ordinary dictation
+        // pastes into the focus current when the result is ready (`deliverTranscript`).
+        target = external ? TextInsertion.capture() : nil
+        if external { takeTrace?.capture = ProcessInfo.processInfo.systemUptime - captureStarted; takeTrace?.startRole = target?.role }
         let targetBundleID = target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }
         takeTrace?.bundleID = targetBundleID
         runMode = mode; runSettings = settings.resolved(for: targetBundleID);
@@ -564,7 +565,7 @@ final class AppState: ObservableObject {
         // The take's screen text is dropped on every exit; reprocess and style edits have none.
         defer { screenContext.end(take: id) }
         let mode = runMode, selected = runSelection, writingKey = runWritingKey
-        var destination = target
+        let destination = target
         transcript = raw; result = ""
         var output = raw
         if mode != .verbatim, let writing = configuration.writing {
@@ -593,41 +594,43 @@ final class AppState: ObservableObject {
         recordVocabularyUsage(output)
         saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
         var delivery: TextInsertionDelivery?
-        defer { destination?.focusGuard?.stop() }
-        // An Electron app enabled at capture may have built its tree since; its
-        // fresh value and range are what the insertion receipt observes.
-        if let pending = destination, ElectronAccessibilityPolicy.shouldRetryCapture(pending: pending.accessibilityPending,
-               writable: pending.writable, external: runExternal, autoPaste: runAutoPaste, ask: mode == .ask), insertionAuthorized,
-           let refreshed = await TextInsertion.refreshPending(pending, ignoring: device.features.shortcuts, trackOpaqueFocus: true) {
-            try Task.checkCancellation()
-            guard generation == id else { refreshed.focusGuard?.stop(); throw CancellationError() }
-            pending.focusGuard?.stop(); destination = refreshed
-        }
-        if runExternal, runAutoPaste, mode != .ask, !insertionAuthorized {
+        // Edit and Style apply replace the captured selection and stay bound to it;
+        // every other take pastes into the focus current now, in any app or window.
+        let binding: InsertionBinding = mode == .edit || source == .styleApplyToSelection ? .selection : .currentInput
+        let automatic = runExternal && runAutoPaste && mode != .ask
+        if runExternal { traceTake(id) { $0.insertion = mode == .ask ? "ask" : !runAutoPaste ? "disabled" : nil } }
+        if automatic, !insertionAuthorized {
+            traceTake(id) { $0.insertion = "unauthorized" }
             self.error = "Enable Accessibility to paste into other apps. The result is available here."
             status = "Result ready · open VoiceDraft to copy"
-        } else if let destination, destination.editable, runAutoPaste, mode != .ask {
+        } else if automatic, binding == .currentInput || destination?.editable == true {
             status = "Inserting text…"
             do {
                 // Returns once Command-V is queued; the take goes idle below while
                 // the receipt window and clipboard restoration finish under the lease.
-                let sent = try await TextInsertion.send(output, into: destination)
+                let sent = try await TextInsertion.send(output, binding: binding, start: destination)
                 guard generation == id else { return }
-                if !destination.opaqueApplication { hideHUD?() }
+                traceTake(id) { $0.insertion = "queued"; $0.deliveryRole = sent.target.role }
+                if !sent.target.opaqueApplication { hideHUD?() }
                 if (mode == .polish || mode == .verbatim), configuration.vocabulary.learnFromCorrections {
-                    observeCorrections(to: output, in: destination, configuration: configuration)
+                    observeCorrections(to: output, in: sent.target, configuration: configuration)
                 }
                 delivery = sent
             } catch {
                 try Task.checkCancellation(); guard generation == id else { return }
+                let failure = error as? InsertionFailure
+                traceTake(id) { $0.insertion = "blocked"; $0.insertionBlocked = failure?.reason.rawValue; $0.deliveryRole = failure?.deliveryRole }
                 self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
             }
-        } else { status = "Your text is ready" }
+        } else {
+            if automatic { traceTake(id) { $0.insertion = "blocked"; $0.insertionBlocked = (destination == nil ? InsertionBlockReason.noFocus : .notEditable).rawValue } }
+            status = "Your text is ready"
+        }
         gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false
         phase = "idle"; level = 0; runSpeechKey = ""; runWritingKey = ""; liveFeed = nil
         recordTakeDiagnostics(id, audioSeconds: duration, outcome: "completed")
-        let opaqueDelivery = destination?.opaqueApplication == true
-        if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery, bundleID: destination?.bundleID, applicationName: destination?.name) }
+        let pasted = delivery?.target, opaqueDelivery = pasted?.opaqueApplication == true
+        if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery, bundleID: pasted?.bundleID, applicationName: pasted?.name) }
         else { hudText = output; hudKind = .result; showHUD?() }
         if let delivery { awaitDeliveryOutcome(delivery, id: id, opaque: opaqueDelivery) }
         if mode == .polish || mode == .verbatim {
@@ -647,7 +650,6 @@ final class AppState: ObservableObject {
     }
     func cancel() {
         recordTakeDiagnostics(generation, audioSeconds: elapsed, outcome: "cancelled")
-        target?.focusGuard?.stop()
         effects.end(sound: false); gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false; runAudio = nil
         player?.stop(); playingAudioID = nil
         stopCorrectionObservation()
@@ -685,7 +687,6 @@ final class AppState: ObservableObject {
         if case SpeechRecognitionError.noSpeech = error { noSpeech = true } else { noSpeech = false }
         recordTakeDiagnostics(id, audioSeconds: elapsed, outcome: noSpeech ? "noSpeech" : error is CancellationError ? "cancelled" : "failed",
                               failure: error is CancellationError ? nil : error)
-        target?.focusGuard?.stop()
         screenContext.end(take: id)
         if noSpeech {
             cancel()
@@ -993,24 +994,14 @@ extension AppState {
                 reinsertFallback(text, id: id, error: VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here."))
                 return
             }
-            var destination = TextInsertion.capture(ignoring: device.features.shortcuts, trackOpaqueFocus: true)
-            defer { destination?.focusGuard?.stop() }
-            // A first enable can take a couple of seconds to build an Electron tree.
-            if let pending = destination, pending.accessibilityPending, !pending.writable,
-               let refreshed = await TextInsertion.refreshPending(pending, ignoring: device.features.shortcuts, trackOpaqueFocus: true) {
-                guard generation == id, !Task.isCancelled else { refreshed.focusGuard?.stop(); return }
-                pending.focusGuard?.stop(); destination = refreshed
-            }
-            guard let destination, destination.editable else {
-                reinsertFallback(text, id: id, error: VoiceDraftError.message("No text field is focused. Copy the result instead."))
-                return
-            }
+            // The focus at send time is the target, as for ordinary dictation; `send`
+            // also waits (bounded) for a first-enabled Electron tree.
             do {
-                let sent = try await TextInsertion.send(text, into: destination)
+                let sent = try await TextInsertion.send(text, binding: .currentInput)
                 guard generation == id else { return }
                 phase = "idle"
-                presentQueuedPaste(text, opaque: destination.opaqueApplication, bundleID: destination.bundleID, applicationName: destination.name)
-                awaitDeliveryOutcome(sent, id: id, opaque: destination.opaqueApplication)
+                presentQueuedPaste(text, opaque: sent.target.opaqueApplication, bundleID: sent.target.bundleID, applicationName: sent.target.name)
+                awaitDeliveryOutcome(sent, id: id, opaque: sent.target.opaqueApplication)
             } catch {
                 guard !(error is CancellationError) else { return }
                 reinsertFallback(text, id: id, error: error)

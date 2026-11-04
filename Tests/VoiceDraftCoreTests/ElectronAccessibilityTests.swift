@@ -28,15 +28,6 @@ final class ElectronAccessibilityTests: XCTestCase {
         XCTAssertFalse(Policy.capturePending(enabled: false, writable: false))
     }
 
-    func testRetryOnlyForPendingAutomaticExternalInsertion() {
-        XCTAssertTrue(Policy.shouldRetryCapture(pending: true, writable: false, external: true, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: false, writable: false, external: true, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: true, external: true, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: false, external: false, autoPaste: true, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: false, external: true, autoPaste: false, ask: false))
-        XCTAssertFalse(Policy.shouldRetryCapture(pending: true, writable: false, external: true, autoPaste: true, ask: true))
-    }
-
     func testRefreshedTargetMustStayInSameProcessAndBeWritable() {
         XCTAssertTrue(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 10, refreshedWritable: true))
         XCTAssertFalse(Policy.acceptsRefreshed(originalPID: 10, refreshedPID: 11, refreshedWritable: true))

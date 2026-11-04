@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-11-04 · Ordinary dictation follows the focus current at delivery
+
+Insertion policy tests distinguish the current writable target from a selection captured for editing.
+
+The recorded run counted 385 tests, 5 skipped, and zero failures.
+
 ## 2026-11-03 · Clipboard restored on consumption after a paste
 
 Receipt and restoration tests cover clipboard consumption, timeouts and concurrent clipboard ownership.

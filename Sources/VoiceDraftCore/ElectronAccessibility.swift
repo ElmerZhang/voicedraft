@@ -31,13 +31,6 @@ public enum ElectronAccessibilityPolicy {
         enabled && !writable
     }
 
-    /// Repeat the capture before inserting only for a pending target that is
-    /// not a writable editor and whose result would be inserted automatically.
-    public static func shouldRetryCapture(pending: Bool, writable: Bool, external: Bool,
-                                          autoPaste: Bool, ask: Bool) -> Bool {
-        pending && !writable && external && autoPaste && !ask
-    }
-
     /// The retry window counts from the enable, so a capture long after the
     /// tree was built is repeated once instead of stalling delivery.
     public static func retryDeadline(enabledAt: TimeInterval?, now: TimeInterval) -> TimeInterval {

@@ -31,6 +31,7 @@ public struct LocalizedMessage: ExpressibleByStringLiteral, ExpressibleByStringI
     }
     public init(error: Error) {
         if let error = error as? VoiceDraftError, case .message(let message) = error { self = message }
+        else if let error = error as? InsertionFailure { self = error.reason.message }
         else { self.init(key: error.localizedDescription) }
     }
     public var isEmpty: Bool { key.isEmpty }

@@ -47,7 +47,7 @@ enum InputFocusProbe {
 
         let target = TextInsertion.classify(app, trace: { emit("classify.\($0)", $1) })
         emit("classify.returnedTarget", "\(target != nil)")
-        target?.focusGuard?.stop()
+        emit("classify.targetRole", target?.role ?? "nil")
         let environment = ProcessInfo.processInfo.environment
         if let samples = Int(environment[samplesKey] ?? ""), samples > 0 {
             sampleIdentity(app, samples: samples, interval: Double(environment[intervalKey] ?? "") ?? 1)
@@ -69,7 +69,6 @@ enum InputFocusProbe {
         for index in 0..<samples {
             var traced: [String: String] = [:]
             let sample = TextInsertion.classify(app, trace: { traced[$0] = $1 })
-            sample?.focusGuard?.stop()
             if first == nil { first = sample }
             let elapsed = ProcessInfo.processInfo.systemUptime - started
             let focusedRole = traced["capabilities.focused"]?.split(separator: " ").first.map(String.init) ?? "nil"
@@ -80,7 +79,7 @@ enum InputFocusProbe {
             let sameWindow = first.map { same($0.window, sample?.window) } ?? false
             emit("sample.\(index)", "t=\(String(format: "%.1f", elapsed)) returned=\(sample != nil) "
                 + "opaque=\(sample?.opaqueApplication.description ?? "nil") editable=\(sample?.editable.description ?? "nil") "
-                + "focused=\(focusedRole) editor=\(editorRole) element=\(element) sameElement=\(sameElement) "
+                + "role=\(sample?.role ?? "nil") focused=\(focusedRole) editor=\(editorRole) element=\(element) sameElement=\(sameElement) "
                 + "window=\(window) sameWindow=\(sameWindow) "
                 + "frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil")")
             Thread.sleep(forTimeInterval: interval)

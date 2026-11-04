@@ -78,7 +78,9 @@ struct KeyboardTakeView: View {
     private func delivered(_ text: String) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 48)).foregroundStyle(.green)
-            Text(verbatim: AppText.t("Sent to the keyboard. Go back to the previous app to insert it."))
+            Text(verbatim: AppModel.isAnswer(model.lastResult)
+                 ? AppText.t("Answer sent to the keyboard. Go back to the previous app to insert or copy it.")
+                 : AppText.t("Sent to the keyboard. Go back to the previous app to insert it."))
                 .font(.headline)
                 .multilineTextAlignment(.center)
             ScrollView {

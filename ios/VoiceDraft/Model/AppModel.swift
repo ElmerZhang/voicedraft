@@ -38,6 +38,8 @@ final class AppModel: ObservableObject {
         var isForegroundActive: @MainActor () -> Bool = { UIApplication.shared.applicationState == .active }
         var meterStore: RecordingMeterStore? = nil
         var appCheckStore: KeyboardAppCheckStore? = nil
+        /// The keyboard's options for its next take (`take-request.json`), read and deleted when it starts one.
+        var takeRequestStore: KeyboardTakeRequestStore? = nil
 
         static func live() -> Dependencies {
             let store = try? IOSLocalStore()
@@ -51,7 +53,8 @@ final class AppModel: ObservableObject {
                                 post: KeyboardBridge.post, observeKeyboard: true,
                                 pendingTakeStore: PendingTakeStore(),
                                 returnToHost: { VDHostNavigation.returnToHost($0, application: UIApplication.shared) },
-                                meterStore: RecordingMeterStore(), appCheckStore: KeyboardAppCheckStore())
+                                meterStore: RecordingMeterStore(), appCheckStore: KeyboardAppCheckStore(),
+                                takeRequestStore: KeyboardTakeRequestStore())
         }
     }
 
@@ -72,6 +75,13 @@ final class AppModel: ObservableObject {
     /// Streaming writing output while processing, then the final result.
     @Published private(set) var resultText = ""
     @Published private(set) var lastResult: SharedResult?
+    /// The mode of the take whose text `resultText` holds: set when a take starts, `.verbatim` after a writing
+    /// failure kept the transcript.
+    @Published private(set) var resultMode: WritingMode?
+    /// The spoken question of the last completed Ask anything take; empty once another take starts.
+    @Published private(set) var lastQuestion = ""
+    /// Optional reference text for in-app Ask anything takes. Kept in memory only: never saved or synced.
+    @Published var askReference = ""
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var level: Double = 0
     @Published var errorMessage: LocalizedMessage = ""
@@ -93,6 +103,24 @@ final class AppModel: ObservableObject {
     var keyboardSetup: KeyboardSetupStatus { KeyboardSetupStatus(presence: keyboardPresence) }
 
     var mode: WritingMode { device.mode }
+    /// The result card shows an Ask anything answer: the current take's text, or the last delivered result.
+    var showsAnswer: Bool {
+        // While an Ask take records or recognizes, the card shows the question, not an answer.
+        if takeState != .idle { return resultMode == .ask && !resultText.isEmpty }
+        if !resultText.isEmpty { return resultMode == .ask }
+        return Self.isAnswer(lastResult)
+    }
+    /// The question shown above the answer, or empty when there is none to show.
+    var shownQuestion: String {
+        guard showsAnswer else { return "" }
+        if takeState != .idle { return resultText.isEmpty ? "" : transcript }
+        if !resultText.isEmpty { return lastQuestion }
+        return lastResult?.id == lastQuestionID ? lastQuestion : ""
+    }
+
+    static func isAnswer(_ result: SharedResult?) -> Bool {
+        result.map { WritingMode(rawValue: $0.mode) == .ask } ?? false
+    }
     var busy: Bool { takeState != .idle }
     var standbyWindowHint: String {
         if IOSPictureInPictureKeepAlive.hidesWindowByDefault {
@@ -104,6 +132,7 @@ final class AppModel: ObservableObject {
     // MARK: Private state
     private var keyboardReturnTask: Task<Void, Never>?
     private var standbyActivation: UUID?
+    private var lastQuestionID: UUID?
 
     let dependencies: Dependencies
     private var machine = TakeMachine()
@@ -164,6 +193,7 @@ final class AppModel: ObservableObject {
         }
         lastResult = dependencies.resultStore.read()
         keyboardPresence = dependencies.presenceStore.read()
+        clearStaleTakeRequest()
         showingOnboarding = !device.onboardingCompleted
         if !device.serverURL.isEmpty, device.lastSyncedAt != nil {
             syncStatus = syncedStatus()
@@ -345,22 +375,30 @@ final class AppModel: ObservableObject {
 
     /// Starts recording. Returns false when the take could not start; the reason is in `errorMessage`.
     /// `id` names the take; a keyboard take opened through `voicedraft://record` passes the keyboard's id so the
-    /// `SharedResult` it produces carries the same id.
+    /// `SharedResult` it produces carries the same id. `mode` overrides `device.mode` for this take only (a keyboard
+    /// Ask anything request); `selection` is the Ask reference text, by default `askReference` for in-app takes.
     @discardableResult
-    func startTake(source: TakeSource = .app, id takeID: UUID = UUID()) -> Bool {
+    func startTake(source: TakeSource = .app, id takeID: UUID = UUID(), mode: WritingMode? = nil,
+                   selection: String? = nil) -> Bool {
         guard machine.state == .idle else { return false }
         errorMessage = ""
         notice = ""
         transcript = ""
         resultText = ""
+        lastQuestion = ""
+        lastQuestionID = nil
+        let takeMode = mode ?? device.mode
+        resultMode = takeMode
         let configuration: TakeConfiguration
         do {
-            configuration = try TakeConfiguration.make(settings: settings, mode: device.mode,
+            configuration = try TakeConfiguration.make(settings: settings, mode: takeMode,
                                                        credentials: dependencies.credentials,
-                                                       application: source == .keyboard ? "" : "VoiceDraft", id: takeID)
+                                                       application: source == .keyboard ? "" : "VoiceDraft",
+                                                       selection: selection ?? (source == .app ? askReference : ""),
+                                                       id: takeID)
         } catch {
             errorMessage = .init(error: error)
-            if source == .keyboard { deliverToKeyboard("", mode: device.mode, id: takeID) }
+            if source == .keyboard { deliverToKeyboard("", mode: takeMode, id: takeID) }
             return false
         }
         machine.handle(.start)
@@ -455,6 +493,7 @@ final class AppModel: ObservableObject {
                 try Task.checkCancellation()
                 guard isCurrent(id) else { return }
                 resultText = raw
+                resultMode = .verbatim
                 appendHistory(mode: .verbatim, original: raw, output: raw, duration: duration,
                               configuration: configuration, source: takeSource ?? .app)
                 throw VoiceDraftError.message("Writing failed. Your transcript is preserved. \(error.localizedDescription)")
@@ -473,6 +512,10 @@ final class AppModel: ObservableObject {
         appendHistory(mode: configuration.mode, original: raw, output: output, duration: duration,
                       configuration: configuration, source: source)
         deliverToKeyboard(output, mode: configuration.mode, id: configuration.id)
+        if configuration.mode == .ask {
+            lastQuestion = raw
+            lastQuestionID = configuration.id
+        }
         finishTake(id: configuration.id, event: .complete)
     }
 
@@ -575,8 +618,36 @@ final class AppModel: ObservableObject {
     }
 
     func keyboardRequestedStart() {
+        let request = consumeTakeRequest(for: nil)
         guard listening, takeState == .idle else { return }
-        if startTake(source: .keyboard) { extendStandbyForKeyboardTake() }
+        if startTake(source: .keyboard, id: request?.id ?? UUID(), mode: request.flatMap(Self.requestedMode),
+                     selection: request?.reference ?? "") {
+            extendStandbyForKeyboardTake()
+        }
+    }
+
+    /// Reads and deletes `take-request.json`. Returns the request only when it is fresh and, for a record link,
+    /// names `takeID`. The reference text is never logged.
+    private func consumeTakeRequest(for takeID: UUID?) -> KeyboardTakeRequest? {
+        guard let store = dependencies.takeRequestStore else { return nil }
+        let request = store.read()
+        store.clear()
+        guard let request, request.isValid(for: takeID) else { return nil }
+        return request
+    }
+
+    /// Deletes a take request left by a start that never reached the app (for example it was not running). A fresh
+    /// one is kept: on a cold launch through `voicedraft://record` the link is handled after `load()`.
+    private func clearStaleTakeRequest() {
+        guard let store = dependencies.takeRequestStore else { return }
+        if let request = store.read(), request.isValid(for: nil) { return }
+        store.clear()
+    }
+
+    /// The take mode a keyboard request asks for, when this iPhone offers it.
+    private static func requestedMode(_ request: KeyboardTakeRequest) -> WritingMode? {
+        guard let mode = WritingMode(rawValue: request.mode), IOSDeviceSettings.modes.contains(mode) else { return nil }
+        return mode
     }
 
     /// Handles `voicedraft://record?take=<id>&source=keyboard`. Returns false for other URLs.
@@ -585,11 +656,13 @@ final class AppModel: ObservableObject {
     @discardableResult
     func receiveRecordLink(_ url: URL) -> Bool {
         guard let id = KeyboardRecordLink.takeID(from: url) else { return false }
+        let request = consumeTakeRequest(for: id)
         // Onboarding would cover the recording view; skip it for this session only.
         showingOnboarding = false
         keyboardTakeID = id
         guard takeState == .idle else { return true }
-        if startTake(source: .keyboard, id: id) {
+        if startTake(source: .keyboard, id: id, mode: request.flatMap(Self.requestedMode),
+                     selection: request?.reference ?? "") {
             extendStandbyForKeyboardTake()
             if let request = dependencies.pendingTakeStore?.read(), request.permitsAutomaticReturn(for: id) {
                 scheduleKeyboardReturn(request)
@@ -849,6 +922,7 @@ final class AppModel: ObservableObject {
     func sceneBecameActive() {
         lastResult = dependencies.resultStore.read() ?? lastResult
         keyboardPresence = dependencies.presenceStore.read()
+        clearStaleTakeRequest()
         publishStatus()
     }
 

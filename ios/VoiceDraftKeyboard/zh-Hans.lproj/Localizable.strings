@@ -34,3 +34,13 @@
 "keyboard.voice.finish" = "结束";
 "keyboard.voice.tap" = "点击说话";
 "keyboard.voice.holdHint" = "也可长按说话，松开结束";
+"keyboard.ask.toggle" = "随心问";
+"keyboard.ask.title" = "问答";
+"keyboard.voice.holdToAsk" = "按住提问";
+"keyboard.voice.tapToAskOpensApp" = "点击提问（会打开 VoiceDraft）";
+"keyboard.voice.referenceHint" = "选中的文本将作为参考发送";
+"keyboard.answer.title" = "回答";
+"keyboard.answer.insert" = "插入";
+"keyboard.answer.copy" = "复制";
+"keyboard.answer.copied" = "已复制";
+"keyboard.answer.close" = "关闭";

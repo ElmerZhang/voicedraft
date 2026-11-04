@@ -1,10 +1,38 @@
 import SwiftUI
 import VoiceDraftCore
 
-/// Local history, newest first. Tap copies the result; swipe deletes. Never synced.
+/// The History filter, in Core `HistoryListing` order: everything, everything except Ask anything, Ask anything only.
+enum HistoryFilter: Int, CaseIterable, Identifiable {
+    case all = 0, dictations = 1, ask = 2
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return AppText.t("All")
+        case .dictations: return AppText.t("Dictations")
+        case .ask: return AppText.t("Ask anything")
+        }
+    }
+
+    /// Day sections, newest first, through the same listing the Mac History page uses.
+    func groups(_ history: [HistoryEntry], calendar: Calendar = .current) -> [HistoryDayGroup] {
+        HistoryListing.groups(history, query: "", filter: rawValue, calendar: calendar)
+    }
+
+    static func dayTitle(_ day: Date, calendar: Calendar = .current) -> String {
+        if calendar.isDateInToday(day) { return AppText.t("Today") }
+        if calendar.isDateInYesterday(day) { return AppText.t("Yesterday") }
+        return day.formatted(Date.FormatStyle(date: .long, time: .omitted).locale(L10n.locale))
+    }
+}
+
+/// Local history, newest first, in day sections with an All / Dictations / Ask anything filter. Tap copies the
+/// result; swipe deletes. Never synced.
 struct HistoryView: View {
     @EnvironmentObject private var model: AppModel
     @State private var confirmingClear = false
+    @State private var filter: HistoryFilter = .all
 
     var body: some View {
         NavigationStack {
@@ -18,15 +46,33 @@ struct HistoryView: View {
                              : AppText.t("History is turned off in Settings."))
                     }
                 } else {
+                    let groups = filter.groups(model.history)
                     List {
-                        MessageBanner().listRowSeparator(.hidden)
-                        ForEach(model.history) { entry in
-                            Button { model.copy(entry.result) } label: { HistoryRow(entry: entry) }
-                                .buttonStyle(.plain)
-                                .accessibilityHint(AppText.t("Copies the result"))
+                        Picker(AppText.t("Show"), selection: $filter) {
+                            ForEach(HistoryFilter.allCases) { Text(verbatim: $0.title).tag($0) }
                         }
-                        .onDelete { offsets in
-                            for id in offsets.map({ model.history[$0].id }) { model.deleteHistory(id) }
+                        .pickerStyle(.segmented)
+                        .listRowSeparator(.hidden)
+                        MessageBanner().listRowSeparator(.hidden)
+                        if groups.isEmpty {
+                            Text(verbatim: AppText.t("No matching entries"))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .listRowSeparator(.hidden)
+                        }
+                        ForEach(groups) { group in
+                            Section {
+                                ForEach(group.entries) { entry in
+                                    Button { model.copy(entry.result) } label: { HistoryRow(entry: entry) }
+                                        .buttonStyle(.plain)
+                                        .accessibilityHint(AppText.t("Copies the result"))
+                                }
+                                .onDelete { offsets in
+                                    for id in offsets.map({ group.entries[$0].id }) { model.deleteHistory(id) }
+                                }
+                            } header: {
+                                Text(verbatim: HistoryFilter.dayTitle(group.day))
+                            }
                         }
                     }
                     .listStyle(.plain)

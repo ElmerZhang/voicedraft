@@ -12,6 +12,10 @@ import UIKit
 ///   (`NSExtensionContext.open`, then the responder chain's `UIApplication`).
 ///   The app records; when the keyboard reappears it shows "recording in VoiceDraft" with Finish, which posts
 ///   `take.stop`, and it inserts the `SharedResult` whose id matches the marker.
+///
+/// Ask anything: with the Ask toggle on, both paths first write `take-request.json` (mode `ask` and the host's
+/// selected text as reference). Answers (`SharedResult.mode == "ask"`) open the answer panel instead of being
+/// inserted; the user chooses Insert, Copy or Close. "Insert last result" still inserts whatever came last.
 final class KeyboardViewController: UIInputViewController {
     private enum VoiceState: Equatable {
         case idle
@@ -39,6 +43,7 @@ final class KeyboardViewController: UIInputViewController {
     private let presenceStore = KeyboardPresenceStore()
     private let pendingStore = PendingTakeStore()
     private let openAttemptStore = KeyboardOpenAttemptStore()
+    private let takeRequestStore = KeyboardTakeRequestStore()
     private lazy var appOpener = ContainingAppOpener(controller: self)
 
     private let voicePage = VoicePageView()
@@ -61,6 +66,9 @@ final class KeyboardViewController: UIInputViewController {
     private var activationID: UUID?
     private var lastAppCheckAt = Date.distantPast
     private var mustOpenApp = false
+    /// The Ask toggle. Lives as long as this controller; answers are recognised by their mode, not by the toggle.
+    private var askMode = false
+    private var copiedTimer: Timer?
 
     // MARK: Lifecycle
 
@@ -74,7 +82,10 @@ final class KeyboardViewController: UIInputViewController {
         hasDictationKey = true
     }
 
-    deinit { meterTimer?.invalidate() }
+    deinit {
+        meterTimer?.invalidate()
+        copiedTimer?.invalidate()
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -158,6 +169,12 @@ final class KeyboardViewController: UIInputViewController {
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         voicePage.returnKeyTitle = Self.returnTitle(for: textDocumentProxy.returnKeyType)
+        if askMode { renderVoice() }
+    }
+
+    override func selectionDidChange(_ textInput: UITextInput?) {
+        super.selectionDidChange(textInput)
+        if askMode { renderVoice() }
     }
 
     // MARK: Voice page
@@ -169,6 +186,10 @@ final class KeyboardViewController: UIInputViewController {
         voicePage.onSpace = { [weak self] in self?.insert(" ") }
         voicePage.onDelete = { [weak self] in self?.textDocumentProxy.deleteBackward() }
         voicePage.onReturn = { [weak self] in self?.insert("\n") }
+        voicePage.onAskToggle = { [weak self] in self?.toggleAsk() }
+        voicePage.onAnswerInsert = { [weak self] in self?.insertAnswer() }
+        voicePage.onAnswerCopy = { [weak self] in self?.copyAnswer() }
+        voicePage.onAnswerClose = { [weak self] in self?.closeAnswer() }
         voicePage.nextKeyboardButton.addTarget(
             self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents
         )
@@ -184,8 +205,66 @@ final class KeyboardViewController: UIInputViewController {
         voicePage.insertButton.isEnabled = !(result?.text.isEmpty ?? true)
     }
 
+    // MARK: Ask anything
+
+    private func toggleAsk() {
+        guard hasFullAccess else { showStatus(L10n.needsFullAccess, autoHide: true); return }
+        askMode.toggle()
+        voicePage.askEnabled = askMode
+        renderVoice()
+    }
+
+    /// The host's selection, read only to show the reference hint and when an Ask take starts. Never stored.
+    private var selectedReference: String {
+        KeyboardTakeRequest.clipped(textDocumentProxy.selectedText ?? "")
+    }
+
+    /// Writes `take-request.json` for an Ask take about to start, or deletes an earlier request in any other mode.
+    private func writeTakeRequest(id: UUID) {
+        guard askMode else { takeRequestStore.clear(); return }
+        try? takeRequestStore.write(KeyboardTakeRequest(id: id, mode: "ask", reference: selectedReference))
+    }
+
+    /// Hands a finished result to the user: an answer opens the answer panel, anything else is inserted.
+    private func deliver(_ result: SharedResult) {
+        if result.isAnswer {
+            presentAnswer(result.text)
+        } else if !result.text.isEmpty {
+            insert(result.text)
+        }
+    }
+
+    private func presentAnswer(_ text: String) {
+        copiedTimer?.invalidate()
+        voicePage.showAnswer(text)
+    }
+
+    private func insertAnswer() {
+        guard let text = voicePage.answerText else { return }
+        insert(text)
+        closeAnswer()
+    }
+
+    private func copyAnswer() {
+        guard let text = voicePage.answerText else { return }
+        UIPasteboard.general.string = text
+        voicePage.showCopied(true)
+        copiedTimer?.invalidate()
+        copiedTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+            self?.voicePage.showCopied(false)
+        }
+    }
+
+    private func closeAnswer() {
+        copiedTimer?.invalidate()
+        copiedTimer = nil
+        voicePage.showAnswer(nil)
+        renderVoice()
+    }
+
     /// Redraws the talk button and the status line from the take state.
     private func renderVoice() {
+        voicePage.referenceSelected = askMode && hasFullAccess && !selectedReference.isEmpty
         switch voiceState {
         case .idle: voicePage.setTalk(hasFullAccess && (mustOpenApp || !statusStore.isAppAvailable()) ? .idleOpensApp : .idle)
         case .connecting: voicePage.setTalk(.connecting)
@@ -230,13 +309,13 @@ final class KeyboardViewController: UIInputViewController {
         case .idle:
             guard hasFullAccess else { return L10n.needsFullAccess }
             let status = statusStore.read()
-            if !mustOpenApp, status?.isAvailable() == true { return L10n.tapToTalk }
+            if !mustOpenApp, status?.isAvailable() == true { return askMode ? L10n.holdToAsk : L10n.tapToTalk }
             // Standby ended on its own (for example iOS refused to record in the background); the next tap opens the app.
             if let status, let error = status.lastError, !error.isEmpty,
                Date().timeIntervalSince(status.updatedAt) < Self.lastErrorDisplayWindow {
                 return error
             }
-            return L10n.tapToTalk
+            return askMode ? L10n.tapToAskOpensApp : L10n.tapToTalk
         }
     }
 
@@ -343,6 +422,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         baselineResultID = resultStore.read()?.id
         takeStartedAt = Date()
+        writeTakeRequest(id: UUID())
         KeyboardBridge.post(KeyboardBridge.takeStart)
         transition(to: .recording)
         showStatus(nil, autoHide: false)
@@ -372,6 +452,7 @@ final class KeyboardViewController: UIInputViewController {
             finishTake(message: L10n.openRefused)
             return
         }
+        writeTakeRequest(id: take.id)
         // Set the marker locally before opening: viewWillDisappear can run before the open completion.
         pendingTake = take
         transition(to: .connecting)
@@ -391,6 +472,7 @@ final class KeyboardViewController: UIInputViewController {
                 self.startPolling()
             } else {
                 if self.pendingStore.read()?.id == take.id { self.pendingStore.clear() }
+                self.takeRequestStore.clear()
                 self.finishTake(message: L10n.openFailed(KeyboardOpenSequence.summary(outcome.attempts)))
             }
         }
@@ -426,6 +508,12 @@ final class KeyboardViewController: UIInputViewController {
             pendingTake = nil
             if !result.text.isEmpty { insert(result.text) }
             if voiceState != .idle { finishTake(message: nil) }
+            refreshInsertButton()
+        case .present(let result):
+            pendingStore.clear()
+            pendingTake = nil
+            if voiceState != .idle { finishTake(message: nil) }
+            presentAnswer(result.text)
             refreshInsertButton()
         case .resume(let take):
             activationID = UUID()
@@ -486,7 +574,8 @@ final class KeyboardViewController: UIInputViewController {
         checkAppStillAvailable()
     }
 
-    /// Inserts the latest result if it was produced for the current take. Returns true when it did.
+    /// Delivers the latest result (inserts it, or shows an answer) if it was produced for the current take. Returns
+    /// true when it did.
     @discardableResult
     private func checkForResult() -> Bool {
         guard voiceState != .idle, let result = resultStore.read() else { return false }
@@ -499,10 +588,8 @@ final class KeyboardViewController: UIInputViewController {
             let startSecond = Date(timeIntervalSince1970: startedAt.timeIntervalSince1970.rounded(.down))
             guard result.id != baselineResultID, result.createdAt >= startSecond else { return false }
         }
-        if !result.text.isEmpty {
-            insert(result.text)
-        }
         finishTake(message: nil)
+        deliver(result)
         refreshInsertButton()
         return true
     }
@@ -535,6 +622,9 @@ final class KeyboardViewController: UIInputViewController {
         appCheck.cancel()
         activationID = nil
         if let pendingTake, pendingStore.read()?.id == pendingTake.id { pendingStore.clear() }
+        // The app reads the request within moments of the start; one left now was never handled, so the
+        // selection must not linger in the app group.
+        takeRequestStore.clear()
         pollTimer?.invalidate()
         pollTimer = nil
         takeStartedAt = nil
@@ -605,4 +695,14 @@ enum L10n {
     static var returnSend: String { string("keyboard.key.send", "Return key title for Send") }
     static var returnDone: String { string("keyboard.key.done", "Return key title for Done") }
     static var returnNext: String { string("keyboard.key.next", "Return key title for Next") }
+    static var askAnything: String { string("keyboard.ask.toggle", "Accessibility label of the Ask anything toggle") }
+    static var askShort: String { string("keyboard.ask.title", "Title of the Ask anything toggle in the header") }
+    static var holdToAsk: String { string("keyboard.voice.holdToAsk", "Talk surface text while Ask anything is on and VoiceDraft is on standby") }
+    static var tapToAskOpensApp: String { string("keyboard.voice.tapToAskOpensApp", "Talk surface text while Ask anything is on and a tap opens VoiceDraft") }
+    static var referenceHint: String { string("keyboard.voice.referenceHint", "Detail line while Ask anything is on and text is selected") }
+    static var answerTitle: String { string("keyboard.answer.title", "Header title while the answer panel is shown") }
+    static var answerInsert: String { string("keyboard.answer.insert", "Answer panel button that inserts the answer") }
+    static var answerCopy: String { string("keyboard.answer.copy", "Answer panel button that copies the answer") }
+    static var answerCopied: String { string("keyboard.answer.copied", "Answer panel Copy button title right after copying") }
+    static var answerClose: String { string("keyboard.answer.close", "Answer panel button that returns to the talk surface") }
 }

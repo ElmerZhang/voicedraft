@@ -40,7 +40,7 @@ long press records until release. The design lives in [`docs/ios.md`](../docs/io
 
 | File | Role |
 | --- | --- |
-| `Shared/AppGroup.swift` | `SharedResult` (`id`, `text`, `mode`, `createdAt`) in `latest-result.json`. Files without `id` or `mode` still decode. `KeyboardPresence` (`seenAt`, `fullAccess`, `version`) in `keyboard-presence.json`. `PendingTake` and `PendingTakeStore` (`pending-take.json`), the pure `KeyboardResumeDecision`, and `KeyboardRecordLink` (`voicedraft://record?take=<id>&source=keyboard`). |
+| `Shared/AppGroup.swift` | `SharedResult` (`id`, `text`, `mode`, `createdAt`) in `latest-result.json`. Files without `id` or `mode` still decode. `KeyboardPresence` (`seenAt`, `fullAccess`, `version`) in `keyboard-presence.json`. `PendingTake` and `PendingTakeStore` (`pending-take.json`), the pure `KeyboardResumeDecision` (insert, or present an Ask answer), `KeyboardTakeRequest` and its store (`take-request.json`, the keyboard's Ask anything request), and `KeyboardRecordLink` (`voicedraft://record?take=<id>&source=keyboard`). |
 | `Shared/KeyboardBridge.swift` | Darwin notification names (`com.voicedraft.ios.take.start`, `.take.stop`, `.result.updated`, `.status.updated`), post and observe helpers, and `AppStatusStore` for `app-status.json`. |
 | `Shared/KeyboardOpenAttempt.swift` | `KeyboardOpenStrategy`, the pure `KeyboardOpenSequence` (first success wins; upper-case scheme retry only after a lower-case failure; the status-line summary) and `KeyboardOpenAttemptStore` (`open-attempts.json`, last 20). |
 | `VoiceDraftKeyboard/ContainingAppOpener.swift` | Opens the containing app: `NSExtensionContext.open`, then the responder chain's `UIApplication`, then `UIApplication` by class name. |

@@ -128,3 +128,16 @@
 "Recording" = "正在录音";
 "Starting standby briefly prepares the microphone. Standby hides automatically without a floating window or edge arrow. Turn off standby here to end it." = "开启待机时会短暂初始化麦克风。待机会自动隐藏，不显示悬浮窗或边缘箭头。需要结束时，在这里关闭待机即可。";
 "Hidden standby is unavailable on this iOS version." = "当前 iOS 版本无法启用隐藏待机。";
+"Ask anything" = "随心问";
+"Speak a question. Make room for an idea." = "说出问题，让想法展开。";
+"Reference text (optional)" = "参考文本（可选）";
+"Sent to the writing model only as reference for your question. It is never saved or synced." = "仅作为问题的参考发送给写作模型，不会保存或同步。";
+"Answer" = "回答";
+"Question: {0}" = "问题：{0}";
+"Answer sent to the keyboard. Go back to the previous app to insert or copy it." = "回答已发送到键盘。返回之前的 App 即可插入或复制。";
+"Show" = "显示";
+"All" = "全部";
+"Dictations" = "听写记录";
+"Today" = "今天";
+"Yesterday" = "昨天";
+"No matching entries" = "没有匹配的记录";

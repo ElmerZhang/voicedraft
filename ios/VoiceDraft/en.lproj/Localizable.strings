@@ -128,3 +128,16 @@
 "Recording" = "Recording";
 "Starting standby briefly prepares the microphone. Standby hides automatically without a floating window or edge arrow. Turn off standby here to end it." = "Starting standby briefly prepares the microphone. Standby hides automatically without a floating window or edge arrow. Turn off standby here to end it.";
 "Hidden standby is unavailable on this iOS version." = "Hidden standby is unavailable on this iOS version.";
+"Ask anything" = "Ask anything";
+"Speak a question. Make room for an idea." = "Speak a question. Make room for an idea.";
+"Reference text (optional)" = "Reference text (optional)";
+"Sent to the writing model only as reference for your question. It is never saved or synced." = "Sent to the writing model only as reference for your question. It is never saved or synced.";
+"Answer" = "Answer";
+"Question: {0}" = "Question: {0}";
+"Answer sent to the keyboard. Go back to the previous app to insert or copy it." = "Answer sent to the keyboard. Go back to the previous app to insert or copy it.";
+"Show" = "Show";
+"All" = "All";
+"Dictations" = "Dictations";
+"Today" = "Today";
+"Yesterday" = "Yesterday";
+"No matching entries" = "No matching entries";

@@ -314,6 +314,11 @@ final class VoicePageView: UIView {
             configuration.showsActivityIndicator = true
             talkButton.accessibilityLabel = L10n.processing
         }
+        if askEnabled, appearance == .idle || appearance == .idleOpensApp {
+            // The bubbles glyph is about half again as wide as the microphone; a smaller size keeps it inside the
+            // icon column instead of running under the status text.
+            configuration.preferredSymbolConfigurationForImage = .init(pointSize: 24, weight: .medium)
+        }
         talkButton.configuration = configuration
         updateTalkAvailability()
     }

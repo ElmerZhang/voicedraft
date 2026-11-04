@@ -66,8 +66,12 @@ final class KeyboardViewController: UIInputViewController {
     private var activationID: UUID?
     private var lastAppCheckAt = Date.distantPast
     private var mustOpenApp = false
-    /// The Ask toggle. Lives as long as this controller; answers are recognised by their mode, not by the toggle.
+    /// The Ask toggle. It persists in the app-group defaults so it survives iOS recreating the keyboard after a take
+    /// opened the app; answers are still recognised by their mode, not by the toggle. The suite is readable only with
+    /// Full Access, which the toggle needs anyway.
     private var askMode = false
+    private static let askModeKey = "keyboard.askMode"
+    private let preferences = UserDefaults(suiteName: AppGroup.identifier)
     private var copiedTimer: Timer?
 
     // MARK: Lifecycle
@@ -122,6 +126,8 @@ final class KeyboardViewController: UIInputViewController {
         #endif
         voicePage.voiceEnabled = hasFullAccess
         if hasFullAccess {
+            askMode = preferences?.bool(forKey: Self.askModeKey) ?? false
+            voicePage.askEnabled = askMode
             // Lets the app show "Keyboard enabled" instead of the setup guide.
             let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
             try? presenceStore.write(KeyboardPresence(seenAt: Date(), fullAccess: true, version: version))
@@ -210,6 +216,7 @@ final class KeyboardViewController: UIInputViewController {
     private func toggleAsk() {
         guard hasFullAccess else { showStatus(L10n.needsFullAccess, autoHide: true); return }
         askMode.toggle()
+        preferences?.set(askMode, forKey: Self.askModeKey)
         voicePage.askEnabled = askMode
         renderVoice()
     }

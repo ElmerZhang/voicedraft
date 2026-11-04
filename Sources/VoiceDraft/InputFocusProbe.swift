@@ -48,9 +48,51 @@ enum InputFocusProbe {
         let target = TextInsertion.classify(app, trace: { emit("classify.\($0)", $1) })
         emit("classify.returnedTarget", "\(target != nil)")
         target?.focusGuard?.stop()
+        let environment = ProcessInfo.processInfo.environment
+        if let samples = Int(environment[samplesKey] ?? ""), samples > 0 {
+            sampleIdentity(app, samples: samples, interval: Double(environment[intervalKey] ?? "") ?? 1)
+        }
         TextInsertion.resetElectronAccessibility()
         emit("result", "done")
         return 0
+    }
+
+    static let samplesKey = "VOICEDRAFT_PROBE_INPUT_SAMPLES"
+    static let intervalKey = "VOICEDRAFT_PROBE_INPUT_INTERVAL"
+
+    /// Classifies the app repeatedly and reports whether the resolved element and
+    /// window keep the same AX identity (`CFEqual`, as the pre-send check uses) and
+    /// the same classification over time. Hashes identify elements, never text.
+    private static func sampleIdentity(_ app: NSRunningApplication, samples: Int, interval: TimeInterval) {
+        var first: InputTarget?
+        let started = ProcessInfo.processInfo.systemUptime
+        for index in 0..<samples {
+            var traced: [String: String] = [:]
+            let sample = TextInsertion.classify(app, trace: { traced[$0] = $1 })
+            sample?.focusGuard?.stop()
+            if first == nil { first = sample }
+            let elapsed = ProcessInfo.processInfo.systemUptime - started
+            let focusedRole = traced["capabilities.focused"]?.split(separator: " ").first.map(String.init) ?? "nil"
+            let editorRole = traced["capabilities.editor"]?.split(separator: " ").first.map(String.init) ?? "nil"
+            let element = sample?.element.map { String(CFHash($0)) } ?? "nil"
+            let window = sample?.window.map { String(CFHash($0)) } ?? "nil"
+            let sameElement = first.map { same($0.element, sample?.element) } ?? false
+            let sameWindow = first.map { same($0.window, sample?.window) } ?? false
+            emit("sample.\(index)", "t=\(String(format: "%.1f", elapsed)) returned=\(sample != nil) "
+                + "opaque=\(sample?.opaqueApplication.description ?? "nil") editable=\(sample?.editable.description ?? "nil") "
+                + "focused=\(focusedRole) editor=\(editorRole) element=\(element) sameElement=\(sameElement) "
+                + "window=\(window) sameWindow=\(sameWindow) "
+                + "frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil")")
+            Thread.sleep(forTimeInterval: interval)
+        }
+    }
+
+    private static func same(_ a: AXUIElement?, _ b: AXUIElement?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case let (a?, b?): return CFEqual(a, b)
+        default: return false
+        }
     }
 
     private static func dump(_ node: AXUIElement, prefix: String) {

@@ -54,4 +54,66 @@ final class DictationPrepassTests: XCTestCase {
             XCTAssertEqual(try transcript(mode), exampleTake)
         }
     }
+
+    func testRanhouAfterALinkedClauseIsDropped() {
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("如果拉上这道帘子的话，然后角落就看不清了。"),
+                       "如果拉上这道帘子的话，角落就看不清了。")
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("等测试跑完然后我们再看。"), "等测试跑完我们再看。")
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("登录之后、然后跳到首页。"), "登录之后、跳到首页。")
+    }
+
+    func testRanhouBeforeATimeWordIsDropped() {
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("盖好时水滴就滑落，然后清洗结束后把杯子收起来。"),
+                       "盖好时水滴就滑落，清洗结束后把杯子收起来。")
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("先发测试版，然后三天后上线。"), "先发测试版，三天后上线。")
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("先合并，然后我们发布以后再看。"), "先合并，我们发布以后再看。")
+    }
+
+    func testSentenceInitialRanhouBeforeATimeWordIsDropped() {
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("然后上线后记得通知我。"), "上线后记得通知我。")
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou("先备份。然后迁移完成的时候告诉我。\n然后两天后复查。"),
+                       "先备份。迁移完成的时候告诉我。\n两天后复查。")
+    }
+
+    func testOtherRanhouStay() {
+        for text in [
+            "先备份数据库的话，然后再执行迁移。",
+            "先备份数据库，然后再执行迁移以后看看。",
+            "他原话是“然后上线后再说”，请保留。",
+            "他原话是\"的话，然后看看\"，请保留。",
+            "这是一条小路，然后另外一条通向河边。",
+            "打开设置。然后点登录。然后输入密码。",
+            "然后后台就挂了。",
+            "然后它的花盆也是蓝色的，明天再挑。",
+            "结束的话，然後識別結束後再說。",
+            "这个接口我们就不动了，看看前端那边。",
+            "",
+            "然"
+        ] {
+            XCTAssertEqual(DictationPrepass.dropRedundantRanhou(text), text, text)
+        }
+    }
+
+    func testRanhouDropIsIdempotent() {
+        let text = "我如果拉上这道帘子的话，然后角落就看不清了，然后清洗结束后再说。"
+        let once = DictationPrepass.dropRedundantRanhou(text)
+        XCTAssertEqual(once, "我如果拉上这道帘子的话，角落就看不清了，清洗结束后再说。")
+        XCTAssertEqual(DictationPrepass.dropRedundantRanhou(once), once)
+    }
+
+    func testCleanupModesSendRanhouPrepassedTranscriptAndVerbatimSendsRaw() throws {
+        let raw = "水滴就滑落，然后清洗结束后把杯子收起来。"
+        func transcript(_ mode: WritingMode) throws -> String? {
+            let request = try QwenRequests.writing(profile: .qwen(.writing), key: "k", text: raw, mode: mode,
+                                                   settings: SharedSettings(), selection: "sel")
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+            let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+            let user = try XCTUnwrap(messages.first { $0["role"] as? String == "user" }?["content"] as? String)
+            let object = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(user.utf8)) as? [String: Any])
+            return object["transcript"] as? String
+        }
+        XCTAssertEqual(try transcript(.polish), "水滴就滑落，清洗结束后把杯子收起来。")
+        XCTAssertEqual(try transcript(.translate), "水滴就滑落，清洗结束后把杯子收起来。")
+        XCTAssertEqual(try transcript(.verbatim), raw)
+    }
 }

@@ -14,8 +14,7 @@
    "note": "A conditional interrupts a repeated clause. Preserve the condition and the speaker.",
    "transcript": "礼堂的挂钟我挂歪了。它原本挂在，如果门楣够高的话，它原本挂在门楣上。然后另外一只放在窗边。",
    "accepted": [
-    "礼堂的挂钟我挂歪了。如果门楣够高的话，它原本挂在门楣上。另外一只放在窗边。",
-    "礼堂的挂钟我挂歪了。如果门楣够高的话，它原本挂在门楣上。然后另外一只放在窗边。"
+    "礼堂的挂钟我挂歪了。如果门楣够高的话，它原本挂在门楣上。另外一只放在窗边。"
    ]
   },
   {
@@ -54,19 +53,18 @@
    ]
   },
   {
-   "id": "keep-affirmation-repeat",
-   "note": "emphatic whole-word repeat must stay",
+   "id": "collapse-affirmation-repeat",
+   "note": "repeated reply word is written once (2026-11-09 rule change)",
    "transcript": "对、对、对，就是这样。",
    "accepted": [
-    "对、对、对，就是这样。",
-    "对，对，对，就是这样。"
+    "对，就是这样。"
    ]
   },
   {
-   "id": "keep-affirmation-repeat-2",
+   "id": "collapse-affirmation-repeat-2",
    "transcript": "好，好，我知道了。",
    "accepted": [
-    "好，好，我知道了。"
+    "好，我知道了。"
    ]
   },
   {
@@ -78,11 +76,10 @@
    ]
   },
   {
-   "id": "ambiguous-ranhou",
-   "note": "either reading is acceptable",
+   "id": "drop-topic-ranhou",
+   "note": "bridge 然后 goes by default since 2026-11-09",
    "transcript": "这个接口我们就不动了，然后看看前端那边。",
    "accepted": [
-    "这个接口我们就不动了，然后看看前端那边。",
     "这个接口我们就不动了，看看前端那边。"
    ]
   },
@@ -196,7 +193,8 @@
    "note": "A restatement discards a correction embedded in an abandoned instruction.",
    "transcript": "请标出花圃，Tulip 不是，是 Lily，直接写，或者说 Label Label 就填 Spring。\n然后和图册 A 关联。",
    "accepted": [
-    "请标出花圃，Label 就填 Spring。\n然后和图册 A 关联。"
+    "请标出花圃，Label 就填 Spring。\n然后和图册 A 关联。",
+    "请标出花圃，Label 就填 Spring。\n和图册 A 关联。"
    ]
   },
   {
@@ -221,6 +219,63 @@
    "transcript": "这个方案可以。\n应该说是目前最稳的一个方案。",
    "accepted": [
     "这个方案可以。\n应该说是目前最稳的一个方案。"
+   ]
+  },
+  {
+   "id": "parallel-observations",
+   "note": "Drop bridges between observations while retaining the condition.",
+   "transcript": "展厅里左边是海报，然后右边是地图，然后桌上是画册。然后灯亮时能看见标题，然后关灯的话，然后角落只剩下轮廓。",
+   "accepted": [
+    "展厅里左边是海报，右边是地图，桌上是画册。灯亮时能看见标题，关灯的话，角落只剩下轮廓。"
+   ]
+  },
+  {
+   "id": "drop-conditional-ranhou",
+   "transcript": "要是关掉同步的话，然后列表就刷新不出来了。",
+   "accepted": [
+    "要是关掉同步的话，列表就刷新不出来了。"
+   ]
+  },
+  {
+   "id": "drop-particles",
+   "transcript": "嗯，这个功能啊，我觉得可以先不做嘛，等下个版本吧。",
+   "accepted": [
+    "这个功能我觉得可以先不做，等下个版本吧。"
+   ]
+  },
+  {
+   "id": "drop-interjection",
+   "transcript": "哎呀，忘了提交了，我再推一次。",
+   "accepted": [
+    "忘了提交了，我再推一次。"
+   ]
+  },
+  {
+   "id": "drop-jiushi-filler",
+   "transcript": "就是我们这边，就是接口一直超时。",
+   "accepted": [
+    "我们这边接口一直超时。"
+   ]
+  },
+  {
+   "id": "keep-jiushi-meaning",
+   "transcript": "问题就是出在缓存上，不是网络。",
+   "accepted": [
+    "问题就是出在缓存上，不是网络。"
+   ]
+  },
+  {
+   "id": "keep-hedge-particles",
+   "transcript": "这个大概要三天吧，我不太确定，你那边好了吗？",
+   "accepted": [
+    "这个大概要三天吧，我不太确定，你那边好了吗？"
+   ]
+  },
+  {
+   "id": "english-fillers",
+   "transcript": "Um, so the build, like, failed again, you know, on CI.",
+   "accepted": [
+    "The build failed again on CI."
    ]
   }
  ]

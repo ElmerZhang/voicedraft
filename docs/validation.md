@@ -1,5 +1,11 @@
 # Validation record
 
+## 2026-11-09 · Polish returns tidy written text: speech-only words go
+
+Tests cover redundant bridges, particles and protected wording in both deterministic cleanup and request construction.
+
+The recorded run counted 390 tests, 5 skipped, and zero failures.
+
 ## 2026-11-04 · Ordinary dictation follows the focus current at delivery
 
 Insertion policy tests distinguish the current writable target from a selection captured for editing.

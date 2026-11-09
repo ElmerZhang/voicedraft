@@ -24,6 +24,59 @@ public enum DictationPrepass {
         return text
     }
 
+    private static let ranhouSeparators: Set<Character> = ["，", "、", " "]
+    private static let ranhouLinkEndings = ["的话", "之后", "以后", "的时候", "完"]
+    private static let ranhouTimeWords = ["之后", "以后", "的时候"]
+    /// Ends the clause that follows a 然后.
+    private static let clausePunctuation: Set<Character> = ["，", "、", "。", "！", "？", "；", "：", ",", ".", "!", "?", ";", ":",
+                                                            "“", "”", "\"", "（", "）", "(", ")"]
+
+    /// Removes a 然后 that is redundant because its clause is already linked by a time or condition word: one that
+    /// follows a clause ending in 的话, 之后, 以后, 的时候 or 完 (an optional `，`, `、` or space in between), or one whose
+    /// clause has 之后, 以后, 的时候 or a non-initial 后 within its first eight characters. Only the two characters
+    /// 然后 are removed; 然后再, quoted 然后 and every other 然后 stay for the model. Idempotent.
+    public static func dropRedundantRanhou(_ transcript: String) -> String {
+        let chars = Array(transcript)
+        guard chars.count >= 2 else { return transcript }
+        var output: [Character] = []
+        output.reserveCapacity(chars.count)
+        var inCurlyQuote = false
+        var inStraightQuote = false
+        var i = 0
+        while i < chars.count {
+            let c = chars[i]
+            if c == "“" { inCurlyQuote = true } else if c == "”" { inCurlyQuote = false } else if c == "\"" { inStraightQuote.toggle() }
+            if c == "然", i + 1 < chars.count, chars[i + 1] == "后", !inCurlyQuote, !inStraightQuote,
+               !(i + 2 < chars.count && chars[i + 2] == "再"),
+               ranhouHasLinkBefore(chars, at: i) || ranhouHasTimeWordAfter(chars, from: i + 2) {
+                i += 2
+                continue
+            }
+            output.append(c)
+            i += 1
+        }
+        return output.count == chars.count ? transcript : String(output)
+    }
+
+    private static func ranhouHasLinkBefore(_ chars: [Character], at index: Int) -> Bool {
+        var end = index
+        if end > 0, ranhouSeparators.contains(chars[end - 1]) { end -= 1 }
+        let before = String(chars[max(0, end - 3)..<end])
+        return ranhouLinkEndings.contains { before.hasSuffix($0) }
+    }
+
+    private static func ranhouHasTimeWordAfter(_ chars: [Character], from start: Int) -> Bool {
+        var clause: [Character] = []
+        var k = start
+        while k < chars.count, clause.count < 8, !clausePunctuation.contains(chars[k]), !chars[k].isNewline {
+            clause.append(chars[k])
+            k += 1
+        }
+        if clause.dropFirst().contains("后") { return true }
+        let text = String(clause)
+        return ranhouTimeWords.contains { text.contains($0) }
+    }
+
     private static func collapseFirst(in text: String) -> String? {
         var searchStart = text.startIndex
         while let match = nextMarker(in: text, from: searchStart) {

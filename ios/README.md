@@ -212,6 +212,11 @@ For device builds, choose your own Apple Development team in Xcode for the app, 
 - `xcodebuild` needs the device's hardware UDID from `xcrun xctrace list devices`, not the CoreDevice identifier that
   `xcrun devicectl list devices` prints.
 - Personal Team profiles expire after 7 days. Rebuild and reinstall before then.
+- Automatic signing reuses an existing profile as long as it is still valid at build time, so a build made late in a
+  profile's week still stops working on day 7. After building, check both embedded profiles' `ExpirationDate`:
+  `security cms -D -i <app>/embedded.mobileprovision | plutil -extract ExpirationDate raw -o - -` and the same for
+  `<app>/PlugIns/VoiceDraftKeyboard.appex/embedded.mobileprovision`. To force fresh profiles, move the old ones out of
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles` before building.
 - On first install, trust the developer under Settings > General > VPN & Device Management, or launch fails with
   "profile has not been explicitly trusted by the user".
 

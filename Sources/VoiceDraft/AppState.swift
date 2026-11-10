@@ -126,6 +126,18 @@ final class AppState: ObservableObject {
     private var runSpeechKey = ""
     private var runWritingKey = ""
     var showMain: (() -> Void)?
+    /// Opens the Draft window (set by the app delegate).
+    var showDraftWindow: (() -> Void)?
+    /// The Draft window's coordinator; owns draft persistence (Application Support/VoiceDraft/drafts).
+    let drafts: DraftWorkspace
+    /// The running take's relation to the draft window; nil for takes started elsewhere.
+    @Published private(set) var runDraft: DraftRun?
+    /// Set while the style menu is open over the draft editor's selection.
+    var pendingDraftStyle: DraftFocus?
+    /// "Whole draft" while an Edit over the whole draft records, so the user knows the target.
+    var draftScopeNotice: String? {
+        runDraft?.kind == .wholeDraftEdit && runMode == .edit && (recording || phase == "starting") ? D("Whole draft") : nil
+    }
     var showHUD: (() -> Void)?
     var hideHUD: (() -> Void)?
     var busy: Bool { phase != "idle" || updater.installing }
@@ -184,6 +196,7 @@ final class AppState: ObservableObject {
 
     init(preview: Bool = false) {
         self.preview = preview
+        drafts = DraftWorkspace(store: preview ? nil : DraftWorkspace.defaultStore())
         screenContext.onTakeUpdate = { [weak self] take in
             guard let self, self.generation == take else { return }
             self.screenContextTermCount = self.screenContext.termCount(take: take)
@@ -400,17 +413,29 @@ final class AppState: ObservableObject {
         takeTrace = TakeTrace(takeID: id, origin: press?.event ?? started, action: press?.action, mode: mode, external: external)
         takeTrace?.pressDelay = press.map { $0.processed - $0.event }
         let captureStarted = ProcessInfo.processInfo.systemUptime
+        // The draft editor is read directly (never through Accessibility): with the
+        // Draft window key and its text view first responder, this is a draft take.
+        let draftFocus = external ? drafts.focus() : nil
+        runDraft = nil
         // Settings, context and History use this start capture; ordinary dictation
         // pastes into the focus current when the result is ready (`deliverTranscript`).
-        target = external ? TextInsertion.capture() : nil
-        if external { takeTrace?.capture = ProcessInfo.processInfo.systemUptime - captureStarted; takeTrace?.startRole = target?.role }
-        let targetBundleID = target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }
+        target = external && draftFocus == nil ? TextInsertion.capture() : nil
+        if external {
+            takeTrace?.capture = ProcessInfo.processInfo.systemUptime - captureStarted
+            takeTrace?.startRole = draftFocus != nil ? DraftRouting.targetRole : target?.role
+        }
+        let targetBundleID = draftFocus != nil ? Bundle.main.bundleIdentifier : target.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }
         takeTrace?.bundleID = targetBundleID
+        let applicationName = draftFocus != nil ? DraftRouting.applicationName : target?.name ?? "VoiceDraft"
         runMode = mode; runSettings = settings.resolved(for: targetBundleID);
-        if device.features.recentContext { runSettings?.recentInputContext = recentInputs.text(application: target?.name ?? "VoiceDraft") }
+        if device.features.recentContext { runSettings?.recentInputContext = recentInputs.text(application: applicationName) }
         runAutoPaste = device.autoPaste; runExternal = external
         runSelection = external ? (target?.selection ?? "") : selection
         do {
+            if let draftFocus {
+                let run = try DraftRouting.run(for: mode, focus: draftFocus)
+                runDraft = run; runSelection = run.selectedText
+            }
             if target?.secure == true { throw VoiceDraftError.message("Voice input is disabled in password fields.") }
             guard let speech = settings.speech, let writing = settings.writing else {
                 throw VoiceDraftError.message("Choose your speech and writing models.")
@@ -453,7 +478,7 @@ final class AppState: ObservableObject {
                         throw VoiceDraftError.message("The recording was too short. Try again.")
                     }
                     runAudio = feed.archivedWAV
-                    try await deliverTranscript(raw, id: id, duration: elapsed, source: .dictationWriting)
+                    try await deliverTranscript(raw, id: id, duration: elapsed, source: runDraft?.source ?? .dictationWriting)
                 } catch { fail(error, id: id) }
             }
         } else {
@@ -554,7 +579,7 @@ final class AppState: ObservableObject {
                                                           screenTerms: screenTerms, usage: usage)
                     }
                     try Task.checkCancellation(); guard generation == id else { return }
-                    try await deliverTranscript(raw, id: id, duration: duration, source: .dictationWriting)
+                    try await deliverTranscript(raw, id: id, duration: duration, source: runDraft?.source ?? .dictationWriting)
                 } catch { fail(error, id: id) }
             }
         }
@@ -565,7 +590,8 @@ final class AppState: ObservableObject {
         // The take's screen text is dropped on every exit; reprocess and style edits have none.
         defer { screenContext.end(take: id) }
         let mode = runMode, selected = runSelection, writingKey = runWritingKey
-        let destination = target
+        let destination = target, draftRun = runDraft
+        let applicationName = draftRun != nil ? DraftRouting.applicationName : destination?.name ?? "VoiceDraft"
         transcript = raw; result = ""
         var output = raw
         if mode != .verbatim, let writing = configuration.writing {
@@ -574,7 +600,7 @@ final class AppState: ObservableObject {
             let screen = await screenContext.writingContext(take: id, mode: mode)
             try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
             let request = try QwenRequests.writing(profile: writing, key: writingKey, text: raw, mode: mode,
-                settings: configuration, selection: selected, application: destination?.name ?? "VoiceDraft", screenContext: screen)
+                settings: configuration, selection: selected, application: applicationName, screenContext: screen, draft: draftRun?.context)
             do { output = try await metered(.writing, source: source, profile: writing, mode: mode, streamed: true, takeID: id) { usage in
                 try await WritingClient.complete(request, profile: writing, key: writingKey, onUpdate: { [weak self] text in
                     await self?.updateWriting(text, id: id)
@@ -582,24 +608,45 @@ final class AppState: ObservableObject {
             }
             if mode == .polish { output = PolishOutput.finalize(output, transcript: raw, protectedTerms: configuration.vocabulary.protectedTypographyTerms) } }
             catch {
+                // Nothing was written: a failed or truncated response never touches the draft or the destination.
                 try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
                 result = raw; hudText = raw
-                saveHistory(mode: .verbatim, original: raw, output: raw, app: destination?.name ?? "VoiceDraft", duration: duration)
+                saveHistory(mode: .verbatim, original: raw, output: raw, app: applicationName, duration: duration)
                 throw VoiceDraftError.message("Writing failed. Your transcript is preserved. \(error.localizedDescription)")
             }
         }
         try Task.checkCancellation(); guard generation == id else { throw CancellationError() }
         result = output
-        if device.features.recentContext { recentInputs.append(output, application: destination?.name ?? "VoiceDraft") }
+        if device.features.recentContext { recentInputs.append(output, application: applicationName) }
         recordVocabularyUsage(output)
-        saveHistory(mode: mode, original: raw, output: output, app: destination?.name ?? "VoiceDraft", duration: duration)
+        let historyID = saveHistory(mode: mode, original: raw, output: output, app: applicationName, duration: duration)
         var delivery: TextInsertionDelivery?
+        var wroteDraft = false
+        // Draft takes write straight into the text view (never the pasteboard): range-bound
+        // runs into their draft, other takes into the draft editor when it is the focus now.
+        let draftDelivery = DraftRouting.delivery(run: draftRun, mode: mode, editorFocusedNow: drafts.focus() != nil)
         // Edit and Style apply replace the captured selection and stay bound to it;
         // every other take pastes into the focus current now, in any app or window.
         let binding: InsertionBinding = mode == .edit || source == .styleApplyToSelection ? .selection : .currentInput
         let automatic = runExternal && runAutoPaste && mode != .ask
         if runExternal { traceTake(id) { $0.insertion = mode == .ask ? "ask" : !runAutoPaste ? "disabled" : nil } }
-        if automatic, !insertionAuthorized {
+        if draftDelivery != .external {
+            do {
+                if draftDelivery == .bound, let draftRun {
+                    try drafts.replace(draftRun, with: output, transcript: raw, historyID: historyID, mode: mode)
+                } else {
+                    try drafts.insertDictation(output, transcript: raw, historyID: historyID, mode: mode)
+                }
+                wroteDraft = true
+                traceTake(id) { $0.insertion = "draft"; $0.deliveryRole = DraftRouting.targetRole }
+                status = "Added to the draft"
+                hudKind = .compact; hideHUD?()
+            } catch {
+                // The draft is untouched; `wroteDraft` stays false, so the result card below offers the text to copy.
+                traceTake(id) { $0.insertion = "blocked"; $0.insertionBlocked = "draftChanged"; $0.deliveryRole = DraftRouting.targetRole }
+                self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
+            }
+        } else if automatic, !insertionAuthorized {
             traceTake(id) { $0.insertion = "unauthorized" }
             self.error = "Enable Accessibility to paste into other apps. The result is available here."
             status = "Result ready · open VoiceDraft to copy"
@@ -631,7 +678,7 @@ final class AppState: ObservableObject {
         recordTakeDiagnostics(id, audioSeconds: duration, outcome: "completed")
         let pasted = delivery?.target, opaqueDelivery = pasted?.opaqueApplication == true
         if delivery != nil { presentQueuedPaste(output, opaque: opaqueDelivery, bundleID: pasted?.bundleID, applicationName: pasted?.name) }
-        else { hudText = output; hudKind = .result; showHUD?() }
+        else if !wroteDraft { hudText = output; hudKind = .result; showHUD?() }
         if let delivery { awaitDeliveryOutcome(delivery, id: id, opaque: opaqueDelivery) }
         if mode == .polish || mode == .verbatim {
             resultBeforeCorrection = output
@@ -695,7 +742,7 @@ final class AppState: ObservableObject {
         }
         effects.end(sound: device.features.sounds); gesture.reset(); recordingLocked = false; heldAction = nil; finishWhenReady = false
         if runAudio == nil { runAudio = liveFeed?.archivedWAV }
-        if runAudio != nil, !(error is CancellationError) { saveHistory(mode: .verbatim, original: liveTranscript, output: liveTranscript, app: target?.name ?? "VoiceDraft", duration: elapsed) }
+        if runAudio != nil, !(error is CancellationError) { saveHistory(mode: .verbatim, original: liveTranscript, output: liveTranscript, app: runDraft != nil ? DraftRouting.applicationName : target?.name ?? "VoiceDraft", duration: elapsed) }
         runAudio = nil
         generation = UUID(); task?.cancel(); stopTask?.cancel(); liveFeed?.cancel(); liveFeed = nil
         recorder.cancel(); liveRecorder.cancel(); tick?.invalidate(); tick = nil; phase = "idle"; level = 0
@@ -707,8 +754,10 @@ final class AppState: ObservableObject {
             hudKind = failureKind; showHUD?()
         }
     }
-    private func saveHistory(mode: WritingMode, original: String, output: String, app: String, duration: Double) {
-        guard device.keepHistory else { return }
+    /// Returns the saved entry's ID; nil when History is off or the write failed.
+    @discardableResult
+    private func saveHistory(mode: WritingMode, original: String, output: String, app: String, duration: Double) -> UUID? {
+        guard device.keepHistory else { return nil }
         var entry = HistoryEntry(mode: mode, original: original, result: output, application: app, duration: duration)
         entry.speechModel = runSettings?.speech?.model; entry.writingModel = runSettings?.writing?.model
         entry.styleName = runSettings?.styles.first { $0.prompt == runSettings?.stylePrompt }?.name
@@ -718,7 +767,8 @@ final class AppState: ObservableObject {
             var updated = history; updated.insert(entry, at: 0)
             try store?.write(updated, name: "history"); history = updated
             pruneHistory()
-        } catch { self.error = "Could not save history: \(error.localizedDescription)" }
+            return entry.id
+        } catch { self.error = "Could not save history: \(error.localizedDescription)"; return nil }
     }
     func deleteHistory(_ id: UUID? = nil) {
         let removed = history.filter { id == nil || $0.id == id }
@@ -745,7 +795,7 @@ final class AppState: ObservableObject {
         liveTranscript = ""; hudText = ""; hudCopied = false; hideHUD?()
         generation = UUID(); let id = generation
         phase = "processing"; status = .init(key: F("Writing…", "正在写作…")); error = ""
-        runAudio = nil; runSettings = settings.resolved(for: nil)
+        runAudio = nil; runSettings = settings.resolved(for: nil); runDraft = nil
         let configuration = runSettings!, mode = mode, raw = transcript, selected = selection
         task = Task {
             do {
@@ -913,6 +963,10 @@ extension AppState {
             if down && !busy { chooseSelectionStyle?() }
             return
         }
+        if action == .draftWindow, !releasesTake {
+            if down { showDraftWindow?() }
+            return
+        }
         let effect: RecordingGesture.Effect
         if down {
             guard heldAction == nil || heldAction == action else { return }
@@ -954,12 +1008,20 @@ extension AppState {
         guard heldAction == from, from != to else { return }
         heldAction = to
         guard phase == "starting" || recording, let mode = to.recordingMode, mode != runMode else { return }
-        switch TakeRetargetPolicy.problem(to: to, selection: runSelection, writingKey: runWritingKey) {
+        // A draft take re-derives its run from the start snapshot (dictation at the caret,
+        // Edit over the selection or the whole draft).
+        var retargetedDraft: DraftRun?
+        if let run = runDraft {
+            do { retargetedDraft = try DraftRouting.run(for: mode, focus: run.focus) }
+            catch { status = .init(error: error); return }
+        }
+        switch TakeRetargetPolicy.problem(to: to, selection: retargetedDraft?.selectedText ?? runSelection, writingKey: runWritingKey) {
         case .needsSelection?: status = "Select text in the destination app before using Edit selection."; return
         case .needsWritingKey?: status = "Add an API key for the writing model first."; return
         case .notRecording?: return
         case nil: break
         }
+        if let retargetedDraft { runDraft = retargetedDraft; runSelection = retargetedDraft.selectedText }
         runMode = mode; self.mode = mode; traceTake(generation) { $0.mode = mode }
         // The tap-versus-hold window restarts at the chord, so a quick release locks the promoted take.
         gesture.retarget(at: time ?? ProcessInfo.processInfo.systemUptime)
@@ -969,9 +1031,20 @@ extension AppState {
     /// whichever input is focused now, through the normal insertion pipeline.
     /// This is not a new take: no history entry, recent context, vocabulary
     /// learning or correction observation. It never starts a recording.
-    func insertLastResult() {
+    func insertLastResult() { insertText(result) }
+
+    /// The Draft window's "Insert into previous app": activates the app that was
+    /// active before the window, then delivers the whole draft through the same
+    /// pipeline as Insert last result (`.currentInput`). Not a take: no History entry.
+    func insertDraftIntoPreviousApp() {
+        insertText(drafts.currentText, activating: drafts.previousApplication, requireApplication: true)
+    }
+
+    /// Insert last result's pipeline for `text`. With `activating`, that app is
+    /// brought to the front first; when it cannot be (quit or never known), the
+    /// copy card offers the text instead.
+    private func insertText(_ text: String, activating application: NSRunningApplication? = nil, requireApplication: Bool = false) {
         guard !busy else { return }
-        let text = result
         notice = ""; hudCopied = false
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             error = .init(error: VoiceDraftError.message("Nothing to insert yet. Dictate first."))
@@ -986,6 +1059,13 @@ extension AppState {
             // its key is released; a paste sent now could arrive as ⌃⌥⌘V.
             let released = await Self.waitForModifierRelease()
             guard generation == id, !Task.isCancelled else { return }
+            if requireApplication {
+                guard let application, !application.isTerminated, await Self.activate(application) else {
+                    reinsertFallback(text, id: id, error: VoiceDraftError.message("The previous app is not available. Copy the draft instead."))
+                    return
+                }
+                guard generation == id, !Task.isCancelled else { return }
+            }
             guard released else {
                 reinsertFallback(text, id: id, error: VoiceDraftError.message("Shortcut keys were still held, so nothing was pasted. Copy the result instead."))
                 return
@@ -1075,6 +1155,19 @@ extension AppState {
         phase = "idle"; self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
         hudText = text; hudCopied = false; hudKind = .result; showHUD?()
     }
+    /// Activates `application` and waits up to one second for it to become frontmost.
+    private static func activate(_ application: NSRunningApplication) async -> Bool {
+        application.activate()
+        for _ in 0..<50 {
+            if NSWorkspace.shared.frontmostApplication?.processIdentifier == application.processIdentifier {
+                // Let the app restore its key window and focused input.
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                return true
+            }
+            do { try await Task.sleep(nanoseconds: 20_000_000) } catch { return false }
+        }
+        return false
+    }
     /// Polls for up to about one second until Shift, Control, Option and Command are all up.
     private static func waitForModifierRelease() async -> Bool {
         let held: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand]
@@ -1132,7 +1225,7 @@ extension AppState {
         stopCorrectionObservation(); player?.stop(); playingAudioID = nil
         generation = UUID(); let id = generation
         let configuration = settings.resolved(for: nil)
-        runSettings = configuration; runAudio = nil; runMode = mode; target = nil; runExternal = false; runAutoPaste = false; runSelection = ""
+        runSettings = configuration; runAudio = nil; runMode = mode; target = nil; runExternal = false; runAutoPaste = false; runSelection = ""; runDraft = nil
         phase = "processing"; error = ""; result = ""; liveTranscript = ""; hudText = ""
         // A historical Edit needs a fresh instruction/selection; retry as dictation polish instead.
         if runMode == .edit { runMode = .polish }
@@ -1157,6 +1250,11 @@ extension AppState {
         }
     }
     func applyStyleToSelection(_ styleID: UUID?) {
+        if let focus = pendingDraftStyle {
+            pendingDraftStyle = nil
+            applyStyleToDraft(focus, styleID: styleID)
+            return
+        }
         guard !busy, let destination = pendingStyleTarget else { return }
         pendingStyleTarget = nil
         guard !destination.secure, !destination.selection.isEmpty else {
@@ -1165,7 +1263,7 @@ extension AppState {
         var configuration = settings.resolved(for: NSRunningApplication(processIdentifier: destination.pid)?.bundleIdentifier)
         if let style = settings.styles.first(where: { $0.id == styleID }) { configuration.stylePrompt = style.prompt }
         stopCorrectionObservation(); generation = UUID(); let id = generation
-        runSettings = configuration; runAudio = nil; target = destination; runMode = .polish
+        runSettings = configuration; runAudio = nil; target = destination; runMode = .polish; runDraft = nil
         runSelection = ""; runExternal = true; runAutoPaste = true
         phase = "processing"; error = ""; hudText = ""; liveTranscript = ""; showHUD?()
         task = Task {
@@ -1176,6 +1274,47 @@ extension AppState {
             } catch { fail(error, id: id) }
         }
     }
+    /// Style menu over the draft editor's selection: Polish with the chosen style,
+    /// written straight into the draft over the same range.
+    private func applyStyleToDraft(_ focus: DraftFocus, styleID: UUID?) {
+        guard !busy else { return }
+        guard let run = DraftRouting.styleRun(focus: focus) else {
+            error = .init(error: FeatureError("Select editable text before applying a style.")); return
+        }
+        var configuration = settings.resolved(for: Bundle.main.bundleIdentifier)
+        if let style = settings.styles.first(where: { $0.id == styleID }) { configuration.stylePrompt = style.prompt }
+        runDraftWriting(run, text: run.focus.selectedText, mode: .polish, configuration: configuration)
+    }
+
+    /// The Draft window's "Re-polish last take": writes the last take again from
+    /// its transcript with the chosen style (Translate stays Translate) and replaces
+    /// it only if it is still intact when the result is ready.
+    func repolishLastDraftTake(styleID: UUID?) {
+        guard !busy else { return }
+        guard let run = drafts.repolishRun(), let transcript = drafts.lastTakeTranscript else {
+            drafts.notice = D("The last take was edited, so it cannot be re-polished."); return
+        }
+        var configuration = settings.resolved(for: Bundle.main.bundleIdentifier)
+        if let style = settings.styles.first(where: { $0.id == styleID }) { configuration.stylePrompt = style.prompt }
+        runDraftWriting(run, text: transcript, mode: drafts.lastTakeMode == .translate ? .translate : .polish, configuration: configuration)
+    }
+
+    /// A writing-only draft run (style apply, re-polish): no recording, no external target.
+    private func runDraftWriting(_ run: DraftRun, text: String, mode: WritingMode, configuration: SharedSettings) {
+        stopCorrectionObservation(); generation = UUID(); let id = generation
+        runSettings = configuration; runAudio = nil; target = nil; runMode = mode; runDraft = run
+        runSelection = run.selectedText; runExternal = true; runAutoPaste = true
+        phase = "processing"; error = ""; hudText = ""; liveTranscript = ""; hudKind = .compact; showHUD?()
+        task = Task {
+            do {
+                guard let writing = configuration.writing else { throw FeatureError("Choose a writing model.") }
+                runWritingKey = try key(for: writing)
+                guard !runWritingKey.isEmpty else { throw VoiceDraftError.message("Add an API key for the writing model first.") }
+                try await deliverTranscript(text, id: id, duration: 0, source: run.source)
+            } catch { fail(error, id: id) }
+        }
+    }
+
     private func recordVocabularyUsage(_ text: String) {
         let before = settings.vocabulary
         Task { [weak self] in

@@ -286,3 +286,10 @@
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Les touches du raccourci étaient encore enfoncées, rien n’a été collé. Copiez plutôt le résultat.";
 "No text field is focused. Copy the result instead." = "Aucun champ de texte n’est actif. Copiez plutôt le résultat.";
 "This is not a VoiceDraft sync pairing link." = "Ce n’est pas un lien d’association de synchronisation VoiceDraft.";
+
+/* Draft window (2026-11-10) */
+"Added to the draft" = "Ajouté au brouillon";
+"The draft changed while the instruction was processing. Copy the result instead." = "Le brouillon a changé pendant le traitement de l’instruction. Copiez plutôt le résultat.";
+"The draft is empty. Dictate a paragraph first." = "Le brouillon est vide. Dictez d’abord un paragraphe.";
+"The draft window is not available. Copy the result instead." = "La fenêtre de brouillon n’est pas disponible. Copiez plutôt le résultat.";
+"The previous app is not available. Copy the draft instead." = "L’app précédente n’est pas disponible. Copiez plutôt le brouillon.";

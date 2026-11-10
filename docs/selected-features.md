@@ -49,6 +49,22 @@ User-authorized expansion. All decisions follow the reviewed implementation spec
 
 **Privacy.** Screen text, excerpts, terms and OCR images live in memory only. Per-take data is dropped when the take ends. OCR snapshots are cached for at most 60 seconds and four windows, and the cache clears on sleep, lock, quit, app exit, and when the master switch, OCR or exclusions change. History stores only the output, and nothing enters shared settings or sync. Secure fields are never read or descended. Excluded apps are checked before any AX or capture call. Credential and URL lines are dropped, long digit runs and secret-like tokens are masked, and bidi and zero-width controls are stripped. The writing model receives the excerpt as a JSON field named `on_screen_context_reference_only` with an untrusted-data rule; model compliance is not guaranteed. Speech models receive only term-shaped tokens. A dictation only preflights Screen Recording and never triggers a permission prompt. Visible text can include other people's messages; the settings footnote says so and per-app exclusion is available. Extraction sends only candidate words to the writing model, never the screen text. No log, status or error contains screen text.
 
+## 2026-11-10 · Draft window (草稿)
+
+Maintainer-authorized expansion, decided 2026-11-10 (roadmap Direction (2026-11-10)): long-form writing by voice is a VoiceDraft-owned drafting surface, one paragraph per take, not a longer take. Draft sync is phase 2; the iOS draft screen and a continuous mode come later.
+
+| Selected | Delivered behavior | Main implementation |
+| --- | --- | --- |
+| H1 | Draft window with a drafts list (New, Delete with confirmation), a plain-text editor, character count and saved state; File › Draft window, the menu bar and a configurable shortcut (default Control-Option-D) | `DraftWindowController`, `DraftWindowView`, `ShortcutAction.draftWindow` |
+| H2 | Dictation with the editor focused inserts at the caret: its own paragraph at a line edge or on an empty line (one blank line between paragraphs), inline mid-paragraph, or over the selection | `DraftText.insertion`, `DraftWorkspace.insertDictation` |
+| H3 | Long-form Polish variant: the text before (1,500 characters) and after (500) the caret as reference only, a fixed cached-prefix paragraph, split only at a clear topic change | `QwenRequests.writing(draft:)`, `DraftWritingContext` |
+| H4 | Edit shortcut over a selection, or over the whole draft when nothing is selected ("Whole draft" in the HUD); style menu over a selection; results written directly, bound to the start range | `DraftRouting`, `DraftWorkspace.replace` |
+| H5 | One undo step per take (Command-Z or Undo last take), Re-polish last take with a chosen style when it is intact | `DraftTake`, `DraftWorkspace` |
+| H6 | Copy all, Insert into previous app (through Insert last result's pipeline), Export as `.md` or `.txt` | `AppState.insertDraftIntoPreviousApp`, `NSSavePanel` |
+| H7 | Local JSON per draft, atomic, autosaved; History entries ("VoiceDraft Draft") and usage-log sources `draft.*` | `FileDraftStore`, `ModelUsageSource` |
+
+**Privacy.** Draft text stays on the Mac except the reference context and selections sent to the user's configured writing provider for draft takes. Drafts are not synced, are not part of `SharedSettings`, and on-screen context never reads VoiceDraft's own window. New strings ship in all eight interface languages.
+
 ## Data and compatibility
 
 Shared settings migrate v1–v4 to v5 without changing existing profile IDs, credentials, vocabulary or general style. New style and application rules join the existing encrypted vault. Device-only settings, audio and context stay local. Older VoiceDraft versions cannot read v5; update other clients before downloading this vault.

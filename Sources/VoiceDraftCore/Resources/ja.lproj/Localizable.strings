@@ -286,3 +286,10 @@
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "ショートカットキーが押されたままだったため、貼り付けませんでした。代わりに結果をコピーしてください。";
 "No text field is focused. Copy the result instead." = "入力欄にフォーカスがありません。代わりに結果をコピーしてください。";
 "This is not a VoiceDraft sync pairing link." = "VoiceDraft の同期ペアリングリンクではありません。";
+
+/* Draft window (2026-11-10) */
+"Added to the draft" = "下書きに追加しました";
+"The draft changed while the instruction was processing. Copy the result instead." = "指示の処理中に下書きが変更されました。代わりに結果をコピーしてください。";
+"The draft is empty. Dictate a paragraph first." = "下書きが空です。先に段落を音声入力してください。";
+"The draft window is not available. Copy the result instead." = "下書きウインドウを使用できません。代わりに結果をコピーしてください。";
+"The previous app is not available. Copy the draft instead." = "前のアプリを使用できません。代わりに下書きをコピーしてください。";

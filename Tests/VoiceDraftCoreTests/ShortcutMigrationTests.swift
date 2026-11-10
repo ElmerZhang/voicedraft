@@ -47,7 +47,7 @@ final class ShortcutMigrationTests: XCTestCase {
         let migrated = try options(shortcuts: custom).shortcuts
         XCTAssertEqual(migrated.first, .init(.dictate, keyCode: 9, modifiers: 6))
         XCTAssertEqual(migrated[1], .init(.ask, keyCode: 0, modifiers: 6, enabled: false))
-        XCTAssertEqual(migrated.last, .init(.insertLast, keyCode: 9, modifiers: 6, enabled: false))
+        XCTAssertEqual(migrated.first { $0.action == .insertLast }, .init(.insertLast, keyCode: 9, modifiers: 6, enabled: false))
         XCTAssertEqual(Set(migrated.map(\.action)), Set(ShortcutAction.allCases))
         try ShortcutBinding.validate(migrated)
         // A disabled binding on the same keys does not block the default.
@@ -65,7 +65,7 @@ final class ShortcutMigrationTests: XCTestCase {
         // Older builds decode this array strictly and accept at most five bindings.
         XCTAssertEqual(stored.compactMap { $0["action"] as? String }, ["dictate", "translate", "edit", "ask", "styleSelection"])
         let additional = try XCTUnwrap(object["additionalShortcuts"] as? [[String: Any]])
-        XCTAssertEqual(additional.first?["action"] as? String, "insertLast")
+        XCTAssertEqual(additional.compactMap { $0["action"] as? String }, ["insertLast", "draftWindow"])
         let roundTrip = try JSONDecoder().decode(DesktopOptions.self, from: JSONEncoder().encode(options))
         XCTAssertEqual(roundTrip, options)
     }
@@ -76,7 +76,19 @@ final class ShortcutMigrationTests: XCTestCase {
          {"action":"someFutureAction","keyCode":3,"modifiers":6,"enabled":true}]
         """
         let decoded = try options(shortcuts: future, extra: #""additionalShortcuts":[{"action":"anotherFutureAction","keyCode":5,"modifiers":6,"enabled":true}],"#)
-        XCTAssertEqual(decoded.shortcuts.map(\.action), [.dictate, .translate, .edit, .ask, .styleSelection, .insertLast])
+        XCTAssertEqual(decoded.shortcuts.map(\.action), [.dictate, .translate, .edit, .ask, .styleSelection, .insertLast, .draftWindow])
         try decoded.validate()
+    }
+
+    func testDraftWindowDefaultsToControlOptionDAndJoinsOlderFiles() throws {
+        let binding = try XCTUnwrap(ShortcutBinding.defaults.first { $0.action == .draftWindow })
+        XCTAssertEqual([binding.keyCode, binding.modifiers], [2, 6]); XCTAssertTrue(binding.enabled)
+        XCTAssertEqual(binding.keyLabel, "⌃⌥D")
+        XCTAssertNil(ShortcutAction.draftWindow.recordingMode)
+        // A file written by the insert-last build gains the draft shortcut; a user binding on ⌃⌥D keeps it.
+        let taken = try options(shortcuts: legacyShortcuts, extra: #""additionalShortcuts":[{"action":"insertLast","keyCode":2,"modifiers":6,"enabled":true}],"#)
+        XCTAssertEqual(taken.shortcuts.first { $0.action == .insertLast }, .init(.insertLast, keyCode: 2, modifiers: 6))
+        XCTAssertEqual(taken.shortcuts.last, .init(.draftWindow, keyCode: 2, modifiers: 6, enabled: false))
+        try ShortcutBinding.validate(taken.shortcuts)
     }
 }

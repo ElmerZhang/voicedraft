@@ -20,6 +20,10 @@ private struct EditingCommands: Commands {
             Button(D("Settings")) { NotificationCenter.default.post(name: .voiceDraftOpenSettings, object: nil) }
                 .keyboardShortcut(",", modifiers: .command)
         }
+        CommandGroup(after: .newItem) {
+            // The global shortcut (default ⌃⌥D) opens it from any app.
+            Button(D("Draft window")) { NotificationCenter.default.post(name: .voiceDraftOpenDraftWindow, object: nil) }
+        }
         CommandGroup(replacing: .undoRedo) {
             command("Undo", action: "undo:", key: "z")
             command("Redo", action: "redo:", key: "z", modifiers: [.command, .shift])
@@ -61,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let escapeCancellation = EscapeCancellationMonitor()
     private var menuKeys: [ObjectIdentifier: String] = [:]
     private var menuObserver: NSObjectProtocol?
+    private var draftWindowObserver: NSObjectProtocol?
+    private var draftWindow: DraftWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Diagnostic probe: isolated, runs before state, windows, hotkeys or the updater exist.
@@ -100,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         hudHost.sizingOptions = []
         hud.contentView = hudHost
         state.showMain = { [weak self] in self?.showWindow() }
+        state.showDraftWindow = { [weak self] in self?.showDraftWindow() }
+        draftWindowObserver = NotificationCenter.default.addObserver(forName: .voiceDraftOpenDraftWindow, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.showDraftWindow() }
+        }
         state.showHUD = { [weak self] in self?.showHUD() }
         state.hideHUD = { [weak self] in self?.hideHUD() }
         hudObservation = state.$hudKind.sink { [weak self] _ in
@@ -144,8 +154,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         else if let sheetPreviewDirectory { captureSheetPreviews(to: sheetPreviewDirectory) }
         else if let hudPreview { state.prepareHUDPreview(hudPreview); showHUD() }
     }
+    @objc private func showDraftWindow() {
+        if draftWindow == nil { draftWindow = DraftWindowController(state: state) }
+        draftWindow?.show()
+    }
     private func showStyleMenu() {
-        state.pendingStyleTarget = TextInsertion.capture()
+        // Over the draft editor the selection is read from the text view, not Accessibility.
+        if let focus = state.drafts.focus() { state.pendingDraftStyle = focus }
+        else { state.pendingStyleTarget = TextInsertion.capture() }
         let menu = NSMenu()
         let options: [(String, String)] = [(F("Default style", "默认风格"), "default")] + state.settings.styles.map { ($0.name, $0.id.uuidString) }
         for (name, id) in options {
@@ -153,7 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item.target = self; item.representedObject = id; menu.addItem(item)
         }
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-        state.pendingStyleTarget = nil
+        state.pendingStyleTarget = nil; state.pendingDraftStyle = nil
     }
     @objc private func applySelectionStyle(_ item: NSMenuItem) {
         state.applyStyleToSelection((item.representedObject as? String).flatMap(UUID.init(uuidString:)))
@@ -166,6 +182,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         record.target = self; menu.addItem(record)
         let reinsert = NSMenuItem(title: L("Insert last result"), action: #selector(insertLastResult), keyEquivalent: "")
         reinsert.target = self; menu.addItem(reinsert)
+        let draft = NSMenuItem(title: D("Draft window"), action: #selector(showDraftWindow), keyEquivalent: "")
+        draft.target = self; menu.addItem(draft)
         let extract = NSMenuItem(title: D("Extract words from this screen…"), action: #selector(extractFromScreen), keyEquivalent: "")
         extract.target = self; menu.addItem(extract)
         menu.addItem(.separator())
@@ -503,7 +521,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
     func applicationWillTerminate(_ notification: Notification) {
-        escapeCancellation.uninstall(); shortcuts.uninstall(); state.cancel()
+        escapeCancellation.uninstall(); shortcuts.uninstall(); state.cancel(); state.drafts.saveNow()
         state.screenContext.stopObserving(); state.screenContext.clearCache()
         TextInsertion.resetElectronAccessibility()
     }

@@ -286,3 +286,10 @@
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Las teclas del atajo seguían pulsadas, así que no se pegó nada. Copia el resultado en su lugar.";
 "No text field is focused. Copy the result instead." = "No hay ningún campo de texto activo. Copia el resultado en su lugar.";
 "This is not a VoiceDraft sync pairing link." = "Este no es un enlace de vinculación de sincronización de VoiceDraft.";
+
+/* Draft window (2026-11-10) */
+"Added to the draft" = "Añadido al borrador";
+"The draft changed while the instruction was processing. Copy the result instead." = "El borrador cambió mientras se procesaba la instrucción. Copia el resultado en su lugar.";
+"The draft is empty. Dictate a paragraph first." = "El borrador está vacío. Dicta primero un párrafo.";
+"The draft window is not available. Copy the result instead." = "La ventana de borrador no está disponible. Copia el resultado en su lugar.";
+"The previous app is not available. Copy the draft instead." = "La app anterior no está disponible. Copia el borrador en su lugar.";

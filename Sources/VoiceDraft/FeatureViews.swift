@@ -20,11 +20,16 @@ extension ShortcutAction {
         case .ask: return L("Ask")
         case .styleSelection: return F("Apply style to selection", "为选中文字应用风格")
         case .insertLast: return D("Insert last result")
+        case .draftWindow: return D("Draft window")
         }
     }
     /// One-line explanation for actions whose title alone is not self-explanatory.
     var detail: String? {
-        self == .insertLast ? D("Paste the last result again, wherever the cursor is now.") : nil
+        switch self {
+        case .insertLast: return D("Paste the last result again, wherever the cursor is now.")
+        case .draftWindow: return D("Open the draft window to write long text one paragraph at a time.")
+        default: return nil
+        }
     }
 }
 

@@ -148,6 +148,14 @@ public enum ModelUsageSource: String, Codable, Sendable, CaseIterable {
     case vocabularyAgentContextFilter = "vocabulary.agentContextFilter"
     case vocabularyScreenContextFilter = "vocabulary.screenContextFilter"
     case modelsConnectionTest = "models.connectionTest"
+    /// Writing pass of a take dictated into the draft window (Polish, Verbatim never calls, Translate).
+    case draftWriting = "draft.writing"
+    /// Edit over the draft's selection or, with nothing selected, the whole draft.
+    case draftEdit = "draft.edit"
+    /// A writing style applied to text selected in the draft window.
+    case draftStyleApply = "draft.styleApply"
+    /// Re-polish last take in the draft window.
+    case draftRepolish = "draft.repolish"
 }
 
 public enum ModelUsageOutcome: String, Codable, Sendable {

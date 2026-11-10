@@ -286,3 +286,10 @@
 "Shortcut keys were still held, so nothing was pasted. Copy the result instead." = "Die Kurzbefehltasten waren noch gedrückt, daher wurde nichts eingefügt. Kopiere stattdessen das Ergebnis.";
 "No text field is focused. Copy the result instead." = "Kein Textfeld ist ausgewählt. Kopiere stattdessen das Ergebnis.";
 "This is not a VoiceDraft sync pairing link." = "Das ist kein VoiceDraft-Sync-Kopplungslink.";
+
+/* Draft window (2026-11-10) */
+"Added to the draft" = "Zum Entwurf hinzugefügt";
+"The draft changed while the instruction was processing. Copy the result instead." = "Der Entwurf hat sich während der Anweisung geändert. Kopiere stattdessen das Ergebnis.";
+"The draft is empty. Dictate a paragraph first." = "Der Entwurf ist leer. Diktiere zuerst einen Absatz.";
+"The draft window is not available. Copy the result instead." = "Das Entwurfsfenster ist nicht verfügbar. Kopiere stattdessen das Ergebnis.";
+"The previous app is not available. Copy the draft instead." = "Die vorherige App ist nicht verfügbar. Kopiere stattdessen den Entwurf.";

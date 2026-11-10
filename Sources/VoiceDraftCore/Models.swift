@@ -76,7 +76,7 @@ public struct ModelProfile: Codable, Identifiable, Equatable {
     }
 }
 
-public enum WritingMode: String, Codable, CaseIterable, Identifiable {
+public enum WritingMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case verbatim, polish, translate, edit, ask
     public var id: String { rawValue }
     public var title: String {

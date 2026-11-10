@@ -53,7 +53,7 @@ struct RecordingHUD: View {
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
         .hudChrome(Capsule())
-        .help((state.recording ? state.runMode.title + " · " : "")
+        .help((state.recording ? state.runMode.title + " · " + (state.draftScopeNotice.map { $0 + " · " } ?? "") : "")
               + (state.recordingDeviceName.isEmpty ? L(state.status) : L("Input: \(state.recordingDeviceName)") + " · " + elapsedText))
     }
 
@@ -66,7 +66,12 @@ struct RecordingHUD: View {
                     if state.runMode != .polish { Image(systemName: state.runMode.icon).font(.system(size: 8, weight: .semibold)) }
                     if state.screenContextTermCount != nil { Image(systemName: "text.viewfinder").font(.system(size: 8, weight: .semibold)) }
                     if state.recordingLocked { Image(systemName: "lock.fill").font(.system(size: 8, weight: .semibold)) }
-                    Text(elapsedText).font(.system(size: 10, weight: .medium).monospacedDigit())
+                    // An Edit with nothing selected in the Draft window targets the whole draft.
+                    if let notice = state.draftScopeNotice {
+                        Text(notice).font(.system(size: 10, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                    } else {
+                        Text(elapsedText).font(.system(size: 10, weight: .medium).monospacedDigit())
+                    }
                 }.foregroundStyle(.white.opacity(0.7)).accessibilityHidden(true)
             }
         } else if state.busy {

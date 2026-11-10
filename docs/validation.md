@@ -1,5 +1,13 @@
 # Validation record
 
+## 2026-11-10 · Draft window: long-form writing one paragraph per take
+
+Covered caret insertion and replacement, UTF-16 selections, per-take undo, export and draft routing with synthetic fixtures.
+
+- Pending hand checks with the maintainer: open the Draft window by menu, menu bar and Control-Option-D; dictate paragraphs at the document start, end, an empty line, a line edge and mid-paragraph; Edit over a selection and over the whole draft (HUD shows "Whole draft"); Command-Z and Undo last take; Re-polish last take with a style; style menu over a selection; Insert into previous app; Export .md and .txt; relaunch and reopen a draft.
+
+The recorded run counted 423 tests, 6 skipped, and zero failures.
+
 ## 2026-11-09 · Polish returns tidy written text: speech-only words go
 
 Tests cover redundant bridges, particles and protected wording in both deterministic cleanup and request construction.

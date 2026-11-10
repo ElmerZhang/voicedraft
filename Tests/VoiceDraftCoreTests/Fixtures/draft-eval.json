@@ -1,0 +1,48 @@
+{
+ "comparison": "PolishEvaluationTests.normalize (trim; CRLF to LF; runs of newlines and the spaces around them to one LF), then exact match against any accepted string; separately, no forbidden substring (text of the reference context) may appear",
+ "cases": [
+  {
+   "id": "caret-second-point",
+   "note": "Remove topic bridges when dictating at the caret; keep the earlier sentence out of the output.",
+   "before": "第一段介绍了果园。入口处有一棵梨树。",
+   "after": "",
+   "transcript": "嗯然后第二点是水渠在哪儿，然后我们就沿着水渠种芦苇。",
+   "accepted": [
+    "第二点是水渠在哪儿，我们就沿着水渠种芦苇。"
+   ],
+   "forbidden": [
+    "介绍了果园",
+    "一棵梨树"
+   ]
+  },
+  {
+   "id": "english-terms-from-context",
+   "note": "Use the casing of a term introduced in context without copying the earlier sentence.",
+   "before": "果园图册把矮梨树品种记作 StarPear，每行都有独立编号。",
+   "after": "下一段介绍浇水时间。",
+   "transcript": "嗯然后 star pear 要种在沙土里，每排留两米。",
+   "accepted": [
+    "StarPear 要种在沙土里，每排留两米。"
+   ],
+   "forbidden": [
+    "每行都有独立编号",
+    "浇水时间"
+   ]
+  },
+  {
+   "id": "topic-change-split",
+   "note": "Preserve the two topics; a paragraph break at the change of topic is optional.",
+   "before": "去年只试种了两排，秋天才收获。",
+   "after": "",
+   "transcript": "呃所以今年要多留一块地，等春天整平。嗯工具箱里可以放铅笔和尺子。",
+   "accepted": [
+    "所以今年要多留一块地，等春天整平。工具箱里可以放铅笔和尺子。",
+    "所以今年要多留一块地，等春天整平。\n\n工具箱里可以放铅笔和尺子。"
+   ],
+   "forbidden": [
+    "只试种了两排",
+    "秋天才收获"
+   ]
+  }
+ ]
+}

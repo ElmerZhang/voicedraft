@@ -246,7 +246,8 @@ final class ModelUsageTests: XCTestCase {
         XCTAssertEqual(ModelUsageSource.allCases.map(\.rawValue), [
             "dictation.liveSpeech", "dictation.speech", "dictation.writing", "studio.writing", "history.transcribeAgain",
             "history.rewrite", "style.applyToSelection", "vocabulary.learning", "vocabulary.agentContextFilter",
-            "vocabulary.screenContextFilter", "models.connectionTest"])
+            "vocabulary.screenContextFilter", "models.connectionTest",
+            "draft.writing", "draft.edit", "draft.styleApply", "draft.repolish"])
     }
 
     func testFailureCategories() {

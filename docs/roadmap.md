@@ -22,11 +22,12 @@ Baseline reviewed against the public [Typeless quickstart](https://www.typeless.
 | Cross-device model and hotword sync | Implemented, end-to-end encrypted including API keys | Field-level conflict resolution, device management, key rotation |
 | Sync service | Go binary, self-hosted single vault, SQLite, token, Docker configuration; compatible with existing Python-era vaults | Production hosting, multi-user accounts, organizations, audit and recovery workflows |
 | Live partial transcription | Qwen Audio 3.1 Message PCM streaming with revisable live text and spoken correction prompts | Real-device/account acceptance; additional streaming adapters, endpoint detection/VAD, network reconnection |
-| Long dictation | Four-minute takes | Chunking, long-session recovery, audio interruption handling |
+| Long dictation | Ten-minute takes with automatic finish; HTTP speech uploads chunked at the provider's five-minute limit, Google below 60 s | Long-session recovery, audio interruption handling |
+| Long-form drafting | Not yet. Decided 2026-11-10: paragraph-at-a-time dictation into a VoiceDraft draft window (see Direction (2026-11-10)) | Draft window with per-paragraph polish, undo and export; then voice edits over the draft, an iOS draft screen, and a continuous mode with pause segmentation |
 | Microphone controls | App input picker, per-take device binding and device name in the HUD tooltip | Real microphone/device-disconnect validation |
 | Offline mode | Settings/history work offline | Local ASR/LLM adapters and queue/retry options |
 | macOS distribution | Locally signed Apple Silicon app | Developer ID signing, notarization, updater, Intel builds, login item |
-| Windows, iOS, Android | No clients yet | Platform-specific capture/input, shared sync protocol implementations |
+| Windows, iOS, Android | iOS client: container app plus voice-only keyboard sharing `VoiceDraftCore` (see [ios.md](ios.md)); no Windows or Android client | Windows and Android capture/input, shared sync protocol implementations |
 | Product polish | Eight interface languages, model editor, sync setup, recording state, application icon | Native-language copy review, onboarding, accessibility review |
 
 ## Suggested delivery sequence
@@ -50,3 +51,7 @@ Full feature parity remains a product program beyond this preview. Billing, subs
 - App Store distribution of the Mac app is not planned. The Mac app ships directly and notarized.
 - The iOS keyboard is voice only (hold to talk, insert last result, globe, space, delete, return); typing is left to other keyboards ([ios.md](ios.md#app-store-constraints-that-shape-the-design)).
 - iOS keyboard dictation opens the VoiceDraft app to record when it is not on standby, then keeps a keyboard standby window (default 15 minutes) so later takes need no app switch ([ios.md](ios.md#process-model)).
+
+## Direction (2026-11-10)
+
+Long-form writing by voice is a drafting surface, not a longer take. The maintainer chose, for the first version, dictation one paragraph per take into a draft window owned by VoiceDraft: press the dictation shortcut with the draft window focused, speak one paragraph, release; the polished paragraph is appended to the draft. Each paragraph stays inside the ten-minute take and the writing model's output limits, and the draft can be edited by keyboard, undone paragraph by paragraph, copied or inserted into another app. A continuous mode (locked recording with pause-based segmentation) and an iOS draft screen come later. Dictating ten minutes in one take into another app's document is not the goal.

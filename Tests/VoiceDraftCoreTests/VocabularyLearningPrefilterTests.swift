@@ -1,3 +1,4 @@
+import NaturalLanguage
 import XCTest
 @testable import VoiceDraftCore
 
@@ -39,9 +40,16 @@ final class VocabularyLearningPrefilterTests: XCTestCase {
         assertClassified("明天跟王老师说一声")
     }
 
-    func testBareChineseNameIsClassifiedByNameTagger() {
-        // NLTagger name tagging for Chinese is best-effort (verified on macOS 26).
-        assertClassified("让张伟看一下这个")
+    func testBareChineseNameFollowsSystemNameTagger() {
+        // Chinese name recognition depends on the linguistic assets installed on this Mac.
+        let text = "让张伟看一下这个"
+        let tagger = NLTagger(tagSchemes: [.nameType])
+        tagger.string = text
+        let tags = tagger.tags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType,
+                               options: [.omitWhitespace, .omitPunctuation, .joinNames])
+        let nameTags: Set<NLTag> = [.personalName, .placeName, .organizationName]
+        XCTAssertEqual(VocabularyLearningPrefilter.shouldClassify(dictation(text)),
+                       tags.compactMap { $0.0 }.contains(where: nameTags.contains))
     }
 
     func testLetterDigitTokenIsClassified() {

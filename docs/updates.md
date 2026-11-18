@@ -14,13 +14,28 @@ The file is created with mode 0600, and the command refuses to overwrite a key. 
 
 ## Build and sign a release
 
-Use a strictly increasing numeric build number and a numeric version. The default development build is 0.2.0 (2):
+Use a strictly increasing numeric build number and a numeric version. The preview build defaults to 0.2.10 (12):
 
 ```sh
-VOICEDRAFT_VERSION=0.2.1 VOICEDRAFT_BUILD=3 ./scripts/build-app.sh
+VOICEDRAFT_VERSION=0.2.10 VOICEDRAFT_BUILD=12 ./scripts/build-app.sh
 ```
 
-For distributed apps, provide `VOICEDRAFT_CODESIGN_IDENTITY` and complete your Developer ID/notarization workflow. The existing default remains ad-hoc signing for personal local builds. Gatekeeper, TCC and macOS login-item behavior should be accepted using your actual signed installation.
+For a public Mac download, check out the release commit in a clean worktree and set `VOICEDRAFT_CODESIGN_IDENTITY` to the full Developer ID Application certificate name. The build script enables hardened runtime and microphone access for that identity. It includes the AGPL text and the source revision in the bundle. For a fork or source archive, set `VOICEDRAFT_SOURCE_URL` to the matching public source. Local builds default to ad-hoc signing.
+
+After signing, notarize the app, staple the accepted ticket, and then create the downloadable ZIP:
+
+```sh
+ditto -c -k --keepParent dist/VoiceDraft.app dist/notary-submission.zip
+xcrun notarytool submit dist/notary-submission.zip --keychain-profile "$NOTARY_PROFILE" --wait
+# Continue after the service reports Accepted.
+xcrun stapler staple dist/VoiceDraft.app
+xcrun stapler validate dist/VoiceDraft.app
+spctl --assess --type execute --verbose=2 dist/VoiceDraft.app
+ditto -c -k --keepParent dist/VoiceDraft.app dist/VoiceDraft-0.2.10-macOS-arm64.zip
+shasum -a 256 dist/VoiceDraft-0.2.10-macOS-arm64.zip
+```
+
+Publish the final ZIP and checksum on the GitHub Release for the matching tag. State the minimum macOS version, CPU architecture and known limitations in its release notes. A self-hosted updater feed is optional.
 
 Choose a fresh output directory and an immutable HTTPS ZIP URL, then sign:
 
@@ -28,9 +43,9 @@ Choose a fresh output directory and an immutable HTTPS ZIP URL, then sign:
 VOICEDRAFT_RELEASE_NOTES='Describe the user-visible changes.' \
   swift scripts/make-update.swift sign \
   "$PWD/dist/VoiceDraft.app" \
-  https://updates.example.com/voicedraft/0.2.1/VoiceDraft.zip \
+  https://updates.example.com/voicedraft/0.2.10/VoiceDraft.zip \
   /secure/private/voicedraft-update-key \
-  "$PWD/output/releases/0.2.1" arm64
+  "$PWD/output/releases/0.2.10" arm64
 ```
 
 The command creates `VoiceDraft.zip` and `update.json`. It does not upload anything. `x86_64` and `universal` are accepted only when you actually build that architecture; the packaging command does not cross-compile on your behalf. Publish the ZIP first and replace the feed last. Use separate feeds when shipping separate architectures.

@@ -31,7 +31,7 @@ The local `run-server.sh` also reuses the existing `.local/access-token` and `.l
 
 ## HTTPS deployment for multiple devices
 
-1. Copy `server/` to your server. Docker Compose uses a Go build stage and a minimal runtime image containing the static binary. It runs as UID/GID 10001, matching the previous service's database ownership.
+1. Copy `server/` to your server. Docker Compose uses a Go build stage and a minimal runtime image containing the static binary and its distribution notices in `/licenses`. It runs as UID/GID 10001, matching the previous service's database ownership.
 2. Create a private `.env` next to `compose.yaml` containing `VOICEDRAFT_SYNC_TOKEN=<a random token of at least 32 characters>`. Generate a token with `openssl rand -hex 32` or the built binary's `--generate-token` command; set the file's permissions to 0600.
 3. Run `docker compose up -d --build`. The named volume preserves the SQLite vault.
 4. Put Caddy or your existing HTTPS reverse proxy in front of `127.0.0.1:8765`. `Caddyfile.example` is a starting point; replace the domain and configure DNS. Install Caddy separately using its official instructions. Apply request size, connection, and rate limits appropriate to your host.
@@ -71,3 +71,10 @@ Responses: 400 invalid envelope, 401 unauthorized, 404 wrong path, 405 unsupport
 From `server/`, run `go vet ./...`, `go build ./...`, and `go test -race ./...`. Tests include authentication, framing/size bounds, encrypted envelopes, concurrent independent connections, revision conflicts, storage errors, persistence, private file permissions, and a synthetic database created by the original Python service. The driver version and checksums are pinned in `go.mod`/`go.sum`.
 
 From the repository root, `./scripts/test-all.sh` additionally checks localization and runs Swift tests against an isolated Go sync/provider fixture server. This full integration path requires loopback listening permission. Python 3 remains a developer-only dependency for the existing localization checkers; neither Go service tests nor the production server use it.
+
+
+## Distributing a sync server build
+
+When sharing a built image, set `VOICEDRAFT_SOURCE_URL` for Compose (or pass `--build-arg SOURCE_URL=...` to Docker) to the public tag or commit for **your build**, including any modifications. The image includes that URL, the AGPL text and notices collected from the Go toolchain and modules used for the target platform.
+
+For a standalone binary, build it from `server/` and ship `LICENSE`, a `SOURCE.txt` containing the matching source URL, and the output of `./collect-notices.sh > THIRD-PARTY-NOTICES.txt` alongside it. Use the same Go toolchain, `GOOS`, `GOARCH` and `CGO_ENABLED` for both commands.

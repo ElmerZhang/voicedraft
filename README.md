@@ -1,28 +1,37 @@
 # VoiceDraft
 
-A native macOS voice writing app with independently configurable Qwen speech and writing models, plus a self-hosted encrypted configuration vault. It is inspired by the public behaviour of Typeless and TypeFlux; this is an independent implementation and no code was copied.
+Dictate into the Mac app you are using, translate as you speak, or select a paragraph and tell VoiceDraft how to edit it. You choose the speech and writing providers and use your own API keys.
 
-An iOS client (a container app plus a custom keyboard extension that shares `VoiceDraftCore`) lives under `ios/`; see [docs/ios.md](docs/ios.md).
+- **Mac (macOS 13+)** · [Build from source](#build-the-mac-app) · [Track prebuilt downloads](https://github.com/ElmerZhang/voicedraft/releases) (first notarized package pending)
+- **iPhone (iOS 17+)** · Build the app and keyboard extension in Xcode. See the [iPhone guide](ios/README.md).
+- **Optional sync** · Share model settings and vocabulary between devices using the [self-hosted Go server](docs/server.md). You can dictate without setting up sync.
 
-## Run the Mac app
+![VoiceDraft Home on macOS showing the dictation, translation, editing and Ask shortcuts](docs/images/macos-home.png)
 
-Open `dist/VoiceDraft.app` after building:
+## Your first dictation on the Mac
+
+1. Open **Settings → Models**. For the default Qwen setup, enter your Bailian key in both the speech and writing profiles and select the endpoints for your region. You can also use Doubao, a Whisper-compatible endpoint or Google Speech for recognition, and Chat Completions, Responses or Anthropic Messages for writing. See [provider setup](docs/selected-features.md#provider-setup).
+2. Allow **Microphone** for recording and **Accessibility** for inserting the result into another app. Both permissions are in **System Settings → Privacy & Security**.
+3. Click in a blank TextEdit document. Tap **Control + Option + Space**, speak a sentence, then tap again. VoiceDraft inserts the finished text at the cursor. You can change the shortcut in Settings.
+
+### Where your data goes
+
+Your device sends audio directly to your speech provider and text directly to your writing provider. History and any recordings you choose to keep stay on the device. If you enable sync, your server stores an encrypted copy of settings, vocabulary and provider keys. Optional on-screen context can send visible terms or excerpts to your providers when you turn it on. See the [privacy and security details](SECURITY.md).
+
+## Build the Mac app
+
+On a Mac with Xcode, the Swift toolchain and Python 3, run:
 
 ```sh
+git clone https://github.com/ElmerZhang/voicedraft.git
+cd voicedraft
 ./scripts/build-app.sh
 open dist/VoiceDraft.app
 ```
 
-Requirements: macOS 13 or newer, Xcode/Swift for source builds. The included build is for the build machine's architecture (Apple Silicon). The preview is locally ad-hoc signed; public distribution and notarization are not included.
+The script produces a locally signed app for the architecture of the build machine. Move the app to Applications if you want to keep using it.
 
-The build script packages the icon directly, checks all ten image representations with macOS ImageIO, and verifies the app signature and Info.plist before reporting success. It does not require `iconutil` conversion.
-
-1. Open **Settings → Models**, edit the speech and writing profiles, and enter a Bailian API key in each. They may share a key or use separate keys.
-2. Select a model first, then configure its endpoint and model parameters. Defaults remain `qwen3-asr-flash` for speech and `qwen-plus` for writing. The catalog supports Qwen3-ASR-Flash (HTTP context), Qwen-Audio-3.0/3.1-ASR-Flash (HTTP weighted hotwords), and Qwen-Audio-3.1-ASR-Flash-Message (WebSocket weighted hotwords). Other ASR IDs require an adapter before use.
-3. Use your region/workspace domain and the selected model’s endpoint. **Use model endpoint** fixes the scheme and path while keeping your host. Message uses `wss://WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference`; it cannot use `/chat/completions`. Already-saved API keys appear as masked dots. Leaving the replacement blank keeps the stored key.
-4. Use **Test connection** on the writing profile. This sends a small real request using your key. Test ASR by using a dictation shortcut in another app.
-5. Allow Microphone when recording. Allow Accessibility in Settings to insert into other applications.
-6. Click a text field in another app and press **Control + Option + Space**, speak, then press the shortcut again.
+## Shortcuts
 
 | Shortcut | Behavior |
 | --- | --- |
@@ -33,7 +42,7 @@ The build script packages the icon directly, checks all ten image representation
 
 Shortcuts are configurable in Settings. Fn works alone or combined with Shift, Control, Option or Command (hold the modifier, then press Fn); set macOS's Fn (🌐) key action to Do Nothing first.
 
-Recordings are limited to four minutes per take. `qwen-audio-3.1-asr-flash-message` streams audio while you speak and shows a live transcript above the compact recording controls. You can say a correction (for example, “把刚才的周二改成周四”) before finishing; Polish and Translate pass the complete transcript to the writing model with explicit self-correction instructions. Verbatim keeps the recognized words, including correction instructions. HTTP speech models still recognize after you finish recording. Choose **Input device** in Settings: follow the system default or select a microphone. The recording capsule has Cancel, an input-level waveform, and Finish; hover for the actual microphone and elapsed time. Nothing is inserted until you finish. If there is no editable input focus, insertion is disabled, or the original focus changes, a persistent result card lets you copy the text without opening the main window. Device selection is local and does not change macOS Sound settings.
+Recordings are limited to ten minutes per take. `qwen-audio-3.1-asr-flash-message` streams audio while you speak and shows a live transcript above the compact recording controls. You can say a correction (for example, “把刚才的周二改成周四”) before finishing; Polish and Translate pass the complete transcript to the writing model with explicit self-correction instructions. Verbatim keeps the recognized words, including correction instructions. HTTP speech models still recognize after you finish recording. Choose **Input device** in Settings: follow the system default or select a microphone. The recording capsule has Cancel, an input-level waveform, and Finish; hover for the actual microphone and elapsed time. Nothing is inserted until you finish. If there is no editable input focus, insertion is disabled, or the original focus changes, a persistent result card lets you copy the text without opening the main window. Device selection is local and does not change macOS Sound settings.
 
 The floating recording panel does not take keyboard focus. If the original field or selection changes while the model is working, the result remains in VoiceDraft for manual copying. VoiceDraft pastes unless the focus is clearly not an input: buttons, menus, static text, disabled controls, password fields and apps without a focused window get a copy card instead. When an app does not expose a text field (some chat, terminal and custom-drawn apps), the paste is still sent and the result card stays up with "Paste sent · copy here if nothing appeared" so you can copy it if nothing arrived. Accessibility support varies between applications; password fields are blocked. No automatic Enter/send keystroke is generated.
 
@@ -59,13 +68,13 @@ The service listens on `http://127.0.0.1:8765`. Its randomly generated access to
 - Enable automatic sync to synchronize after saves and every 30 seconds while Studio or History is open. Editing model/vocabulary pages pauses background polling to protect unsaved form edits.
 - Conflicting changes stop with an explicit message. Downloading a server copy requires confirmation and replaces local model settings and vocabulary. Reapply any local edits you want to keep afterward.
 
-Localhost is only reachable from the same machine. For multiple physical devices, deploy the service on a shared HTTPS host using [the server guide](docs/server.md). Cross-platform clients are planned; the initial client is macOS.
+Localhost is only reachable from the same machine. For multiple physical devices, deploy the service on a shared HTTPS host using [the server guide](docs/server.md). Both the Mac and iPhone clients can use the same vault.
 
 ## Included
 
-- Multiple saved Qwen model profiles; speech and writing are selected independently.
+- Multiple saved provider profiles; speech and writing are selected independently.
 - Model catalog, protocol-specific endpoints, separate API keys, read-only vocabulary adaptation previews, and advanced JSON parameters.
-- Dictation cleanup, spoken self-corrections, structured formatting, translation, selected-text editing, and text-only question answering through Qwen.
+- Dictation cleanup, spoken self-corrections, structured formatting, translation, selected-text editing, and text-only question answering through your configured writing provider.
 - One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Vocabulary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
 - Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
@@ -103,8 +112,6 @@ Add its case and matching rules in `AppLanguage`/`L10n`, provide complete `Local
 - [Qwen ASR HTTP API](https://www.alibabacloud.com/help/en/model-studio/qwen-asr-api-reference)
 - [Bailian OpenAI-compatible text generation](https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope)
 - Public behaviour that inspired this project: [Typeless quickstart](https://www.typeless.com/help/quickstart) and [Ask anything](https://www.typeless.com/ask-anything). Independent implementation, no code copied.
-
-Other model providers are intentionally out of scope for this release.
 
 ## Selected feature expansion (0.2)
 

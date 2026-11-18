@@ -1,0 +1,50 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Mac, Go sync and localization
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: ./scripts/test-all.sh
+      - run: ./scripts/build-app.sh
+      - run: cmp LICENSE dist/VoiceDraft.app/Contents/Resources/LICENSE
+
+  ios:
+    name: iPhone simulator
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          xcodebuild -project ios/VoiceDraft.xcodeproj -scheme VoiceDraft \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -parallel-testing-enabled NO test CODE_SIGNING_ALLOWED=NO
+
+  server-image:
+    name: Sync server distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cmp LICENSE server/LICENSE
+          docker build --build-arg SOURCE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA" -t voicedraft-sync server
+          container=$(docker create voicedraft-sync)
+          docker cp "$container:/licenses" "$RUNNER_TEMP/licenses"
+          cmp LICENSE "$RUNNER_TEMP/licenses/LICENSE"
+          grep -Fx "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA" "$RUNNER_TEMP/licenses/SOURCE.txt"
+          grep -F 'modernc.org/sqlite@' "$RUNNER_TEMP/licenses/THIRD-PARTY-NOTICES.txt"

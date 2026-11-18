@@ -8,6 +8,12 @@ swift build -c release --disable-sandbox
 BIN_DIR="$(swift build -c release --show-bin-path --disable-sandbox)"
 APP="$PWD/dist/VoiceDraft.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp LICENSE "$APP/Contents/Resources/LICENSE"
+source_url=${VOICEDRAFT_SOURCE_URL:-https://github.com/ElmerZhang/voicedraft}
+if [[ -z "${VOICEDRAFT_SOURCE_URL:-}" ]] && revision=$(git rev-parse --verify HEAD 2>/dev/null); then
+    source_url="$source_url/tree/$revision"
+fi
+printf '%s\n' "$source_url" > "$APP/Contents/Resources/SOURCE.txt"
 cp "$BIN_DIR/VoiceDraft" "$APP/Contents/MacOS/VoiceDraft"
 rm -rf "$APP/Contents/Resources/VoiceDraft_VoiceDraftCore.bundle"
 cp -R "$BIN_DIR/VoiceDraft_VoiceDraftCore.bundle" "$APP/Contents/Resources/"
@@ -36,9 +42,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
 PLIST
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VOICEDRAFT_VERSION:-0.2.9}" "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VOICEDRAFT_BUILD:-11}" "$APP/Contents/Info.plist"
-codesign --force --sign "${VOICEDRAFT_CODESIGN_IDENTITY:--}" "$APP"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VOICEDRAFT_VERSION:-0.2.10}" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VOICEDRAFT_BUILD:-12}" "$APP/Contents/Info.plist"
+identity=${VOICEDRAFT_CODESIGN_IDENTITY:--}
+sign_options=(--force --sign "$identity")
+if [[ "$identity" == "Developer ID Application:"* ]]; then
+    sign_options+=(--options runtime --timestamp --entitlements scripts/mac-distribution.entitlements)
+fi
+codesign "${sign_options[@]}" "$APP"
 codesign --verify --deep --strict "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 printf 'Built %s\n' "$APP"

@@ -6,7 +6,7 @@ Please do not open a public issue. Either open a private GitHub security advisor
 
 ## Supported versions
 
-Only the latest release receives security fixes.
+Until the first public binary release, report issues against a commit on `main`. After that, the latest published version receives security fixes. Include the tag or commit in your report.
 
 ## Threat model
 

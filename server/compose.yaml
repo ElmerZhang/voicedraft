@@ -1,6 +1,9 @@
 services:
   sync:
-    build: .
+    build:
+      context: .
+      args:
+        SOURCE_URL: ${VOICEDRAFT_SOURCE_URL:-https://github.com/ElmerZhang/voicedraft}
     restart: unless-stopped
     environment:
       VOICEDRAFT_SYNC_TOKEN: ${VOICEDRAFT_SYNC_TOKEN:?Set a random token of at least 32 characters}

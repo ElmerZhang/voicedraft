@@ -52,6 +52,37 @@ final class DeliveryOutcomeTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testQueuedRepeatPasteClosesAnExistingCardEvenForAnOpaqueTarget() {
+        let state = AppState(preview: true)
+        state.presentQueuedPaste("First take", opaque: true, bundleID: "example.editor")
+        var hidden = false
+        state.hideHUD = { hidden = true }
+        state.showHUD = { XCTFail("Re-inserting should not open the copy card") }
+
+        state.presentQueuedPaste(nil, opaque: true, bundleID: "example.editor")
+        state.applyDeliveryOutcome(.sentWithoutConfirmation, id: state.generation, opaque: true)
+
+        XCTAssertTrue(hidden)
+        XCTAssertEqual(state.hudKind, .compact)
+        XCTAssertNil(state.pasteConfirmationApp)
+        XCTAssertEqual(state.status, "Paste sent · check the input field")
+    }
+
+    @MainActor
+    func testBlockedInsertLastShortcutShowsOnlyTheError() async {
+        let state = AppState(preview: true)
+        let notice = expectation(description: "Insertion failure notice")
+        state.showHUD = { notice.fulfill() }
+        state.result = "Synthetic dictation"
+        state.shortcutEvent(.insertLast, down: false)
+        await fulfillment(of: [notice], timeout: 3)
+        XCTAssertEqual(state.hudKind, .notice)
+        XCTAssertTrue(state.hudText.isEmpty)
+        XCTAssertFalse(state.error.isEmpty)
+        XCTAssertEqual(state.result, "Synthetic dictation")
+    }
+
     func testWritableOrTerminalPasteHidesTheHUD() async {
         await MainActor.run {
             let state = AppState(preview: true)

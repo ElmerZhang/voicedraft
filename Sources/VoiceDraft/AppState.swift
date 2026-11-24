@@ -1031,20 +1031,32 @@ extension AppState {
     /// whichever input is focused now, through the normal insertion pipeline.
     /// This is not a new take: no history entry, recent context, vocabulary
     /// learning or correction observation. It never starts a recording.
-    func insertLastResult() { insertText(result) }
+    func insertLastResult() { insertText(.lastResult) }
 
     /// The Draft window's "Insert into previous app": activates the app that was
     /// active before the window, then delivers the whole draft through the same
     /// pipeline as Insert last result (`.currentInput`). Not a take: no History entry.
     func insertDraftIntoPreviousApp() {
-        insertText(drafts.currentText, activating: drafts.previousApplication, requireApplication: true)
+        insertText(.draft(drafts.previousApplication))
     }
 
-    /// Insert last result's pipeline for `text`. With `activating`, that app is
-    /// brought to the front first; when it cannot be (quit or never known), the
-    /// copy card offers the text instead.
-    private func insertText(_ text: String, activating application: NSRunningApplication? = nil, requireApplication: Bool = false) {
+    private enum RepeatInsertion {
+        case lastResult
+        case draft(NSRunningApplication?)
+    }
+
+    private func insertText(_ source: RepeatInsertion) {
         guard !busy else { return }
+        let text: String
+        let copyCardText: String?
+        switch source {
+        case .lastResult:
+            text = result
+            copyCardText = nil
+        case .draft:
+            text = drafts.currentText
+            copyCardText = text
+        }
         notice = ""; hudCopied = false
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             error = .init(error: VoiceDraftError.message("Nothing to insert yet. Dictate first."))
@@ -1059,19 +1071,20 @@ extension AppState {
             // its key is released; a paste sent now could arrive as ⌃⌥⌘V.
             let released = await Self.waitForModifierRelease()
             guard generation == id, !Task.isCancelled else { return }
-            if requireApplication {
+            if case let .draft(application) = source {
                 guard let application, !application.isTerminated, await Self.activate(application) else {
-                    reinsertFallback(text, id: id, error: VoiceDraftError.message("The previous app is not available. Copy the draft instead."))
+                    reinsertFallback(copyCardText, id: id, error: VoiceDraftError.message("The previous app is not available. Copy the draft instead."))
                     return
                 }
                 guard generation == id, !Task.isCancelled else { return }
             }
             guard released else {
-                reinsertFallback(text, id: id, error: VoiceDraftError.message("Shortcut keys were still held, so nothing was pasted. Copy the result instead."))
+                reinsertFallback(copyCardText, id: id, error: VoiceDraftError.message("Shortcut keys were still held, so nothing was pasted. Copy the result instead."))
                 return
             }
             guard !preview, insertionAuthorized else {
-                reinsertFallback(text, id: id, error: VoiceDraftError.message("Enable Accessibility to paste into other apps. The result is available here."))
+                let message: LocalizedMessage = copyCardText == nil ? "Allow Accessibility" : "Enable Accessibility to paste into other apps. The result is available here."
+                reinsertFallback(copyCardText, id: id, error: VoiceDraftError.message(message))
                 return
             }
             // The focus at send time is the target, as for ordinary dictation; `send`
@@ -1080,11 +1093,11 @@ extension AppState {
                 let sent = try await TextInsertion.send(text, binding: .currentInput)
                 guard generation == id else { return }
                 phase = "idle"
-                presentQueuedPaste(text, opaque: sent.target.opaqueApplication, bundleID: sent.target.bundleID, applicationName: sent.target.name)
+                presentQueuedPaste(copyCardText, opaque: sent.target.opaqueApplication, bundleID: sent.target.bundleID, applicationName: sent.target.name)
                 awaitDeliveryOutcome(sent, id: id, opaque: sent.target.opaqueApplication)
             } catch {
                 guard !(error is CancellationError) else { return }
-                reinsertFallback(text, id: id, error: error)
+                reinsertFallback(copyCardText, id: id, error: error)
             }
         }
     }
@@ -1102,17 +1115,15 @@ extension AppState {
     /// True while the HUD shows the fallback card of an opaque paste.
     var hudPasteSent: Bool { hudKind == .result && status == Self.opaquePasteStatus }
     /// Called once Command-V is queued. A writable editor or terminal hides the
-    /// HUD; an opaque target (paste unless proven otherwise) keeps the result
-    /// card up so the user can copy if the paste went nowhere. The card closes on
-    /// Escape, its close button, Copy, or the next take.
-    func presentQueuedPaste(_ text: String, opaque: Bool, bundleID: String? = nil, applicationName: String? = nil) {
+    /// HUD. An opaque target can offer a copy card when the caller supplies text.
+    func presentQueuedPaste(_ copyCardText: String?, opaque: Bool, bundleID: String? = nil, applicationName: String? = nil) {
         pasteConfirmationApp = nil
         let app = bundleID.flatMap { id in
             id.isEmpty ? nil : PasteConfirmationApp(bundleID: id, name: applicationName ?? id)
         }
         let hidden = app.map { device.hiddenPasteConfirmationApps[$0.bundleID] != nil } ?? false
         guard opaque else { hudKind = .compact; hideHUD?(); return }
-        guard !hidden || !error.isEmpty else {
+        guard let text = copyCardText, !hidden || !error.isEmpty else {
             status = "Paste sent · check the input field"
             hudKind = .compact; hideHUD?(); return
         }
@@ -1150,10 +1161,13 @@ extension AppState {
         case .sentWithoutConfirmation: status = opaque && hudPasteSent ? Self.opaquePasteStatus : "Paste sent · check the input field"
         }
     }
-    private func reinsertFallback(_ text: String, id: UUID, error: Error) {
+    private func reinsertFallback(_ copyCardText: String?, id: UUID, error: Error) {
         guard generation == id else { return }
         phase = "idle"; self.error = .init(error: error); status = "Result ready · open VoiceDraft to copy"
-        hudText = text; hudCopied = false; hudKind = .result; showHUD?()
+        pasteConfirmationApp = nil
+        hudText = copyCardText ?? ""; hudCopied = false
+        hudKind = copyCardText == nil ? .notice : .result
+        showHUD?()
     }
     /// Activates `application` and waits up to one second for it to become frontmost.
     private static func activate(_ application: NSRunningApplication) async -> Bool {

@@ -2,7 +2,7 @@ import Foundation
 
 /// Which input a finished result may be pasted into.
 public enum InsertionBinding: Equatable, Sendable {
-    /// Ordinary dictation and Insert last result: the focus that is current when
+    /// Ordinary dictation and insertion from the Draft window: the focus that is current when
     /// the result is ready, in whatever app and window that is.
     case currentInput
     /// Edit and Style apply replace the selection captured at the start, so the

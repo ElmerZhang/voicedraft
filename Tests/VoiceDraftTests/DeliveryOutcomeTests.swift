@@ -53,15 +53,14 @@ final class DeliveryOutcomeTests: XCTestCase {
     }
 
     @MainActor
-    func testQueuedRepeatPasteClosesAnExistingCardEvenForAnOpaqueTarget() {
+    func testDirectPasteClosesAnExistingOpaquePasteCard() {
         let state = AppState(preview: true)
         state.presentQueuedPaste("First take", opaque: true, bundleID: "example.editor")
         var hidden = false
         state.hideHUD = { hidden = true }
         state.showHUD = { XCTFail("Re-inserting should not open the copy card") }
 
-        state.presentQueuedPaste(nil, opaque: true, bundleID: "example.editor")
-        state.applyDeliveryOutcome(.sentWithoutConfirmation, id: state.generation, opaque: true)
+        state.presentDirectPaste()
 
         XCTAssertTrue(hidden)
         XCTAssertEqual(state.hudKind, .compact)

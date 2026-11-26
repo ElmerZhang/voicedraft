@@ -1,8 +1,28 @@
 import AppKit
+import Carbon
 import XCTest
 @testable import VoiceDraft
 
 final class InsertionClipboardTests: XCTestCase {
+    @MainActor
+    func testPasteWithoutInputTargetPostsOneCommandVAndRestoresClipboard() async throws {
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        board.setString("prior clipboard", forType: .string)
+        let previous = try XCTUnwrap(InsertionClipboardSnapshot.capture(board, maximumBytes: 1024))
+        var events: [CGEventType] = []
+        let outcome = try TextInsertion.postPaste("last dictation", previous: previous, fresh: nil, board: board) { event in
+            events.append(event.type)
+            XCTAssertEqual(event.getIntegerValueField(.keyboardEventKeycode), Int64(kVK_ANSI_V))
+            XCTAssertEqual(event.flags, .maskCommand)
+            XCTAssertEqual(board.string(forType: .string), "last dictation")
+        }
+        XCTAssertEqual(events, [.keyDown, .keyUp])
+        let result = await outcome.value
+        XCTAssertEqual(result, .sentWithoutConfirmation)
+        XCTAssertEqual(board.string(forType: .string), "prior clipboard")
+    }
+
     func testAllFormatsRestoreButNewUserCopyWins() async {
         let board = NSPasteboard.withUniqueName()
         defer { board.releaseGlobally() }

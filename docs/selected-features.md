@@ -60,7 +60,7 @@ Maintainer-authorized expansion, decided 2026-11-10 (roadmap Direction (2026-11-
 | H3 | Long-form Polish variant: the text before (1,500 characters) and after (500) the caret as reference only, a fixed cached-prefix paragraph, split only at a clear topic change | `QwenRequests.writing(draft:)`, `DraftWritingContext` |
 | H4 | Edit shortcut over a selection, or over the whole draft when nothing is selected ("Whole draft" in the HUD); style menu over a selection; results written directly, bound to the start range | `DraftRouting`, `DraftWorkspace.replace` |
 | H5 | One undo step per take (Command-Z or Undo last take), Re-polish last take with a chosen style when it is intact | `DraftTake`, `DraftWorkspace` |
-| H6 | Copy all, Insert into previous app (through Insert last result's pipeline), Export as `.md` or `.txt` | `AppState.insertDraftIntoPreviousApp`, `NSSavePanel` |
+| H6 | Copy all, Insert into previous app (checks the current input), Export as `.md` or `.txt` | `AppState.insertDraftIntoPreviousApp`, `NSSavePanel` |
 | H7 | Local JSON per draft, atomic, autosaved; History entries ("VoiceDraft Draft") and usage-log sources `draft.*` | `FileDraftStore`, `ModelUsageSource` |
 
 **Privacy.** Draft text stays on the Mac except the reference context and selections sent to the user's configured writing provider for draft takes. Drafts are not synced, are not part of `SharedSettings`, and on-screen context never reads VoiceDraft's own window. New strings ship in all eight interface languages.

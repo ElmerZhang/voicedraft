@@ -1028,14 +1028,13 @@ extension AppState {
         screenContext.retarget(take: generation, mode: mode)
     }
     /// Inserts the last result (`result`, from a recording or Studio) again into
-    /// whichever input is focused now, through the normal insertion pipeline.
+    /// the current app with a direct Command-V.
     /// This is not a new take: no history entry, recent context, vocabulary
     /// learning or correction observation. It never starts a recording.
     func insertLastResult() { insertText(.lastResult) }
 
     /// The Draft window's "Insert into previous app": activates the app that was
-    /// active before the window, then delivers the whole draft through the same
-    /// pipeline as Insert last result (`.currentInput`). Not a take: no History entry.
+    /// active before the window, then delivers the whole draft to its current input.
     func insertDraftIntoPreviousApp() {
         insertText(.draft(drafts.previousApplication))
     }
@@ -1087,13 +1086,18 @@ extension AppState {
                 reinsertFallback(copyCardText, id: id, error: VoiceDraftError.message(message))
                 return
             }
-            // The focus at send time is the target, as for ordinary dictation; `send`
-            // also waits (bounded) for a first-enabled Electron tree.
             do {
+                if case .lastResult = source {
+                    try await TextInsertion.pasteDirectly(text)
+                    guard generation == id else { return }
+                    phase = "idle"
+                    presentDirectPaste()
+                    return
+                }
                 let sent = try await TextInsertion.send(text, binding: .currentInput)
                 guard generation == id else { return }
                 phase = "idle"
-                presentQueuedPaste(copyCardText, opaque: sent.target.opaqueApplication, bundleID: sent.target.bundleID, applicationName: sent.target.name)
+                presentQueuedPaste(text, opaque: sent.target.opaqueApplication, bundleID: sent.target.bundleID, applicationName: sent.target.name)
                 awaitDeliveryOutcome(sent, id: id, opaque: sent.target.opaqueApplication)
             } catch {
                 guard !(error is CancellationError) else { return }
@@ -1114,16 +1118,23 @@ extension AppState {
     static let opaquePasteStatus: LocalizedMessage = "Paste sent · copy here if nothing appeared"
     /// True while the HUD shows the fallback card of an opaque paste.
     var hudPasteSent: Bool { hudKind == .result && status == Self.opaquePasteStatus }
+    /// A manual paste has no AX target or receipt. Close any card from the previous take.
+    func presentDirectPaste() {
+        pasteConfirmationApp = nil
+        status = "Paste sent · check the input field"
+        hudKind = .compact
+        hideHUD?()
+    }
     /// Called once Command-V is queued. A writable editor or terminal hides the
     /// HUD. An opaque target can offer a copy card when the caller supplies text.
-    func presentQueuedPaste(_ copyCardText: String?, opaque: Bool, bundleID: String? = nil, applicationName: String? = nil) {
+    func presentQueuedPaste(_ text: String, opaque: Bool, bundleID: String? = nil, applicationName: String? = nil) {
         pasteConfirmationApp = nil
         let app = bundleID.flatMap { id in
             id.isEmpty ? nil : PasteConfirmationApp(bundleID: id, name: applicationName ?? id)
         }
         let hidden = app.map { device.hiddenPasteConfirmationApps[$0.bundleID] != nil } ?? false
         guard opaque else { hudKind = .compact; hideHUD?(); return }
-        guard let text = copyCardText, !hidden || !error.isEmpty else {
+        guard !hidden || !error.isEmpty else {
             status = "Paste sent · check the input field"
             hudKind = .compact; hideHUD?(); return
         }

@@ -254,6 +254,23 @@ enum TextInsertion {
     /// released once, on the first of confirmation, the text's first pasteboard
     /// read plus a short grace, or the end of the window.
     static func send(_ text: String, binding: InsertionBinding, start: InputTarget? = nil) async throws -> TextInsertionDelivery {
+        try await withDeliveryClipboard(waitForEditor: binding == .currentInput) { previous in
+            let (target, fresh) = try validatedTarget(binding: binding, start: start)
+            let outcome = try postPaste(text, previous: previous, fresh: fresh)
+            return TextInsertionDelivery(outcome: outcome, target: target)
+        }
+    }
+
+    /// An explicit user paste goes to the frontmost responder just like Command-V.
+    static func pasteDirectly(_ text: String) async throws {
+        try await withDeliveryClipboard(waitForEditor: false) { previous in
+            _ = try postPaste(text, previous: previous, fresh: nil)
+        }
+    }
+
+    /// Hold the lease across the snapshot and transfer it to the posted paste's restoration task.
+    private static func withDeliveryClipboard<Result>(waitForEditor: Bool,
+        post: (InsertionClipboardSnapshot) throws -> Result) async throws -> Result {
         try Task.checkCancellation()
         // A previous delivery's temporary text may still be on the clipboard. Wait
         // for its lease before reading the snapshot, or that text would later be
@@ -272,8 +289,8 @@ enum TextInsertion {
         // A first read of the delivery-time focus. An Electron app this read just
         // enabled, or one enabled at take start, may still be building its tree:
         // wait (bounded) for its editor here, before the clipboard snapshot, so the
-        // wait never holds the snapshot. Callers only send automatic insertions.
-        if binding == .currentInput, let pending = capture(), pending.accessibilityPending, !pending.writable {
+        // wait never holds the snapshot.
+        if waitForEditor, let pending = capture(), pending.accessibilityPending, !pending.writable {
             _ = await refreshPending(pending)
             try Task.checkCancellation()
         }
@@ -281,10 +298,13 @@ enum TextInsertion {
         guard let previous = await InsertionClipboardReader.shared.read(name: board.name) else {
             throw InsertionFailure(.clipboard)
         }
-        // Clipboard providers can yield; the focus read now is the delivery-time
-        // capture. For `.currentInput` it is authoritative, so an editor that
-        // appeared during the wait is found here.
         try Task.checkCancellation()
+        let result = try post(previous)
+        handedOff = true
+        return result
+    }
+
+    private static func validatedTarget(binding: InsertionBinding, start: InputTarget?) throws -> (target: InputTarget, fresh: InputTarget) {
         let current = capture()
         func snapshot(_ t: InputTarget?) -> InsertionTargetPolicy.Snapshot? {
             t.map { .init(pid: $0.pid, editable: $0.editable, secure: $0.secure, opaque: $0.opaqueApplication, keyboardSurface: $0.keyboardSurface) }
@@ -297,21 +317,23 @@ enum TextInsertion {
                 keyboardSurface: start.keyboardSurface) } ?? false } ?? false)
         // `target` is what the caller sees as pasted into; the receipt observes the
         // delivery-time read of that same input (`fresh`).
-        let target: InputTarget, fresh: InputTarget
         switch (decision, start, current) {
         case (.blocked(let reason), _, _): throw InsertionFailure(reason, deliveryRole: current?.role)
-        case (.start, let start?, let now?): target = start; fresh = now
-        case (.current, _, let now?): target = now; fresh = now
+        case (.start, let start?, let now?): return (start, now)
+        case (.current, _, let now?): return (now, now)
         default: throw InsertionFailure(.noFocus)
         }
-        let receiptRange = nsRange(fresh.range) ?? (fresh.value == "" ? NSRange(location: 0, length: 0) : nil)
-        let receipt = TextInsertionReceipt(value: fresh.value, range: receiptRange, replacement: text)
+    }
+
+    static func postPaste(_ text: String, previous: InsertionClipboardSnapshot, fresh: InputTarget?,
+                          board: NSPasteboard = .general, postEvent: (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
+    ) throws -> Task<TextInsertionOutcome, Never> {
         // Chromium can acknowledge AXSelectedText writes without implementing
         // the replacement action. Use the editor's normal paste path instead.
         let source = CGEventSource(stateID: .privateState)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
-            throw InsertionFailure(.pasteEvent, deliveryRole: fresh.role)
+            throw InsertionFailure(.pasteEvent, deliveryRole: fresh?.role)
         }
         down.flags = .maskCommand; up.flags = .maskCommand
         // The text is supplied lazily so the first read marks consumption; the
@@ -320,19 +342,21 @@ enum TextInsertion {
         let item = NSPasteboardItem()
         guard item.setDataProvider(provider, forTypes: [.string]),
               item.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")),
-              board.changeCount == previous.generation else { throw InsertionFailure(.clipboard, deliveryRole: fresh.role) }
+              board.changeCount == previous.generation else { throw InsertionFailure(.clipboard, deliveryRole: fresh?.role) }
         board.clearContents()
         let supplied = board.writeObjects([item])
         let generation = board.changeCount
         guard supplied else {
             previous.restore(board, ifGeneration: generation)
-            throw InsertionFailure(.clipboard, deliveryRole: fresh.role)
+            throw InsertionFailure(.clipboard, deliveryRole: fresh?.role)
         }
-        down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
-        handedOff = true
-        let policy = InsertionReceiptPolicy(keyboardSurface: target.keyboardSurface)
-        let element = policy.observesAccessibility ? fresh.element : nil
-        let keyboardSurface = target.keyboardSurface, opaqueApplication = target.opaqueApplication
+        postEvent(down); postEvent(up)
+        let policy = InsertionReceiptPolicy(keyboardSurface: fresh?.keyboardSurface == true)
+        let element = policy.observesAccessibility ? fresh?.element : nil
+        let receipt = fresh.map { input in
+            let range = nsRange(input.range) ?? (input.value == "" ? NSRange(location: 0, length: 0) : nil)
+            return TextInsertionReceipt(value: input.value, range: range, replacement: text)
+        }
         let restoration = InsertionClipboardRestoration(previous: previous, board: board, generation: generation) {
             delivering = false
         }
@@ -346,27 +370,31 @@ enum TextInsertion {
             await Task.detached { try? await Task.sleep(nanoseconds: policy.consumptionGraceNanoseconds) }.value
             restoration.finish()
         }
-        let outcome = Task { @MainActor () -> TextInsertionOutcome in
+        return Task { @MainActor () -> TextInsertionOutcome in
             // The paste is already queued: keep the clipboard available until it
             // is consumed or the bounded window ends, regardless of cancellation.
             // Receipt polling continues independently of the restore.
             defer { restoration.finish(); provider.stopWaiting() }
             // AX/event success only acknowledges delivery. Wait for the actual
             // field update before claiming success, without retrying and duplicating text.
-            for _ in 0..<policy.attempts {
-                await Task.detached { try? await Task.sleep(nanoseconds: policy.intervalNanoseconds) }.value
-                if let element, receipt.confirms(value: attribute(element, kAXValueAttribute) as? String,
-                                                 range: nsRange(selectedRange(element))) { return .confirmed }
+            if let element, let receipt {
+                for _ in 0..<policy.attempts {
+                    await Task.detached { try? await Task.sleep(nanoseconds: policy.intervalNanoseconds) }.value
+                    if receipt.confirms(value: attribute(element, kAXValueAttribute) as? String,
+                                        range: nsRange(selectedRange(element))) { return .confirmed }
+                }
+            } else {
+                let timeout = UInt64(policy.attempts) * policy.intervalNanoseconds
+                await Task.detached { try? await Task.sleep(nanoseconds: timeout) }.value
             }
             // Terminal echo is not an AX value/selection replacement. Keep the
             // honest distinction between sending paste and observing inserted text.
-            if keyboardSurface && !opaqueApplication { return .sentToTerminal }
+            if let fresh, fresh.keyboardSurface && !fresh.opaqueApplication { return .sentToTerminal }
             // A rich editor can accept paste without exposing an exact AX receipt.
             // Missing confirmation is not a failed send: prompting Copy here can
             // duplicate text that already arrived. Keep it distinct from confirmed.
             return .sentWithoutConfirmation
         }
-        return TextInsertionDelivery(outcome: outcome, target: target)
     }
     private static func nsRange(_ range: CFRange?) -> NSRange? {
         range.map { NSRange(location: $0.location, length: $0.length) }

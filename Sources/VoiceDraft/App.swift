@@ -506,7 +506,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func toggleRecording() { state.toggle(external: true) }
     @objc private func insertLastResult() {
         // The status menu does not activate VoiceDraft, but let it finish closing
-        // so focus capture sees the previously frontmost app's input.
+        // so Command-V reaches the previously frontmost app.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.state.insertLastResult() }
     }
     @objc private func extractFromScreen() {

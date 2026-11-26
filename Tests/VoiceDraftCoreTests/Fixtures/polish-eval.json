@@ -193,8 +193,8 @@
    "note": "A restatement discards a correction embedded in an abandoned instruction.",
    "transcript": "请标出花圃，Tulip 不是，是 Lily，直接写，或者说 Label Label 就填 Spring。\n然后和图册 A 关联。",
    "accepted": [
-    "请标出花圃，Label 就填 Spring。\n然后和图册 A 关联。",
-    "请标出花圃，Label 就填 Spring。\n和图册 A 关联。"
+    "请标出花圃，Label 就填 Spring。然后和图册 A 关联。",
+    "请标出花圃，Label 就填 Spring。和图册 A 关联。"
    ]
   },
   {
@@ -215,10 +215,33 @@
   },
   {
    "id": "keep-yinggaishuo-content",
-   "note": "应该说 after a complete statement, across a paragraph break, is content; the break stays",
+   "note": "应该说 after a complete statement continues the same thought across an ASR break",
    "transcript": "这个方案可以。\n应该说是目前最稳的一个方案。",
    "accepted": [
-    "这个方案可以。\n应该说是目前最稳的一个方案。"
+    "这个方案可以。应该说是目前最稳的一个方案。",
+    "这个方案可以，应该说是目前最稳的一个方案。"
+   ]
+  },
+  {
+   "id": "join-fragment-across-asr-break",
+   "transcript": "请把，阳台上的。\n两盆薄荷搬到窗边。\n下午能晒到太阳吗？",
+   "accepted": [
+    "请把阳台上的两盆薄荷搬到窗边。下午能晒到太阳吗？"
+   ]
+  },
+  {
+   "id": "break-at-topic-change",
+   "transcript": "温室的玻璃已经换好了。\n周末可以把花搬进去。再说下个月的读书会。书单周五发给大家。",
+   "accepted": [
+    "温室的玻璃已经换好了。周末可以把花搬进去。\n再说下个月的读书会。书单周五发给大家。"
+   ]
+  },
+  {
+   "id": "keep-explicit-list-lines",
+   "transcript": "出门前要检查两项：\n第一，关掉烤箱。\n第二，锁好后门。",
+   "accepted": [
+    "出门前要检查两项：\n第一，关掉烤箱。\n第二，锁好后门。",
+    "出门前要检查两项：\n1. 关掉烤箱。\n2. 锁好后门。"
    ]
   },
   {

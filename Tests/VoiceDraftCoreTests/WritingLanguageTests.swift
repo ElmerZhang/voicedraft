@@ -51,7 +51,7 @@ final class WritingLanguageTests: XCTestCase {
                 XCTAssertTrue(system.contains(settings.stylePrompt))
                 XCTAssertFalse(system.contains("into German"))
                 XCTAssertFalse(system.contains("then translate into the requested target language"))
-                XCTAssertTrue(system.hasSuffix("Keep the original language mix and paragraph breaks."))
+                XCTAssertTrue(system.hasSuffix("Keep the original language mix."))
             }
         }
     }
@@ -92,6 +92,9 @@ final class WritingLanguageTests: XCTestCase {
                 XCTAssertEqual(system.contains("Cleaned: 他原话是“折折折起来”，我不确定是不是要删。"), cleansDictation)
                 XCTAssertEqual(system.contains("Before returning, read the result once against the transcript"), cleansDictation)
                 XCTAssertEqual(system.contains("APP becomes App, GITHUB becomes GitHub"), mode == .polish)
+                XCTAssertEqual(system.contains("Treat line breaks in recognized speech as possible pauses"), mode == .polish)
+                XCTAssertEqual(system.contains("Omit a pause comma inside a continuous phrase"), mode == .polish)
+                XCTAssertEqual(system.contains("Keep the speaker's paragraph breaks"), mode == .translate)
                 XCTAssertEqual(system.contains("Polish language-preservation rules"), mode == .polish)
                 XCTAssertEqual(system.contains("Chinese typography rules"), mode == .polish)
                 XCTAssertEqual(system.contains("Single-word transcripts"), mode == .polish)

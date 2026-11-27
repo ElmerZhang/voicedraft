@@ -122,14 +122,13 @@ final class CoreTests: XCTestCase {
             let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
             XCTAssertEqual(messages.map { $0["role"] as? String }, ["system", "user"])
             let system = try XCTUnwrap(promptText(messages.first?["content"]))
-            let cleansDictation = mode == .polish || mode == .translate
-            XCTAssertEqual(system.contains("Dictation cleanup rules:"), cleansDictation, "\(mode)")
-            XCTAssertEqual(system.contains("Cleaned: 请把这张纸折起来吧，收好了。"), cleansDictation, "\(mode)")
+            XCTAssertEqual(system.contains("Dictation cleanup rules:"), mode == .polish, "\(mode)")
+            XCTAssertEqual(system.contains("Cleaned: 请把这张纸折起来吧，收好了。"), mode == .polish, "\(mode)")
             XCTAssertTrue(system.contains(settings.stylePrompt))
             XCTAssertTrue(system.contains("VoiceDraft"))
             if mode == .translate {
-                XCTAssertTrue(system.contains("translate the dictated transcript into Japanese"))
-                XCTAssertTrue(system.contains("these examples do not set the output language"))
+                XCTAssertTrue(system.contains("Return the complete translation in Japanese"))
+                XCTAssertFalse(system.contains("Cleanup examples (source language only"))
             }
         }
     }

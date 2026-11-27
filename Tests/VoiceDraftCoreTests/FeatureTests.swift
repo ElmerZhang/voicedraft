@@ -78,7 +78,7 @@ final class FeatureTests: XCTestCase {
         try ShortcutBinding.validate(ShortcutBinding.defaults)
         try ShortcutBinding.validate([.init(.dictate, keyCode: 63, modifiers: 0)])
         XCTAssertThrowsError(try ShortcutBinding.validate([.init(.dictate, keyCode: 0, modifiers: 0)]))
-        XCTAssertThrowsError(try ShortcutBinding.validate([.init(.dictate, keyCode: 0, modifiers: 6), .init(.ask, keyCode: 0, modifiers: 6)]))
+        XCTAssertThrowsError(try ShortcutBinding.validate([.init(.dictate, keyCode: 0, modifiers: 6), .init(.translate, keyCode: 0, modifiers: 6)]))
     }
     func testSchemaFourMigratesWithoutChangingProfileOrKeyIdentity() throws {
         let old = SharedSettings()

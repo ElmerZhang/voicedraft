@@ -76,8 +76,11 @@ public struct ModelProfile: Codable, Identifiable, Equatable {
     }
 }
 
-public enum WritingMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case verbatim, polish, translate, edit, ask
+public enum WritingMode: String, Codable, Identifiable, Sendable {
+    case verbatim, polish, translate, edit
+    /// Kept for decoding and displaying existing history and usage records.
+    case legacyAsk = "ask"
+    public static let available: [Self] = [.verbatim, .polish, .translate, .edit]
     public var id: String { rawValue }
     public var title: String {
         switch self {
@@ -85,7 +88,7 @@ public enum WritingMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .polish: return L("Polish")
         case .translate: return L("Translate")
         case .edit: return L("Edit selection")
-        case .ask: return L("Ask")
+        case .legacyAsk: return L("Ask")
         }
     }
     public var icon: String {
@@ -94,7 +97,7 @@ public enum WritingMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .polish: return "sparkles"
         case .translate: return "character.bubble"
         case .edit: return "pencil.line"
-        case .ask: return "bubble.left.and.bubble.right"
+        case .legacyAsk: return "bubble.left.and.bubble.right"
         }
     }
 }

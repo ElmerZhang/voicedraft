@@ -34,13 +34,3 @@
 "keyboard.voice.finish" = "Finish";
 "keyboard.voice.tap" = "Tap to speak";
 "keyboard.voice.holdHint" = "Or hold to speak, then release to finish";
-"keyboard.ask.toggle" = "Ask anything";
-"keyboard.ask.title" = "Ask";
-"keyboard.voice.holdToAsk" = "Hold to ask";
-"keyboard.voice.tapToAskOpensApp" = "Tap to ask (opens VoiceDraft)";
-"keyboard.voice.referenceHint" = "Selected text is sent as reference";
-"keyboard.answer.title" = "Answer";
-"keyboard.answer.insert" = "Insert";
-"keyboard.answer.copy" = "Copy";
-"keyboard.answer.copied" = "Copied";
-"keyboard.answer.close" = "Close";

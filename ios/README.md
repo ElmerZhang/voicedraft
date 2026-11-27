@@ -40,7 +40,7 @@ long press records until release. The design lives in [`docs/ios.md`](../docs/io
 
 | File | Role |
 | --- | --- |
-| `Shared/AppGroup.swift` | `SharedResult` (`id`, `text`, `mode`, `createdAt`) in `latest-result.json`. Files without `id` or `mode` still decode. `KeyboardPresence` (`seenAt`, `fullAccess`, `version`) in `keyboard-presence.json`. `PendingTake` and `PendingTakeStore` (`pending-take.json`), the pure `KeyboardResumeDecision` (insert, or present an Ask answer), `KeyboardTakeRequest` and its store (`take-request.json`, the keyboard's Ask anything request), and `KeyboardRecordLink` (`voicedraft://record?take=<id>&source=keyboard`). |
+| `Shared/AppGroup.swift` | `SharedResult` (`id`, `text`, `mode`, `createdAt`) in `latest-result.json`. Files without `id` or `mode` still decode. `KeyboardPresence` (`seenAt`, `fullAccess`, `version`) in `keyboard-presence.json`. `PendingTake` and `PendingTakeStore` (`pending-take.json`), the pure `KeyboardResumeDecision`, and `KeyboardRecordLink` (`voicedraft://record?take=<id>&source=keyboard`). |
 | `Shared/KeyboardBridge.swift` | Darwin notification names (`com.voicedraft.ios.take.start`, `.take.stop`, `.result.updated`, `.status.updated`), post and observe helpers, and `AppStatusStore` for `app-status.json`. |
 | `Shared/KeyboardOpenAttempt.swift` | `KeyboardOpenStrategy`, the pure `KeyboardOpenSequence` (first success wins; upper-case scheme retry only after a lower-case failure; the status-line summary) and `KeyboardOpenAttemptStore` (`open-attempts.json`, last 20). |
 | `VoiceDraftKeyboard/ContainingAppOpener.swift` | Opens the containing app: `NSExtensionContext.open`, then the responder chain's `UIApplication`, then `UIApplication` by class name. |
@@ -142,7 +142,7 @@ content and asks the user to download first. The server's 409 shows Core's confl
 ### Takes
 
 Hold the record button to record and release to stop. A short tap locks recording and a second tap stops it, using
-Core's `RecordingGesture`. Modes are Polish, Translate and Ask. Each finished take is added to history and written to
+Core's `RecordingGesture`. Modes are Polish and Translate. Each finished take is added to history and written to
 `latest-result.json`, followed by a `result.updated` post. Every take or listening change rewrites `app-status.json`
 and posts `status.updated`.
 

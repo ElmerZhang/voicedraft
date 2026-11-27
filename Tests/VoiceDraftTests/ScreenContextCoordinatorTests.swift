@@ -333,7 +333,7 @@ final class ScreenContextCoordinatorTests: XCTestCase {
         screen.begin(take: take, target: target(), bundleID: "com.example.notes", mode: .polish, options: writingOnly, vocabulary: AppVocabulary())
         let terms = await screen.asrTerms(take: take, until: gate())
         XCTAssertEqual(terms, [], "Recognition hints are off.")
-        let ask = await screen.writingContext(take: take, mode: .ask)
+        let ask = await screen.writingContext(take: take, mode: .legacyAsk)
         XCTAssertNil(ask, "Ask never receives on-screen context.")
         let edit = await screen.writingContext(take: take, mode: .edit)
         XCTAssertEqual(edit?.excerpt, "", "Edit receives terms only.")

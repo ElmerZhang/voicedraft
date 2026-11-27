@@ -16,8 +16,6 @@ struct HomeView: View {
                     .pickerStyle(.segmented)
                     .disabled(model.busy)
 
-                    if model.mode == .ask { AskCard() }
-
                     MessageBanner()
                     KeyboardSetupBanner()
 
@@ -130,50 +128,14 @@ struct RecordButton: View {
     }
 }
 
-/// Ask anything: the hint and optional reference text for in-app takes. Keyboard takes send the host's selected
-/// text instead, for that take only.
-struct AskCard: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(AppText.t("Ask anything"), systemImage: WritingMode.ask.icon)
-                .font(.headline)
-            Text(verbatim: AppText.t("Speak a question. Make room for an idea."))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text(verbatim: AppText.t("Reference text (optional)"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
-            TextEditor(text: $model.askReference)
-                .frame(minHeight: 88, maxHeight: 180)
-                .scrollContentBackground(.hidden)
-                .padding(6)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
-                .disabled(model.busy)
-                .accessibilityLabel(AppText.t("Reference text (optional)"))
-            Text(verbatim: AppText.t("Sent to the writing model only as reference for your question. It is never saved or synced."))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
-    }
-}
-
-/// The latest result. An Ask anything answer is titled "Answer" with the spoken question above it; Copy copies
-/// the answer only.
 struct ResultCard: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
         let text = displayedText
-        let question = model.shownQuestion
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(verbatim: AppText.t(model.showsAnswer ? "Answer" : "Result")).font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: AppText.t("Result")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     model.copy(text)
@@ -182,14 +144,6 @@ struct ResultCard: View {
                 }
                 .font(.caption.weight(.semibold))
                 .disabled(text.isEmpty || model.takeState == .processing)
-            }
-            if !question.isEmpty, question != text {
-                Text(verbatim: question)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(AppText.t("Question: {0}", question))
             }
             Text(verbatim: text.isEmpty ? AppText.t("Your text appears here.") : text)
                 .foregroundStyle(text.isEmpty ? .secondary : .primary)

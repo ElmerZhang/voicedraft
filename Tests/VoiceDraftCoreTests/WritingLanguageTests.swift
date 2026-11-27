@@ -60,7 +60,7 @@ final class WritingLanguageTests: XCTestCase {
         var settings = SharedSettings(); settings.targetLanguage = "German"
         settings.stylePrompt = "Keep the original Chinese wording."
         for adapter in [ModelAdapter.qwenChatWriting, .chatCompletions, .anthropic, .responses] {
-            for mode in WritingMode.allCases {
+            for mode in WritingMode.available {
                 let text = "然后，这个 demo 我挺喜欢的。先保存，然后退出。原话是‘然后’。"
                 let (system, input) = try payload(adapter: adapter, mode: mode, settings: settings, text: text)
                 XCTAssertEqual(input["transcript"], text)

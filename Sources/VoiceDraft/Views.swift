@@ -16,9 +16,9 @@ struct StudioView: View {
                 VDPageHeader(L("A little less typing."), subtitle: L("Speak naturally. Turn your thoughts into words, wherever you work."))
             }
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: VD.Space.s) { ForEach(WritingMode.allCases) { mode in modeButton(mode) } }.fixedSize()
+                HStack(spacing: VD.Space.s) { ForEach(WritingMode.available) { mode in modeButton(mode) } }.fixedSize()
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading, spacing: VD.Space.s) {
-                    ForEach(WritingMode.allCases) { mode in modeButton(mode) }
+                    ForEach(WritingMode.available) { mode in modeButton(mode) }
                 }
             }
             VDSurface {
@@ -75,7 +75,7 @@ struct StudioView: View {
                     }.buttonStyle(.plain).foregroundStyle(VD.Palette.accent).padding(.trailing, -6)
                 }.font(VD.Font.detail).foregroundStyle(.secondary)
             }
-            if state.mode == .edit || state.mode == .ask {
+            if state.mode == .edit {
                 VDSurface(spacing: VD.Space.s) {
                     Text(L("Selection")).font(VD.Font.cardTitle)
                     Text(L("Global shortcuts read selected text from the active app. For a test here, paste text below.")).font(VD.Font.detail).foregroundStyle(.secondary)
@@ -370,8 +370,8 @@ struct ProfileEditor: View {
                             defer { testing = false }
                             do {
                                 let key = try keyDraft.keyForRequest { try state.key(for: profile) }
-                                let request = try QwenRequests.writing(profile: profile, key: key, text: "Reply with OK.", mode: .ask, settings: SharedSettings())
-                                _ = try await state.metered(.connectionTest, source: .modelsConnectionTest, profile: profile, mode: .ask) { usage in
+                                let request = try QwenRequests.writing(profile: profile, key: key, text: "OK", mode: .verbatim, settings: SharedSettings())
+                                _ = try await state.metered(.connectionTest, source: .modelsConnectionTest, profile: profile) { usage in
                                     try await WritingClient.complete(request, profile: profile, key: key, usage: usage)
                                 }
                                 problem = L("Connection successful.")

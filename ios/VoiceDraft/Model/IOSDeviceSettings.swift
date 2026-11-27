@@ -4,7 +4,7 @@ import VoiceDraftCore
 /// Device-local options for iOS, the counterpart of the Mac `DeviceSettings`. Never synced.
 /// Missing keys decode to their defaults so older files keep loading.
 struct IOSDeviceSettings: Codable, Equatable {
-    static let modes: [WritingMode] = [.polish, .translate, .ask]
+    static let modes: [WritingMode] = [.polish, .translate]
     /// Keyboard standby durations offered in Settings; 0 turns standby off.
     static let standbyOptions = [0, 5, 15, 30]
 

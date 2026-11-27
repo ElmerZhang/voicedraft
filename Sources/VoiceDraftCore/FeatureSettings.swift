@@ -16,13 +16,13 @@ public struct WritingStyle: Codable, Identifiable, Equatable {
 }
 
 public enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
-    case dictate, translate, edit, ask, styleSelection, insertLast, draftWindow
+    case dictate, translate, edit, styleSelection, insertLast, draftWindow
     public var id: String { rawValue }
     /// Actions understood by builds before `insertLast`. Those builds decode
     /// `DesktopOptions.shortcuts` strictly (an unknown raw value fails the whole
     /// device file) and accept at most five bindings, so newer actions are
     /// stored under a separate key that older builds ignore.
-    static let legacy: Set<ShortcutAction> = [.dictate, .translate, .edit, .ask, .styleSelection]
+    static let legacy: Set<ShortcutAction> = [.dictate, .translate, .edit, .styleSelection]
     /// The writing mode a take started or retargeted by this action uses; nil
     /// for actions that never record (style selection, insert last result, draft window).
     public var recordingMode: WritingMode? {
@@ -30,7 +30,6 @@ public enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
         case .dictate: return .polish
         case .translate: return .translate
         case .edit: return .edit
-        case .ask: return .ask
         case .styleSelection, .insertLast, .draftWindow: return nil
         }
     }
@@ -68,7 +67,7 @@ public struct ShortcutBinding: Codable, Equatable, Identifiable {
     }
     public static let defaults: [Self] = [
         .init(.dictate, keyCode: 49, modifiers: 6), .init(.translate, keyCode: 17, modifiers: 6),
-        .init(.edit, keyCode: 14, modifiers: 6), .init(.ask, keyCode: 0, modifiers: 6),
+        .init(.edit, keyCode: 14, modifiers: 6),
         .init(.styleSelection, keyCode: 1, modifiers: 6), .init(.insertLast, keyCode: 9, modifiers: 6),
         .init(.draftWindow, keyCode: 2, modifiers: 6)
     ]

@@ -397,7 +397,7 @@ final class ScreenContextTests: XCTestCase {
         let edit = ScreenWritingContext(snapshot: item, mode: .edit)
         XCTAssertEqual(edit?.excerpt, ""); XCTAssertEqual(edit?.terms.first, "WriteKit0")
         XCTAssertNil(ScreenWritingContext(snapshot: item, mode: .verbatim))
-        XCTAssertNil(ScreenWritingContext(snapshot: item, mode: .ask))
+        XCTAssertNil(ScreenWritingContext(snapshot: item, mode: .legacyAsk))
         let lowOnly = ScreenContextSnapshot(sources: [.accessibility], bundleID: "b", applicationName: "A", excerpt: "Text",
                                             terms: [ScreenTerm(text: "章山", kind: .cjkRun)])
         XCTAssertNil(ScreenWritingContext(snapshot: lowOnly, mode: .edit))

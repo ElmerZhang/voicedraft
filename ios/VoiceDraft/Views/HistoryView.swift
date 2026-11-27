@@ -1,38 +1,14 @@
 import SwiftUI
 import VoiceDraftCore
 
-/// The History filter, in Core `HistoryListing` order: everything, everything except Ask anything, Ask anything only.
-enum HistoryFilter: Int, CaseIterable, Identifiable {
-    case all = 0, dictations = 1, ask = 2
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: return AppText.t("All")
-        case .dictations: return AppText.t("Dictations")
-        case .ask: return AppText.t("Ask anything")
-        }
-    }
-
-    /// Day sections, newest first, through the same listing the Mac History page uses.
-    func groups(_ history: [HistoryEntry], calendar: Calendar = .current) -> [HistoryDayGroup] {
-        HistoryListing.groups(history, query: "", filter: rawValue, calendar: calendar)
-    }
-
-    static func dayTitle(_ day: Date, calendar: Calendar = .current) -> String {
+struct HistoryView: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var confirmingClear = false
+    private func dayTitle(_ day: Date, calendar: Calendar = .current) -> String {
         if calendar.isDateInToday(day) { return AppText.t("Today") }
         if calendar.isDateInYesterday(day) { return AppText.t("Yesterday") }
         return day.formatted(Date.FormatStyle(date: .long, time: .omitted).locale(L10n.locale))
     }
-}
-
-/// Local history, newest first, in day sections with an All / Dictations / Ask anything filter. Tap copies the
-/// result; swipe deletes. Never synced.
-struct HistoryView: View {
-    @EnvironmentObject private var model: AppModel
-    @State private var confirmingClear = false
-    @State private var filter: HistoryFilter = .all
 
     var body: some View {
         NavigationStack {
@@ -46,20 +22,9 @@ struct HistoryView: View {
                              : AppText.t("History is turned off in Settings."))
                     }
                 } else {
-                    let groups = filter.groups(model.history)
+                    let groups = HistoryListing.groups(model.history, query: "")
                     List {
-                        Picker(AppText.t("Show"), selection: $filter) {
-                            ForEach(HistoryFilter.allCases) { Text(verbatim: $0.title).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .listRowSeparator(.hidden)
                         MessageBanner().listRowSeparator(.hidden)
-                        if groups.isEmpty {
-                            Text(verbatim: AppText.t("No matching entries"))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .listRowSeparator(.hidden)
-                        }
                         ForEach(groups) { group in
                             Section {
                                 ForEach(group.entries) { entry in
@@ -71,7 +36,7 @@ struct HistoryView: View {
                                     for id in offsets.map({ group.entries[$0].id }) { model.deleteHistory(id) }
                                 }
                             } header: {
-                                Text(verbatim: HistoryFilter.dayTitle(group.day))
+                                Text(verbatim: dayTitle(group.day))
                             }
                         }
                     }

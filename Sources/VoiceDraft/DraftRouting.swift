@@ -28,7 +28,7 @@ struct DraftRun: Equatable {
     var binding: Binding
     /// Context for the writing request (the long-form Polish passage, or the whole-draft Edit).
     var context: DraftWritingContext?
-    /// Text the writing request receives as `selected_text` (Edit and Ask).
+    /// Text the writing request receives as `selected_text` (Edit).
     var selectedText: String
     var source: ModelUsageSource
     /// The editor state at the start, so a Fn chord can switch between dictation and Edit.
@@ -64,10 +64,8 @@ enum DraftRouting {
             let whole = NSRange(location: 0, length: (focus.text as NSString).length)
             return DraftRun(documentID: focus.documentID, kind: .wholeDraftEdit, binding: .range(whole, expected: focus.text),
                             context: .wholeDraft, selectedText: focus.text, source: .draftEdit, focus: focus)
-        case .ask:
-            // Ask never writes into the draft; the selection is its reference text.
-            return DraftRun(documentID: focus.documentID, kind: .dictation, binding: .caret, context: nil,
-                            selectedText: selected, source: .dictationWriting, focus: focus)
+        case .legacyAsk:
+            throw CocoaError(.featureUnsupported)
         case .polish, .verbatim, .translate:
             return DraftRun(documentID: focus.documentID, kind: .dictation, binding: .caret,
                             context: .passage(at: focus.selection, in: focus.text), selectedText: "", source: .draftWriting, focus: focus)
@@ -103,10 +101,8 @@ enum DraftRouting {
     /// their draft. Otherwise the delivery-time focus rule applies: when the
     /// draft editor is the focus now (whether the take started there or not),
     /// the text goes in at its caret; any other focus takes the external path.
-    /// Ask never writes into the draft.
-    static func delivery(run: DraftRun?, mode: WritingMode, editorFocusedNow: Bool) -> Delivery {
+    static func delivery(run: DraftRun?, editorFocusedNow: Bool) -> Delivery {
         if let run, case .range = run.binding { return .bound }
-        if mode == .ask { return .external }
         return editorFocusedNow ? .caret : .external
     }
 }

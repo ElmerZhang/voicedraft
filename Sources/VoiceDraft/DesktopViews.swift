@@ -132,14 +132,14 @@ extension Notification.Name {
     static let voiceDraftOpenDraftWindow = Notification.Name("VoiceDraft.openDraftWindow")
 }
 
-/// Informational list of the enabled dictate / translate / edit / ask / insert-last shortcuts, shown as key caps.
+/// Informational list of the enabled dictate / translate / edit / insert-last shortcuts, shown as key caps.
 private struct ShortcutSummaryList: View {
     @ObservedObject var state: AppState
     var rowPadding: CGFloat = 20
     /// Home's compact form: single-line 40pt rows with the title only; Settings keeps the title and its detail line.
     var compact = false
     private var bindings: [ShortcutBinding] {
-        [ShortcutAction.dictate, .translate, .edit, .ask, .insertLast, .draftWindow].compactMap { action in
+        [ShortcutAction.dictate, .translate, .edit, .insertLast, .draftWindow].compactMap { action in
             state.device.features.shortcuts.first { $0.action == action && $0.enabled }
         }
     }
@@ -173,7 +173,6 @@ private struct ShortcutSummaryList: View {
     private func title(_ action: ShortcutAction) -> String {
         switch action {
         case .dictate: return D("Dictate")
-        case .ask: return D("Ask anything")
         default: return action.title
         }
     }
@@ -181,7 +180,6 @@ private struct ShortcutSummaryList: View {
         switch action {
         case .translate: return D("Your voice, in another language")
         case .edit: return D("Speak an instruction for selected text.")
-        case .ask: return D("Speak a question. Make room for an idea.")
         case .insertLast, .draftWindow: return action.detail ?? ""
         default: return D("Messy thoughts → clear writing")
         }
@@ -469,7 +467,6 @@ struct VocabularyBulkAddSheet: View {
 private struct DesktopHistoryView: View {
     @ObservedObject var state: AppState
     @State private var query = ""
-    @State private var filter = 0
     @State private var confirmClear = false
     @State private var expanded: Set<UUID> = []
     /// Filtered, sorted and grouped once per change of history, query or filter; nil until the page first appears.
@@ -493,7 +490,6 @@ private struct DesktopHistoryView: View {
                 VDInlineNotice(kind: .info, text: D("History is off. New transcripts are not saved on this Mac."))
             }
             HStack(spacing: VD.Space.m) {
-                VDFilterPills(labels: [D("All"), D("Dictations"), D("Ask anything")], selection: $filter).fixedSize()
                 Spacer(minLength: VD.Space.s)
                 VDSearchField(title: L("Search your words"), text: $query, width: 200)
             }
@@ -513,10 +509,9 @@ private struct DesktopHistoryView: View {
         .onAppear(perform: regroup)
         .onChange(of: state.history) { _ in regroup() }
         .onChange(of: query) { _ in regroup() }
-        .onChange(of: filter) { _ in regroup() }
     }
     private func regroup() {
-        groups = HistoryListing.groups(state.history, query: query, filter: filter)
+        groups = HistoryListing.groups(state.history, query: query)
     }
 }
 

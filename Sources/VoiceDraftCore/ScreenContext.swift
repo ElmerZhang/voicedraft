@@ -532,7 +532,7 @@ public struct ScreenWritingContext: Equatable, Sendable {
     public init?(snapshot: ScreenContextSnapshot, mode: WritingMode, limits: ScreenContextLimits = .standard) {
         let excerpt: String
         switch mode {
-        case .verbatim, .ask: return nil
+        case .verbatim, .legacyAsk: return nil
         case .polish, .translate: excerpt = String(snapshot.excerpt.prefix(limits.excerptCharacters))
         case .edit: excerpt = ""
         }

@@ -46,7 +46,7 @@ final class ShortcutMigrationTests: XCTestCase {
         """
         let migrated = try options(shortcuts: custom).shortcuts
         XCTAssertEqual(migrated.first, .init(.dictate, keyCode: 9, modifiers: 6))
-        XCTAssertEqual(migrated[1], .init(.ask, keyCode: 0, modifiers: 6, enabled: false))
+        XCTAssertFalse(migrated.contains { $0.action.rawValue == "ask" })
         XCTAssertEqual(migrated.first { $0.action == .insertLast }, .init(.insertLast, keyCode: 9, modifiers: 6, enabled: false))
         XCTAssertEqual(Set(migrated.map(\.action)), Set(ShortcutAction.allCases))
         try ShortcutBinding.validate(migrated)
@@ -59,11 +59,11 @@ final class ShortcutMigrationTests: XCTestCase {
 
     func testOlderBuildsCanStillReadNewFiles() throws {
         var options = DesktopOptions()
-        options.shortcuts[5] = .init(.insertLast, keyCode: 9, modifiers: 14)
+        options.shortcuts[try XCTUnwrap(options.shortcuts.firstIndex { $0.action == .insertLast })] = .init(.insertLast, keyCode: 9, modifiers: 14)
         let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(options)) as! [String: Any]
         let stored = try XCTUnwrap(object["shortcuts"] as? [[String: Any]])
         // Older builds decode this array strictly and accept at most five bindings.
-        XCTAssertEqual(stored.compactMap { $0["action"] as? String }, ["dictate", "translate", "edit", "ask", "styleSelection"])
+        XCTAssertEqual(stored.compactMap { $0["action"] as? String }, ["dictate", "translate", "edit", "styleSelection"])
         let additional = try XCTUnwrap(object["additionalShortcuts"] as? [[String: Any]])
         XCTAssertEqual(additional.compactMap { $0["action"] as? String }, ["insertLast", "draftWindow"])
         let roundTrip = try JSONDecoder().decode(DesktopOptions.self, from: JSONEncoder().encode(options))
@@ -76,7 +76,7 @@ final class ShortcutMigrationTests: XCTestCase {
          {"action":"someFutureAction","keyCode":3,"modifiers":6,"enabled":true}]
         """
         let decoded = try options(shortcuts: future, extra: #""additionalShortcuts":[{"action":"anotherFutureAction","keyCode":5,"modifiers":6,"enabled":true}],"#)
-        XCTAssertEqual(decoded.shortcuts.map(\.action), [.dictate, .translate, .edit, .ask, .styleSelection, .insertLast, .draftWindow])
+        XCTAssertEqual(decoded.shortcuts.map(\.action), [.dictate, .translate, .edit, .styleSelection, .insertLast, .draftWindow])
         try decoded.validate()
     }
 

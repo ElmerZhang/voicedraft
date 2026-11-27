@@ -479,7 +479,7 @@ These have not been established by the automated tests:
 1. Enter real Bailian credentials in both profiles; test the writing connection, then record a short phrase in Studio.
 2. Try Chinese/English mixed text, names from Vocabulary, filler words, a spoken correction, a list, and a translation. Compare the original transcript and output.
 3. In TextEdit and the maintainer's browser/editor, record with the global shortcut. Verify the original field receives text and the previous clipboard returns. Change focus mid-request and confirm VoiceDraft retains the result instead of inserting elsewhere.
-4. Select editable text, trigger Edit selection, and dictate an instruction. Ask a question and verify its answer appears in VoiceDraft without replacing the selection.
+4. Select editable text, trigger Edit selection, and dictate an instruction.
 5. Deny microphone/accessibility permission and verify useful recovery messages. Cancel during recording and processing; no later output should be inserted.
 6. Start a sync server, upload from Mac A, download on Mac B, and verify models, API keys, vocabulary, and style. Try a wrong passphrase. Make offline edits on both Macs and confirm an explicit conflict without lost local changes.
 

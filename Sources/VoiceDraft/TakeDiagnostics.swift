@@ -39,7 +39,7 @@ struct TakeDiagnosticRecord: Codable, Equatable {
     /// `ModelUsageFailure.message` of the error; nil when completed or cancelled.
     var failure: String?
     /// External takes that reached delivery: `queued`, `blocked`, `disabled`
-    /// (automatic paste off), `ask` or `unauthorized`.
+    /// (automatic paste off) or `unauthorized`.
     var insertion: String?
     /// `InsertionBlockReason` raw value when `insertion` is `blocked`.
     var insertionBlocked: String?

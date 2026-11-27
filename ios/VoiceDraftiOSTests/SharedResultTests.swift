@@ -10,6 +10,13 @@ final class SharedResultTests: XCTestCase {
 
     override func tearDown() { try? FileManager.default.removeItem(at: url) }
 
+    func testLegacyAnswerCannotAutoInsertAfterUpgrade() {
+        let pending = PendingTake()
+        let answer = SharedResult(id: pending.id, text: "Previous answer", mode: "ask")
+        XCTAssertFalse(answer.permitsAutomaticInsertion)
+        XCTAssertEqual(KeyboardResumeDecision.decide(pending: pending, latest: answer, status: nil), .clear)
+    }
+
     func testRoundTrip() throws {
         let store = SharedResultStore(fileURL: url)
         XCTAssertNil(store.read())

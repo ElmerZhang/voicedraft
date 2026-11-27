@@ -17,7 +17,6 @@ extension ShortcutAction {
         case .dictate: return F("Dictate", "听写")
         case .translate: return L("Translate")
         case .edit: return L("Edit selection")
-        case .ask: return L("Ask")
         case .styleSelection: return F("Apply style to selection", "为选中文字应用风格")
         case .insertLast: return D("Insert last result")
         case .draftWindow: return D("Draft window")

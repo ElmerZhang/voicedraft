@@ -14,11 +14,9 @@ struct TakeConfiguration {
     let writingKey: String
     /// Passed to the writing prompt. Keyboard takes cannot know their host app, so they send none.
     let application: String
-    /// Reference text for Ask anything (`selected_text` in the writing request). Always empty for other modes.
-    let selection: String
 
     static func make(settings: SharedSettings, mode: WritingMode, credentials: CredentialStore,
-                     application: String, selection: String = "", id: UUID = UUID()) throws -> TakeConfiguration {
+                     application: String, id: UUID = UUID()) throws -> TakeConfiguration {
         guard IOSDeviceSettings.modes.contains(mode) else {
             throw VoiceDraftError.message("This mode is not available on iPhone.")
         }
@@ -35,14 +33,7 @@ struct TakeConfiguration {
         var resolved = settings.resolved(for: nil)
         resolved.recentInputContext = ""
         return TakeConfiguration(id: id, mode: mode, settings: resolved, speech: speech, writing: writing,
-                                 speechKey: speechKey, writingKey: writingKey, application: application,
-                                 selection: mode == .ask ? selection.trimmingCharacters(in: .whitespacesAndNewlines) : "")
-    }
-
-    /// The writing request for `raw`, built with the shared prompts.
-    func writingRequest(for raw: String) throws -> URLRequest {
-        try QwenRequests.writing(profile: writing, key: writingKey, text: raw, mode: mode, settings: settings,
-                                 selection: selection, application: application)
+                                 speechKey: speechKey, writingKey: writingKey, application: application)
     }
 }
 
@@ -101,7 +92,9 @@ final class TakeCoordinator: @unchecked Sendable {
     /// Rewrites `raw` for the take's mode with the shared prompts.
     func write(_ raw: String, onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
         let configuration = configuration
-        let request = try configuration.writingRequest(for: raw)
+        let request = try QwenRequests.writing(profile: configuration.writing, key: configuration.writingKey, text: raw,
+                                               mode: configuration.mode, settings: configuration.settings,
+                                               application: configuration.application)
         var output = try await metered(.writing, source: .dictationWriting, profile: configuration.writing,
                                        mode: configuration.mode, streamed: true) { usage in
             try await WritingClient.complete(request, profile: configuration.writing, key: configuration.writingKey,

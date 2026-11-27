@@ -88,7 +88,7 @@ extension WritingProtocolTests {
     }
 
     func testEmptyScreenContextAddsNoPayloadAndKeepsThePrompt() throws {
-        for mode in WritingMode.allCases {
+        for mode in WritingMode.available {
             let none = try messages(mode, screen: nil)
             let empty = try messages(mode, screen: ScreenWritingContext(source: .accessibility, excerpt: "", terms: []))
             XCTAssertEqual(none.system, empty.system, mode.rawValue)
@@ -149,7 +149,7 @@ extension WritingProtocolTests {
     }
 
     func testQwenWritingSystemMessageHasCacheMarkedPrefixAndPlainSuffix() throws {
-        for mode in WritingMode.allCases {
+        for mode in WritingMode.available {
             let request = try QwenRequests.writing(profile: .qwen(.writing), key: "k", text: "hello", mode: mode,
                                                    settings: SharedSettings(), selection: "sel")
             let content = try blocks(request)
@@ -180,7 +180,7 @@ extension WritingProtocolTests {
     }
 
     func testCachedPrefixAlwaysCarriesScreenContextRule() throws {
-        for mode in WritingMode.allCases {
+        for mode in WritingMode.available {
             XCTAssertTrue(try cachedPrefix(mode).a.hasSuffix(QwenRequests.screenContextRule + "\n"), mode.rawValue)
         }
         XCTAssertTrue(try cachedPrefix(.polish).a.contains("from the app, recent context, on-screen context, writing preferences,"))

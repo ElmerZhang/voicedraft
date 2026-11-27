@@ -214,7 +214,7 @@ final class AppState: ObservableObject {
                 history = [
                     HistoryEntry(mode: .polish, original: "A sample voice note", result: "A sample voice note, ready to use.", application: "VoiceDraft Preview", duration: 12),
                     HistoryEntry(mode: .translate, original: "这是用于界面检查的示例。", result: "This is a sample for checking the interface.", application: "VoiceDraft Preview", duration: 8),
-                    HistoryEntry(mode: .ask, original: "How can I organize my notes?", result: "Group related ideas and give each group a short heading.", application: "VoiceDraft Preview", duration: 5)
+                    HistoryEntry(mode: .verbatim, original: "Pick up the notes.", result: "Pick up the notes.", application: "VoiceDraft Preview", duration: 5)
                 ]
                 history[1].date = Date().addingTimeInterval(-3600)
                 history[2].date = Date().addingTimeInterval(-86400)
@@ -624,12 +624,12 @@ final class AppState: ObservableObject {
         var wroteDraft = false
         // Draft takes write straight into the text view (never the pasteboard): range-bound
         // runs into their draft, other takes into the draft editor when it is the focus now.
-        let draftDelivery = DraftRouting.delivery(run: draftRun, mode: mode, editorFocusedNow: drafts.focus() != nil)
+        let draftDelivery = DraftRouting.delivery(run: draftRun, editorFocusedNow: drafts.focus() != nil)
         // Edit and Style apply replace the captured selection and stay bound to it;
         // every other take pastes into the focus current now, in any app or window.
         let binding: InsertionBinding = mode == .edit || source == .styleApplyToSelection ? .selection : .currentInput
-        let automatic = runExternal && runAutoPaste && mode != .ask
-        if runExternal { traceTake(id) { $0.insertion = mode == .ask ? "ask" : !runAutoPaste ? "disabled" : nil } }
+        let automatic = runExternal && runAutoPaste
+        if runExternal { traceTake(id) { $0.insertion = runAutoPaste ? nil : "disabled" } }
         if draftDelivery != .external {
             do {
                 if draftDelivery == .bound, let draftRun {

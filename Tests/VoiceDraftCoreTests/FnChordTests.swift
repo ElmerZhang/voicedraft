@@ -76,16 +76,16 @@ final class FnChordTests: XCTestCase {
 
     func testReleaseLandingOnAnotherBindingDoesNotRetarget() {
         var tracker = FnChordTracker()
-        let three = both + [.init(.ask, keyCode: fn, modifiers: control | shift)]
+        let three = both + [.init(.edit, keyCode: fn, modifiers: control | shift)]
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: three), [Event(.dictate, down: true)])
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control, bindings: three), [])
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [.retarget(from: .dictate, to: .ask)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [.retarget(from: .dictate, to: .edit)])
         // Releasing Control leaves Fn-Shift (Translate) held: a release, so no event.
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: shift, bindings: three), [])
-        XCTAssertEqual(tracker.active, .ask)
+        XCTAssertEqual(tracker.active, .edit)
         // A later press that completes Fn-Control-Shift again matches the current action: nothing.
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [])
-        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: control | shift, bindings: three), [Event(.ask, down: false)])
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: control | shift, bindings: three), [Event(.edit, down: false)])
     }
 
     func testFnThenShiftSelectsTheChordWhenFnAloneIsNotBound() {
@@ -100,18 +100,18 @@ final class FnChordTests: XCTestCase {
 
     func testUnmatchedIntermediateChordKeepsTheCurrentAction() {
         var tracker = FnChordTracker()
-        let three = both + [.init(.ask, keyCode: fn, modifiers: control | shift)]
+        let three = both + [.init(.edit, keyCode: fn, modifiers: control | shift)]
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: 0, bindings: three), [Event(.dictate, down: true)])
         // Fn + Command matches nothing: no event, no cancel.
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: command, bindings: three), [])
         XCTAssertEqual(tracker.active, .dictate)
         // Fn + Control alone is unbound on the way to Fn + Control + Shift.
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control, bindings: three), [])
-        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [.retarget(from: .dictate, to: .ask)])
+        XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift, bindings: three), [.retarget(from: .dictate, to: .edit)])
         // Extra modifiers that form no binding are ignored.
         XCTAssertEqual(tracker.observe(fnHeld: true, modifiers: control | shift | command, bindings: three), [])
-        XCTAssertEqual(tracker.active, .ask)
-        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: 0, bindings: three), [Event(.ask, down: false)])
+        XCTAssertEqual(tracker.active, .edit)
+        XCTAssertEqual(tracker.observe(fnHeld: false, modifiers: 0, bindings: three), [Event(.edit, down: false)])
     }
 
     func testRetargetToDisabledBindingSendsNothing() {
@@ -168,14 +168,12 @@ final class FnChordTests: XCTestCase {
         XCTAssertEqual(ShortcutAction.dictate.recordingMode, .polish)
         XCTAssertEqual(ShortcutAction.translate.recordingMode, .translate)
         XCTAssertEqual(ShortcutAction.edit.recordingMode, .edit)
-        XCTAssertEqual(ShortcutAction.ask.recordingMode, .ask)
         XCTAssertNil(ShortcutAction.styleSelection.recordingMode)
         XCTAssertNil(ShortcutAction.insertLast.recordingMode)
     }
 
     func testRetargetPolicyMirrorsTakeStartChecks() {
         XCTAssertNil(TakeRetargetPolicy.problem(to: .translate, selection: "", writingKey: "k"))
-        XCTAssertNil(TakeRetargetPolicy.problem(to: .ask, selection: "", writingKey: "k"))
         XCTAssertNil(TakeRetargetPolicy.problem(to: .edit, selection: "text", writingKey: "k"))
         XCTAssertEqual(TakeRetargetPolicy.problem(to: .edit, selection: "", writingKey: "k"), .needsSelection)
         XCTAssertEqual(TakeRetargetPolicy.problem(to: .dictate, selection: "", writingKey: ""), .needsWritingKey)

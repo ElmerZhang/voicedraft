@@ -6,7 +6,7 @@ Dictate into the Mac app you are using, translate as you speak, or select a para
 - **iPhone (iOS 17+)** · Build the app and keyboard extension in Xcode. See the [iPhone guide](ios/README.md).
 - **Optional sync** · Share model settings and vocabulary between devices using the [self-hosted Go server](docs/server.md). You can dictate without setting up sync.
 
-![VoiceDraft Home on macOS showing the dictation, translation, editing and Ask shortcuts](docs/images/macos-home.png)
+![VoiceDraft Home on macOS showing the dictation shortcuts](docs/images/macos-home.png)
 
 ## Your first dictation on the Mac
 
@@ -38,7 +38,6 @@ The script produces a locally signed app for the architecture of the build machi
 | Control + Option + Space | Start polished dictation / finish recording |
 | Control + Option + T | Translate into your configured language |
 | Control + Option + E | Speak an editing instruction for selected editable text |
-| Control + Option + A | Ask a question, optionally using selected text; show result in the app |
 
 Shortcuts are configurable in Settings. Fn works alone or combined with Shift, Control, Option or Command (hold the modifier, then press Fn); set macOS's Fn (🌐) key action to Do Nothing first.
 
@@ -49,7 +48,7 @@ The floating recording panel does not take keyboard focus. Ordinary dictation go
 ## Pages
 
 - **Home**: enabled shortcuts as single-line key-cap rows on the left (stacked above the summary only in very narrow layouts) and a usage summary on the right: four large totals across all retained local history (dictation time, dictated words, average WPM, estimated time saved) and one line for yesterday (hidden when there are no records for yesterday). **View more** opens **Settings → Usage**, which adds Personalization (current vocabulary coverage), the 365-day activity calendar and daily details. Deleted/expired history is excluded, and disabling history pauses new activity.
-- **History**: records grouped by day, search, dictation/question filters, original transcript details, copy, deletion, and the local-history toggle.
+- **History**: records grouped by day, search, original transcript details, copy, deletion, and the local-history toggle.
 - **Vocabulary**: searchable word grid, enabled/disabled filters, add/edit, bulk add, and per-word controls in the context menu. Changes save immediately. Model projection details remain available below the grid.
 - **Settings** (sidebar or **Command-comma**): an overlay with shortcuts, recording, on-screen context, audio, language, general and update preferences, plus Personalization, Models, Usage, Sync, About, and Help tabs. Models and Sync are settings tabs, not pages. Save writing style and translation target in Personalization.
 
@@ -74,7 +73,7 @@ Localhost is only reachable from the same machine. For multiple physical devices
 
 - Multiple saved provider profiles; speech and writing are selected independently.
 - Model catalog, protocol-specific endpoints, separate API keys, read-only vocabulary adaptation previews, and advanced JSON parameters.
-- Dictation cleanup, spoken self-corrections, structured formatting, translation, selected-text editing, and text-only question answering through your configured writing provider.
+- Dictation cleanup, spoken self-corrections, structured formatting, translation, and selected-text editing through your configured writing provider.
 - One app-wide vocabulary with enabled terms, strength, priority, language, aliases, preferred spelling, and IPA pronunciation. Adapters derive context or weighted hotwords and show omitted/downgraded data while retaining the full source. Manage it in **Vocabulary**, not individual profiles. Writing also receives spelling and alias guidance. Recognition is not guaranteed to use every supplied term.
 - Encrypted sync of profiles, API keys, active selections, vocabulary, writing preferences, and translation target.
 - Eight interface languages (简体中文、繁體中文, English, 日本語, 한국어, Deutsch, Français, Español), selected in **Settings → Language** or following the system. This choice is local and separate from the translation target.
@@ -112,7 +111,7 @@ Add its case and matching rules in `AppLanguage`/`L10n`, provide complete `Local
 - [Qwen ASR Message server events](https://help.aliyun.com/zh/model-studio/qwen-asr-message-server-events)
 - [Qwen ASR HTTP API](https://www.alibabacloud.com/help/en/model-studio/qwen-asr-api-reference)
 - [Bailian OpenAI-compatible text generation](https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope)
-- Public behaviour that inspired this project: [Typeless quickstart](https://www.typeless.com/help/quickstart) and [Ask anything](https://www.typeless.com/ask-anything). Independent implementation, no code copied.
+- Public behaviour that inspired this project: [Typeless quickstart](https://www.typeless.com/help/quickstart). Independent implementation, no code copied.
 
 ## Selected feature expansion (0.2)
 

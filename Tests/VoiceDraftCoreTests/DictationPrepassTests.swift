@@ -50,7 +50,7 @@ final class DictationPrepassTests: XCTestCase {
         }
         XCTAssertEqual(try transcript(.polish), exampleTakeCollapsed)
         XCTAssertEqual(try transcript(.translate), exampleTakeCollapsed)
-        for mode in [WritingMode.verbatim, .edit, .ask] {
+        for mode in [WritingMode.verbatim, .edit] {
             XCTAssertEqual(try transcript(mode), exampleTake)
         }
     }

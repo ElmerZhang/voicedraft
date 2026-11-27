@@ -2,8 +2,6 @@ import UIKit
 
 /// A voice-first keyboard with deletion above the recording surface and submission below it.
 /// Touch handling remains in `KeyboardViewController`; this view never starts audio or changes a take.
-/// The header also holds the Ask anything toggle. An answer replaces the recording surface with a read-only answer
-/// and an Insert / Copy / Close row in place of the bottom row, so nothing is inserted without a tap.
 final class VoicePageView: UIView {
     enum TalkAppearance {
         case idle
@@ -21,10 +19,6 @@ final class VoicePageView: UIView {
     var onSpace: (() -> Void)?
     var onDelete: (() -> Void)?
     var onReturn: (() -> Void)?
-    var onAskToggle: (() -> Void)?
-    var onAnswerInsert: (() -> Void)?
-    var onAnswerCopy: (() -> Void)?
-    var onAnswerClose: (() -> Void)?
 
     let statusLabel = UILabel()
     let insertButton = KeyButton(style: .secondary)
@@ -37,25 +31,7 @@ final class VoicePageView: UIView {
     private let deleteButton = KeyButton(style: .secondary)
     private let returnButton = KeyButton(style: .accent)
     private let deleteRepeater = KeyRepeater()
-    private let askButton = KeyButton(style: .secondary)
-    private let answerTextView = UITextView()
-    private let answerInsertButton = KeyButton(style: .accent)
-    private let answerCopyButton = KeyButton(style: .secondary)
-    private let answerCloseButton = KeyButton(style: .secondary)
     private var talkAppearance: TalkAppearance = .idle
-
-    /// Ask anything is on: the talk surface says "ask" and the controller sends the selection as reference.
-    var askEnabled = false {
-        didSet { updateAskButton(); setTalk(talkAppearance) }
-    }
-
-    /// The host has selected text; while Ask is on, the detail line says it will be sent as reference.
-    var referenceSelected = false {
-        didSet { if referenceSelected != oldValue { setTalk(talkAppearance) } }
-    }
-
-    /// The answer shown in the answer panel; nil shows the recording surface.
-    private(set) var answerText: String?
     var showsNextKeyboardKey = true {
         didSet {
             nextKeyboardButton.isHidden = !showsNextKeyboardKey
@@ -149,57 +125,11 @@ final class VoicePageView: UIView {
         returnButton.titleLabel?.minimumScaleFactor = 0.75
         returnButton.addTarget(self, action: #selector(returnTapped), for: .touchUpInside)
 
-        var askConfiguration = UIButton.Configuration.plain()
-        askConfiguration.image = UIImage(systemName: "bubble.left.and.bubble.right")
-        askConfiguration.title = L10n.askShort
-        askConfiguration.imagePadding = 4
-        askConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6)
-        askConfiguration.titleLineBreakMode = .byClipping
-        askConfiguration.preferredSymbolConfigurationForImage = .init(pointSize: 15)
-        askConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var attributes = attributes
-            attributes.font = .systemFont(ofSize: 14, weight: .medium)
-            return attributes
-        }
-        askButton.configuration = askConfiguration
-        askButton.accessibilityLabel = L10n.askAnything
-        askButton.accessibilityIdentifier = "keyboard.ask"
-        askButton.addTarget(self, action: #selector(askTapped), for: .touchUpInside)
-        updateAskButton()
-
-        answerTextView.isEditable = false
-        answerTextView.isSelectable = false
-        answerTextView.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 15), maximumPointSize: 20)
-        answerTextView.adjustsFontForContentSizeCategory = true
-        answerTextView.textColor = .label
-        answerTextView.backgroundColor = UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(white: 0.2, alpha: 1) : UIColor.white.withAlphaComponent(0.65)
-        }
-        answerTextView.layer.cornerRadius = 16
-        answerTextView.layer.cornerCurve = .continuous
-        answerTextView.textContainerInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
-        answerTextView.accessibilityIdentifier = "keyboard.answer"
-        for (button, title, identifier, action) in [
-            (answerInsertButton, L10n.answerInsert, "keyboard.answer.insert", #selector(answerInsertTapped)),
-            (answerCopyButton, L10n.answerCopy, "keyboard.answer.copy", #selector(answerCopyTapped)),
-            (answerCloseButton, L10n.answerClose, "keyboard.answer.close", #selector(answerCloseTapped)),
-        ] {
-            button.setTitle(title, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-            button.titleLabel?.adjustsFontSizeToFitWidth = true
-            button.titleLabel?.minimumScaleFactor = 0.75
-            button.accessibilityLabel = title
-            button.accessibilityIdentifier = identifier
-            button.addTarget(self, action: action, for: .touchUpInside)
-        }
-
         // Labels sit over the recording surface but do not intercept its touch-down/up gestures.
         [brandLabel, talkButton, statusLabel, detailLabel, waveformView, insertButton,
-         nextKeyboardButton, spaceButton, deleteButton, returnButton, askButton,
-         answerTextView, answerInsertButton, answerCopyButton, answerCloseButton].forEach(addSubview)
-        accessibilityElements = [brandLabel, askButton, deleteButton, statusLabel, talkButton, detailLabel,
-                                 answerTextView, insertButton, spaceButton, returnButton,
-                                 answerInsertButton, answerCopyButton, answerCloseButton, nextKeyboardButton]
+         nextKeyboardButton, spaceButton, deleteButton, returnButton].forEach(addSubview)
+        accessibilityElements = [brandLabel, deleteButton, statusLabel, talkButton, detailLabel,
+                                 insertButton, spaceButton, returnButton, nextKeyboardButton]
         setTalk(.idle)
     }
 
@@ -211,8 +141,7 @@ final class VoicePageView: UIView {
         let inset: CGFloat = 16
         let headerY: CGFloat = compact ? 8 : 12
         deleteButton.frame = CGRect(x: width - inset - 104, y: headerY, width: 104, height: 44)
-        askButton.frame = CGRect(x: deleteButton.frame.minX - 8 - 80, y: headerY, width: 80, height: 44)
-        brandLabel.frame = CGRect(x: inset + 4, y: headerY, width: askButton.frame.minX - inset - 12, height: 44)
+        brandLabel.frame = CGRect(x: inset + 4, y: headerY, width: deleteButton.frame.minX - inset - 20, height: 44)
 
         // Delete and return never share a row, even in compact layouts. The recording surface separates
         // the two targets so a small horizontal slip while deleting cannot send the host's message.
@@ -237,44 +166,6 @@ final class VoicePageView: UIView {
                                    width: statusLabel.bounds.width, height: detailHeight)
         waveformView.frame = CGRect(x: statusLabel.frame.minX, y: statusLabel.frame.maxY,
                                     width: min(240, statusLabel.bounds.width), height: detailHeight)
-
-        // The answer panel takes the recording surface; its buttons take the bottom row (never the header row).
-        answerTextView.frame = talkButton.frame
-        let answerButtons = [answerInsertButton, answerCopyButton, answerCloseButton]
-        let rowWidth = width - inset - insertX
-        let buttonWidth = (rowWidth - 8 * CGFloat(answerButtons.count - 1)) / CGFloat(answerButtons.count)
-        for (index, button) in answerButtons.enumerated() {
-            button.frame = CGRect(x: insertX + CGFloat(index) * (buttonWidth + 8), y: rowY, width: buttonWidth, height: key)
-        }
-    }
-
-    /// Shows `text` in the answer panel in place of the recording surface, or the recording surface again for nil.
-    func showAnswer(_ text: String?) {
-        answerText = text
-        answerTextView.text = text
-        answerTextView.setContentOffset(.zero, animated: false)
-        answerCopyButton.setTitle(L10n.answerCopy, for: .normal)
-        answerCopyButton.accessibilityLabel = L10n.answerCopy
-        brandLabel.text = text == nil ? "VoiceDraft" : L10n.answerTitle
-        updateTalkAvailability()
-        if text != nil { UIAccessibility.post(notification: .layoutChanged, argument: answerTextView) }
-    }
-
-    /// The Copy button reads "Copied" while `copied` is true; `showAnswer` resets it.
-    func showCopied(_ copied: Bool) {
-        let title = copied ? L10n.answerCopied : L10n.answerCopy
-        answerCopyButton.setTitle(title, for: .normal)
-        answerCopyButton.accessibilityLabel = title
-    }
-
-    private func updateAskButton() {
-        guard var configuration = askButton.configuration else { return }
-        configuration.baseForegroundColor = askEnabled ? .systemBlue : .label
-        configuration.background.backgroundColor = askEnabled ? UIColor.systemBlue.withAlphaComponent(0.18) : .clear
-        configuration.background.cornerRadius = 12
-        askButton.configuration = configuration
-        askButton.accessibilityTraits = askEnabled ? [.button, .selected] : .button
-        askButton.isEnabled = voiceEnabled
     }
 
     func setTalk(_ appearance: TalkAppearance) {
@@ -289,13 +180,13 @@ final class VoicePageView: UIView {
         detailLabel.text = nil
         switch appearance {
         case .idle:
-            configuration.image = UIImage(systemName: askEnabled ? "bubble.left.and.bubble.right.fill" : "mic.fill")
-            talkButton.accessibilityLabel = askEnabled ? L10n.holdToAsk : L10n.micStart
-            detailLabel.text = askEnabled && referenceSelected ? L10n.referenceHint : L10n.holdHint
+            configuration.image = UIImage(systemName: "mic.fill")
+            talkButton.accessibilityLabel = L10n.micStart
+            detailLabel.text = L10n.holdHint
         case .idleOpensApp:
-            configuration.image = UIImage(systemName: askEnabled ? "bubble.left.and.bubble.right.fill" : "mic.fill")
-            talkButton.accessibilityLabel = askEnabled ? L10n.tapToAskOpensApp : L10n.tapOpensApp
-            detailLabel.text = askEnabled && referenceSelected ? L10n.referenceHint : L10n.opensAppHint
+            configuration.image = UIImage(systemName: "mic.fill")
+            talkButton.accessibilityLabel = L10n.tapOpensApp
+            detailLabel.text = L10n.opensAppHint
         case .connecting:
             configuration.showsActivityIndicator = true
             talkButton.accessibilityLabel = L10n.connecting
@@ -314,11 +205,6 @@ final class VoicePageView: UIView {
             configuration.showsActivityIndicator = true
             talkButton.accessibilityLabel = L10n.processing
         }
-        if askEnabled, appearance == .idle || appearance == .idleOpensApp {
-            // The bubbles glyph is about half again as wide as the microphone; a smaller size keeps it inside the
-            // icon column instead of running under the status text.
-            configuration.preferredSymbolConfigurationForImage = .init(pointSize: 24, weight: .medium)
-        }
         talkButton.configuration = configuration
         updateTalkAvailability()
     }
@@ -331,16 +217,6 @@ final class VoicePageView: UIView {
         detailLabel.textColor = UIColor.white.withAlphaComponent(0.8)
         detailLabel.isHidden = !voiceEnabled || detailLabel.text == nil
         waveformView.isHidden = !voiceEnabled || !isRecording
-        askButton.isEnabled = voiceEnabled
-        let answering = answerText != nil
-        for view in [talkButton, statusLabel, insertButton, spaceButton, returnButton] as [UIView] { view.isHidden = answering }
-        if answering {
-            detailLabel.isHidden = true
-            waveformView.isHidden = true
-        }
-        for view in [answerTextView, answerInsertButton, answerCopyButton, answerCloseButton] as [UIView] {
-            view.isHidden = !answering
-        }
         if waveformView.isHidden { waveformView.update(level: nil) }
         setNeedsLayout()
     }
@@ -359,10 +235,6 @@ final class VoicePageView: UIView {
     @objc private func insertTapped() { onInsertLast?() }
     @objc private func spaceTapped() { onSpace?() }
     @objc private func returnTapped() { onReturn?() }
-    @objc private func askTapped() { onAskToggle?() }
-    @objc private func answerInsertTapped() { onAnswerInsert?() }
-    @objc private func answerCopyTapped() { onAnswerCopy?() }
-    @objc private func answerCloseTapped() { onAnswerClose?() }
     @objc private func deleteDown() { deleteRepeater.start { [weak self] in self?.onDelete?() } }
     @objc private func deleteUp() { deleteRepeater.stop() }
 }

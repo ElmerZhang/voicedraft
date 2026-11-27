@@ -49,16 +49,16 @@ final class IOSLocalStoreTests: XCTestCase {
         device.serverURL = "https://sync.example.com"
         device.syncRevision = 7
         device.dirty = false
-        device.mode = .ask
+        device.mode = .translate
         device.keyboardStandbyMinutes = 30
         device.onboardingCompleted = true
         try store.saveDevice(device)
         XCTAssertEqual(try store.loadDevice(), device)
 
-        try Data(#"{"serverURL":"https://a.example","mode":"edit","listeningTimeoutMinutes":0,"keyboardStandbyMinutes":7}"#.utf8).write(to: store.url("device"))
+        try Data(#"{"serverURL":"https://a.example","mode":"ask","listeningTimeoutMinutes":0,"keyboardStandbyMinutes":7}"#.utf8).write(to: store.url("device"))
         let legacy = try store.loadDevice()
         XCTAssertEqual(legacy.serverURL, "https://a.example")
-        XCTAssertEqual(legacy.mode, .polish, "Edit is not offered on iPhone")
+        XCTAssertEqual(legacy.mode, .polish, "A saved Ask mode falls back to Polish")
         XCTAssertEqual(legacy.keyboardStandbyMinutes, 15, "an unknown standby value falls back to the default")
         XCTAssertTrue(legacy.keepHistory)
     }

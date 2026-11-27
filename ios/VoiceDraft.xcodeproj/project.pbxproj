@@ -46,7 +46,6 @@
 		B10000000000000000000029 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* Localizable.strings */; };
 		B1000000000000000000002C /* AppStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002B /* AppStatusTests.swift */; };
 		B1000000000000000000002E /* SharedResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002D /* SharedResultTests.swift */; };
-		B1000000000000000000003E /* AskAnythingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003D /* AskAnythingTests.swift */; };
 		B10000000000000000000030 /* TakeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002F /* TakeStateTests.swift */; };
 		B10000000000000000000032 /* IOSLocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000031 /* IOSLocalStoreTests.swift */; };
 		C10000000000000000000004 /* KeyboardPresenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000003 /* KeyboardPresenceTests.swift */; };
@@ -133,7 +132,6 @@
 		B10000000000000000000028 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		B1000000000000000000002B /* AppStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatusTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000002D /* SharedResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedResultTests.swift; sourceTree = "<group>"; };
-		B1000000000000000000003D /* AskAnythingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskAnythingTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000002F /* TakeStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeStateTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000031 /* IOSLocalStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSLocalStoreTests.swift; sourceTree = "<group>"; };
 		C10000000000000000000003 /* KeyboardPresenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardPresenceTests.swift; sourceTree = "<group>"; };
@@ -296,7 +294,6 @@
 			children = (
 				B1000000000000000000002B /* AppStatusTests.swift */,
 				B1000000000000000000002D /* SharedResultTests.swift */,
-				B1000000000000000000003D /* AskAnythingTests.swift */,
 				B1000000000000000000002F /* TakeStateTests.swift */,
 				B10000000000000000000031 /* IOSLocalStoreTests.swift */,
 				C10000000000000000000003 /* KeyboardPresenceTests.swift */,
@@ -507,7 +504,6 @@
 			files = (
 				B1000000000000000000002C /* AppStatusTests.swift in Sources */,
 				B1000000000000000000002E /* SharedResultTests.swift in Sources */,
-				B1000000000000000000003E /* AskAnythingTests.swift in Sources */,
 				B10000000000000000000030 /* TakeStateTests.swift in Sources */,
 				B10000000000000000000032 /* IOSLocalStoreTests.swift in Sources */,
 				C10000000000000000000004 /* KeyboardPresenceTests.swift in Sources */,

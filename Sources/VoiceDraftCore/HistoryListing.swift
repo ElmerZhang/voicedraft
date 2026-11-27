@@ -12,14 +12,12 @@ public struct HistoryDayGroup: Equatable, Identifiable {
 
 /// Filters, sorts and groups history for the History page in a single pass.
 public enum HistoryListing {
-    /// `filter`: 0 all entries, 1 everything except Ask anything, 2 Ask anything only.
     /// `query` is trimmed and matched case-insensitively against the result or the original transcript.
     /// Entries are sorted newest first and grouped by `calendar`'s start of day; days are newest first.
-    public static func groups(_ history: [HistoryEntry], query: String, filter: Int, calendar: Calendar = .current) -> [HistoryDayGroup] {
+    public static func groups(_ history: [HistoryEntry], query: String, calendar: Calendar = .current) -> [HistoryDayGroup] {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let entries = history.filter {
-            (filter == 0 || (filter == 2 ? $0.mode == .ask : $0.mode != .ask)) &&
-            (term.isEmpty || $0.result.localizedCaseInsensitiveContains(term) || $0.original.localizedCaseInsensitiveContains(term))
+            term.isEmpty || $0.result.localizedCaseInsensitiveContains(term) || $0.original.localizedCaseInsensitiveContains(term)
         }.sorted { $0.date > $1.date }
         let byDay = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.date) }
         return byDay.keys.sorted(by: >).map { HistoryDayGroup(day: $0, entries: byDay[$0] ?? []) }

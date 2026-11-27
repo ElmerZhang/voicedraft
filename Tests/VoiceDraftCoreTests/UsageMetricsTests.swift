@@ -32,7 +32,7 @@ final class UsageMetricsTests: XCTestCase {
         XCTAssertEqual(metrics.words, 0)
         XCTAssertNil(metrics.wordsPerMinute)
         XCTAssertNil(metrics.personalization)
-        metrics.include(entry("Hi", duration: 60, result: String(repeating: "long answer ", count: 500), mode: .ask))
+        metrics.include(entry("Hi", duration: 60, result: String(repeating: "long answer ", count: 500), mode: .legacyAsk))
         XCTAssertEqual(metrics.words, 1)
         XCTAssertEqual(metrics.wordsPerMinute, 1)
         XCTAssertEqual(metrics.estimatedTimeSaved, 0)

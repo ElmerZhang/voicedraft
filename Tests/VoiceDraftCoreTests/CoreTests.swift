@@ -115,7 +115,7 @@ final class CoreTests: XCTestCase {
         settings.targetLanguage = "Japanese"
         settings.stylePrompt = "Preserve my casual tone."
         settings.vocabulary = AppVocabulary(words: "VoiceDraft")
-        for mode in WritingMode.allCases {
+        for mode in WritingMode.available {
             let request = try QwenRequests.writing(profile: .qwen(.writing), key: "test-only", text: "A test transcript",
                                                    mode: mode, settings: settings, selection: "Selected fixture")
             let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])

@@ -35,7 +35,7 @@ final class DraftWritingRequestTests: XCTestCase {
         XCTAssertEqual(draft, other)
         XCTAssertFalse(draft.contains("FIXTURE_BEFORE_1180")); XCTAssertFalse(draft.contains("FIXTURE_AFTER_5521"))
         // Other modes ignore a passage context.
-        for mode in [WritingMode.translate, .verbatim, .edit, .ask] {
+        for mode in [WritingMode.translate, .verbatim, .edit] {
             XCTAssertEqual(try blockA(request(mode, draft: passage)), try blockA(request(mode)), mode.rawValue)
         }
     }
@@ -45,7 +45,7 @@ final class DraftWritingRequestTests: XCTestCase {
         XCTAssertEqual(input["draft_before_reference_only"] as? String, "FIXTURE_BEFORE_1180")
         XCTAssertEqual(input["draft_after_reference_only"] as? String, "FIXTURE_AFTER_5521")
         XCTAssertEqual(input["application"] as? String, "VoiceDraft Draft")
-        for (mode, draft) in [(WritingMode.polish, nil), (.translate, passage), (.verbatim, passage), (.ask, passage),
+        for (mode, draft) in [(WritingMode.polish, nil), (.translate, passage), (.verbatim, passage),
                               (.edit, passage), (.edit, DraftWritingContext.wholeDraft), (.polish, .wholeDraft)] as [(WritingMode, DraftWritingContext?)] {
             let fields = try userInput(request(mode, draft: draft))
             XCTAssertNil(fields["draft_before_reference_only"], "\(mode)")

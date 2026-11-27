@@ -38,24 +38,18 @@ final class DraftRoutingTests: XCTestCase {
         }
     }
 
-    func testAskUsesTheSelectionAsReferenceAndNeverWrites() throws {
-        let run = try DraftRouting.run(for: .ask, focus: focus("abc", NSRange(location: 1, length: 1)))
-        XCTAssertEqual(run.selectedText, "b")
-        XCTAssertEqual(DraftRouting.delivery(run: run, mode: .ask, editorFocusedNow: true), .external)
-    }
-
     func testDeliveryFollowsTheFocusUnlessBound() throws {
         let caret = try DraftRouting.run(for: .polish, focus: focus("x", NSRange(location: 1, length: 0)))
         let bound = try DraftRouting.run(for: .edit, focus: focus("x", NSRange(location: 0, length: 1)))
         // Started in the draft: still focused → caret; focus moved to another app → external (delivery-time focus).
-        XCTAssertEqual(DraftRouting.delivery(run: caret, mode: .polish, editorFocusedNow: true), .caret)
-        XCTAssertEqual(DraftRouting.delivery(run: caret, mode: .polish, editorFocusedNow: false), .external)
+        XCTAssertEqual(DraftRouting.delivery(run: caret, editorFocusedNow: true), .caret)
+        XCTAssertEqual(DraftRouting.delivery(run: caret, editorFocusedNow: false), .external)
         // Started elsewhere, the draft editor is the focus now → caret.
-        XCTAssertEqual(DraftRouting.delivery(run: nil, mode: .translate, editorFocusedNow: true), .caret)
-        XCTAssertEqual(DraftRouting.delivery(run: nil, mode: .polish, editorFocusedNow: false), .external)
+        XCTAssertEqual(DraftRouting.delivery(run: nil, editorFocusedNow: true), .caret)
+        XCTAssertEqual(DraftRouting.delivery(run: nil, editorFocusedNow: false), .external)
         // Edit (and style apply, re-polish) stay bound to their draft range wherever the focus is.
-        XCTAssertEqual(DraftRouting.delivery(run: bound, mode: .edit, editorFocusedNow: false), .bound)
-        XCTAssertEqual(DraftRouting.delivery(run: bound, mode: .edit, editorFocusedNow: true), .bound)
+        XCTAssertEqual(DraftRouting.delivery(run: bound, editorFocusedNow: false), .bound)
+        XCTAssertEqual(DraftRouting.delivery(run: bound, editorFocusedNow: true), .bound)
     }
 
     func testStyleAndRepolishRuns() {

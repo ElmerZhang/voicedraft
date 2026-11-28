@@ -10,3 +10,5 @@ Run `swift test --disable-sandbox` and `cd server && go test -race ./...`.
 For Go changes also run `go fmt ./...`, `go vet ./...`, and `go build ./...` in `server/`. `./scripts/test-all.sh` includes Go checks and Swift integration against an isolated Go fixture server.
 Package with `./scripts/build-app.sh`. No third-party Swift packages. The Go server uses the pinned pure-Go `modernc.org/sqlite` driver; keep its protocol and SQLite schema compatible with existing deployments. Python is used only by the dependency-free localization checks, not the server or its fixtures.
 Do not send real audio, selections, or credentials in automated tests.
+
+After verifying a local deployment of VoiceDraft changes, promptly push the deployed commit to the corresponding branch on GitHub (`origin`) and confirm the remote branch contains it.
